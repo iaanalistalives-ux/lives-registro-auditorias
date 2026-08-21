@@ -1054,9 +1054,12 @@ function procesarCola(){
     it.enviando=true; it.intentos++;
     jsonp(it.envio, function(r){
       it.enviando=false;
-      if(r && r.ok){ it.estado='ok'; it.msg=r.mensaje||''; it.nAud=r.nAuditoria;
-                     it.idAud=r.id; guardados++; }
-      else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; fallidos++; }
+      if(r && r.ok){
+        it.estado='ok';
+        it.msg = r.repetido ? 'Ya estaba guardada, no se duplicó.' : (r.mensaje||'Guardado.');
+        it.nAud=r.nAuditoria; it.idAud=r.id;
+      }
+      else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; }
       pintarLog(); procesarCola();
     }, function(motivo){
       it.enviando=false;
@@ -1066,8 +1069,8 @@ function procesarCola(){
         setTimeout(procesarCola, 3000*it.intentos);
       } else {
         it.estado='err';
-        it.msg='No llegó respuesta. Revisa en el Sheet si quedó guardada antes de volver a digitarla.';
-        fallidos++;
+        it.msg='No llegó respuesta del servidor. Puede que sí se haya guardado: '+
+               'pulsa Reintentar para comprobarlo (no se duplica).';
         setTimeout(procesarCola, 500);
       }
       pintarLog();
@@ -1106,8 +1109,9 @@ function pintarLog(){
   else if(fallidos>0){ pill.style.display=''; pill.className='pill bad'; pill.textContent=fallidos+' con error'; }
   else { pill.style.display='none'; }
 
-  $('resumen').textContent = guardados
-    ? (guardados+' auditoría(s) guardada(s)'+(fallidos?' · '+fallidos+' con error':''))
+  $('resumen').innerHTML = guardados
+    ? (guardados+' auditoría(s) guardada(s)'+
+       (fallidos?(' · <b style="color:var(--rose)">'+fallidos+' sin confirmar</b> — pulsa Reintentar en cada una'):''))
     : 'Todavía no has guardado nada.';
 
   guardarCola();
@@ -1118,6 +1122,12 @@ function pintarLog(){
       acc = '<div class="acc">'+
         '<button class="mini" type="button" data-ed="'+esc(i.idAud)+'">Editar</button>'+
         '<button class="mini danger" type="button" data-an="'+esc(i.idAud)+'">Anular</button></div>';
+    } else if(i.estado==='err'){
+      /* Reintentar es seguro: cada envío lleva un identificador único y el
+         servidor reconoce si ya lo había guardado, así que no se duplica. */
+      acc = '<div class="acc">'+
+        '<button class="mini" type="button" data-rt="'+esc(i.id)+'">Reintentar</button>'+
+        '<button class="mini danger" type="button" data-qt="'+esc(i.id)+'">Quitar de la lista</button></div>';
     }
     return '<div class="li '+i.estado+'"><div class="ic">'+ic+'</div><div class="d">'+
       '<b>'+esc(i.etiqueta)+'</b>'+
@@ -1130,6 +1140,21 @@ function pintarLog(){
   });
   Array.prototype.forEach.call($('log').querySelectorAll('[data-an]'),function(b){
     b.onclick=function(){ anular(b.dataset.an); };
+  });
+  Array.prototype.forEach.call($('log').querySelectorAll('[data-rt]'),function(b){
+    b.onclick=function(){
+      var it=null;
+      for(var k=0;k<cola.length;k++) if(cola[k].id===b.dataset.rt) it=cola[k];
+      if(!it) return;
+      it.estado='wait'; it.intentos=0; it.msg='Comprobando…';
+      pintarLog(); procesarCola();
+    };
+  });
+  Array.prototype.forEach.call($('log').querySelectorAll('[data-qt]'),function(b){
+    b.onclick=function(){
+      for(var k=0;k<cola.length;k++) if(cola[k].id===b.dataset.qt){ cola.splice(k,1); break; }
+      pintarLog();
+    };
   });
 }
 

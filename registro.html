@@ -130,6 +130,19 @@
         font-family:inherit;font-size:13.5px;font-weight:700;color:var(--sage);cursor:pointer;}
   .mtBtn:hover{border-color:var(--sage);background:#fff;}
   .mtPie{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}
+  .btn.env{background:var(--petrol);}
+  .btn.env:hover{background:var(--petrol-2,#12463F);}
+  .btn.env:disabled{background:var(--warm);color:var(--stone);}
+  .cnt{background:var(--sage);color:#fff;border-radius:10px;font-size:11px;
+       padding:1px 8px;font-weight:700;margin-left:6px;}
+  .pend{max-height:230px;overflow:auto;}
+  .pi{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--wl);font-size:13px;}
+  .pi .n{width:22px;color:var(--stone);font-weight:700;}
+  .pi .d{flex:1;} .pi .d b{color:#333;} .pi .m{color:var(--stone);font-size:11.5px;}
+  .pi .rs{font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;white-space:nowrap;}
+  .pi .rs.ok{background:#ECFDF5;color:#065F46;} .pi .rs.no{background:#FEF2F2;color:#991B1B;}
+  .pi .x{background:none;border:none;color:var(--rose);font-size:19px;cursor:pointer;padding:0 6px;line-height:1;}
+  .pi .ed{background:none;border:none;color:var(--sage);font-size:12px;font-weight:700;cursor:pointer;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -326,8 +339,9 @@
       <div class="ver ok" id="ver"></div>
 
       <div class="acciones">
-        <button class="btn" id="btnGuardar" type="button">Guardar <span class="kbd">F2</span></button>
+        <button class="btn" id="btnGuardar" type="button">Agregar a la lista <span class="kbd">F2</span></button>
         <button class="btn sec" id="btnLimpiar" type="button">Limpiar <span class="kbd">Esc</span></button>
+        <button class="btn env" id="btnEnviar" type="button" disabled>Guardar todo</button>
         <span class="hint" id="hGuardar" style="margin:0"></span>
       </div>
 
@@ -338,6 +352,14 @@
         Al guardar, el formulario se limpia al instante y el envío sigue en segundo plano: no hay que esperar.
       </div>
     </div>
+  </div>
+
+  <div class="card" id="cardPend">
+    <h2>Por guardar <span class="cnt" id="pendCnt">0</span></h2>
+    <div class="sub">Se quedan aquí hasta que pulses <b>Guardar todo</b>. Puedes quitar
+      cualquiera al instante: todavía no salieron al servidor.</div>
+    <div class="pend" id="pend"></div>
+    <div class="vacio" id="pendVacio">Nada pendiente. Digita una auditoría y pulsa Agregar a la lista.</div>
   </div>
 
   <div class="card" id="cardLog">
@@ -772,6 +794,12 @@ function validar(){
   return '';
 }
 
+/* Lista de auditorías digitadas que todavía NO salieron al servidor.
+   Se guarda en el navegador: si se cierra la pestaña, no se pierde el trabajo. */
+var pend = leerLocal('lives_pend_aud') || [];
+
+function guardarPend(){ try{ guardarLocal('lives_pend_aud', pend); }catch(e){} }
+
 function guardar(){
   var err=validar();
   if(err){ $('hGuardar').className='hint err'; $('hGuardar').textContent=err; return; }
@@ -812,10 +840,83 @@ function guardar(){
   envio.token = 'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
   var etiqueta=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
                ' · '+(totalDef()===0?'aprobado':'rechazado ('+totalDef()+')');
-  var item={id:'t'+Date.now()+Math.random(), envio:envio, etiqueta:etiqueta, estado:'wait', intentos:0};
-  cola.push(item);
+  /* Antes cada auditoría salía al servidor al instante. Ahora se acumulan y se
+     mandan todas juntas: quitar una es inmediato porque no salió nada, y no hay
+     esperas entre registro y registro. */
+  var yaEsta = pend.some(function(x){
+    return x.envio.tipo===envio.tipo && x.envio.grupo===envio.grupo &&
+           x.envio.estilo===envio.estilo && x.envio.color===envio.color &&
+           x.envio.lote===envio.lote && x.envio.muestra===envio.muestra;
+  });
+  if(yaEsta && !confirm('Ya hay una igual en la lista por guardar.\n\n'+etiqueta+
+     '\n\n¿Es otra auditoría distinta del mismo lote?')) return;
+
+  pend.push({ id:envio.token, envio:envio, etiqueta:etiqueta,
+              tipo:NOMBRE_TIPO[$('tipo').value],
+              resultado: totalDef()>0 ? 'RECHAZADO' : (U($('resultado').value)||'APROBADO'),
+              defectuosas: totalDef() });
+  guardarPend(); pintarPend();
+  limpiarRegistro(true);
+}
+
+function pintarPend(){
+  $('pendCnt').textContent = pend.length;
+  $('pendVacio').style.display = pend.length ? 'none' : 'block';
+  $('btnEnviar').disabled = !pend.length;
+  $('btnEnviar').textContent = pend.length ? ('Guardar todo ('+pend.length+')') : 'Guardar todo';
+  $('pend').innerHTML = pend.map(function(x,i){
+    var mal=(x.resultado||'').toUpperCase()==='RECHAZADO';
+    return '<div class="pi"><span class="n">'+(i+1)+'</span>'+
+      '<div class="d"><b>'+esc(x.etiqueta)+'</b>'+
+      '<div class="m">'+esc(x.tipo)+(x.defectuosas?' · '+x.defectuosas+' defectuosa(s)':'')+'</div></div>'+
+      '<span class="rs '+(mal?'no':'ok')+'">'+esc(x.resultado||'')+'</span>'+
+      '<button class="ed" type="button" data-ed="'+i+'">Corregir</button>'+
+      '<button class="x" type="button" data-q="'+i+'" title="Quitar">&times;</button></div>';
+  }).join('');
+  Array.prototype.forEach.call($('pend').querySelectorAll('[data-q]'),function(b){
+    b.onclick=function(){ pend.splice(+b.dataset.q,1); guardarPend(); pintarPend(); };
+  });
+  Array.prototype.forEach.call($('pend').querySelectorAll('[data-ed]'),function(b){
+    b.onclick=function(){ corregirPend(+b.dataset.ed); };
+  });
+}
+
+/* Devuelve una pendiente al formulario para corregirla y la saca de la lista. */
+function corregirPend(i){
+  var x=pend[i]; if(!x) return;
+  var e=x.envio;
+  $('tipo').value=e.tipo; aplicarTipo();
+  $('fecha').value=e.fecha;
+  if(e.auditores){ try{ $('auditor').value=(JSON.parse(e.auditores)[0])||''; }catch(err){} }
+  $('inspector').value=e.inspector||''; $('linea').value=e.linea||'';
+  $('grupo').value=e.grupo||''; $('estilo').value=e.estilo||''; $('color').value=e.color||'';
+  $('po').value=e.po||''; $('pedido').value=e.pedido||'';
+  $('lote').value=e.lote||''; $('muestra').value=e.muestra||'';
+  $('cajas').value=e.cajas||''; $('derivados').value=e.derivados||'';
+  $('servicio').value=e.servicio||''; $('intExt').value=e.intExt||'INTERNO';
+  $('proceso').value=e.proceso||'COSTURA'; $('nivelAql').value=e.nivelAql||'1.5';
+  $('resultado').value=e.resultado||''; $('licencia').checked=e.licencia==='1';
+  $('reproceso').checked=e.reproceso==='1';
+  try{ $('destino').value=(JSON.parse(e.destinos)[0]||{}).codigo||''; }catch(err){}
+  try{ defs=JSON.parse(e.defectos)||[]; }catch(err){ defs=[]; }
+  aplicarCliente(); pintarDefs();
+  pend.splice(i,1); guardarPend(); pintarPend();
+  $('hGuardar').className='hint';
+  $('hGuardar').textContent='Corrígela y vuelve a pulsar Agregar a la lista.';
+  $('grupo').focus();
+}
+
+/* Manda todas las pendientes, de una en una, mostrando el avance. */
+function enviarTodo(){
+  if(!pend.length) return;
+  if(!confirm('Se van a guardar '+pend.length+' auditoría(s). ¿Continuar?')) return;
+  $('btnEnviar').disabled=true;
+  var lista=pend.slice();
+  pend=[]; guardarPend(); pintarPend();
+  lista.forEach(function(x){
+    cola.push({ id:x.id, envio:x.envio, etiqueta:x.etiqueta, estado:'wait', intentos:0 });
+  });
   pintarLog();
-  limpiarRegistro(true);          // el campo se libera al instante
   procesarCola();
 }
 
@@ -1124,10 +1225,13 @@ autocompletar('destino','dDestino', function(){
 });
 autocompletar('po','dPo', function(){ return (SUG.PO||[]).map(function(v){ return {texto:v}; }); });
 $('btnGuardar').onclick=guardar;
+$('btnEnviar').onclick=enviarTodo;
 $('btnLimpiar').onclick=function(){ limpiarRegistro(false); };
 
 document.addEventListener('keydown', function(e){
   if(e.key==='F2'){ e.preventDefault(); guardar(); }
+  /* Ctrl+Enter manda todo lo pendiente, sin soltar el teclado. */
+  if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); enviarTodo(); }
   if(e.key==='Escape' && e.target.tagName!=='INPUT'){ limpiarRegistro(false); }
 });
 
@@ -1141,7 +1245,10 @@ function datosFijos(){
 });
 window.addEventListener('beforeunload', function(e){
   guardarLocal('lives_fijo_aud', datosFijos());
-  if(cola.some(function(i){ return i.estado==='wait'; })){ e.preventDefault(); e.returnValue=''; }
+  guardarPend();
+  if(pend.length || cola.some(function(i){ return i.estado==='wait'; })){
+    e.preventDefault(); e.returnValue='';
+  }
 });
 
 /* Al abrir se traen los últimos registros guardados, para que el historial no
@@ -1177,6 +1284,7 @@ function cargarRecientes(){
   aplicarTipo();
   cargarCatalogos();
   restaurarCola();
+  pintarPend();
   setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
   setTimeout(cargarRecientes, 900);
   pintarDefs();

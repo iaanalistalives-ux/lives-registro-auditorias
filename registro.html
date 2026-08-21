@@ -18,18 +18,19 @@
   .pill{font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,.14);color:#fff;}
   .pill.warn{background:var(--tan);color:#3b2600;}
   .pill.bad{background:var(--rose);}
-  .wrap{max-width:100%;margin:0;padding:16px 22px 60px;}
+  .wrap{max-width:100%;margin:0;padding:12px 20px 40px;}
+  .uno{display:block;}
   .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start;}
   @media(max-width:1050px){.grid{grid-template-columns:1fr;}}
   .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(14,59,54,.10),0 1px 2px rgba(14,59,54,.06);
-        padding:16px 18px;margin-bottom:14px;}
-  .card h2{margin:0 0 3px;font-size:14px;color:var(--petrol);font-weight:700;}
-  .card .sub{font-size:12px;color:var(--stone);margin-bottom:12px;}
+        padding:12px 16px;margin-bottom:10px;}
+  .card h2{margin:0 0 2px;font-size:13.5px;color:var(--petrol);font-weight:700;}
+  .card .sub{font-size:11.5px;color:var(--stone);margin-bottom:9px;}
   .row{display:flex;gap:12px;flex-wrap:wrap;}
   .f{flex:1;min-width:120px;}
   .f.sm{max-width:120px;}
   label{display:block;font-size:11.5px;font-weight:700;color:var(--slate);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;}
-  input,select{width:100%;font-family:inherit;font-size:15px;padding:8px 10px;border:1.5px solid var(--warm);
+  input,select{width:100%;font-family:inherit;font-size:14.5px;padding:6px 9px;border:1.5px solid var(--warm);
         border-radius:7px;background:#fff;color:#333;}
   input:focus,select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(15,122,90,.14);}
   input:disabled{background:var(--wl);color:var(--stone);}
@@ -49,7 +50,7 @@
   .opt .tag{font-size:10px;color:var(--stone);background:var(--wl);border:1px solid var(--warm);border-radius:10px;padding:1px 7px;white-space:nowrap;}
   .opt.sel .tag{background:#fff;}
   .opt.nuevo .nm{color:var(--tan);font-weight:700;}
-  .fija{background:var(--wl);border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px dashed var(--warm);}
+  .fija{background:var(--wl);border-radius:10px;padding:9px 13px;margin-bottom:10px;border:1px dashed var(--warm);}
   .fija .t{font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
   .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
   .chip{background:var(--wl);border:1.5px solid var(--warm);border-radius:18px;padding:6px 13px;font-family:inherit;
@@ -67,7 +68,7 @@
   .ver.no{background:#FEF2F2;border:1px solid var(--rose);color:#991B1B;}
   .ver .exp{display:block;font-size:12px;font-weight:400;margin-top:3px;color:var(--stone);}
   .acciones{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;}
-  .btn{background:var(--sage);color:#fff;border:none;border-radius:9px;padding:13px 26px;font-family:inherit;
+  .btn{background:var(--sage);color:#fff;border:none;border-radius:9px;padding:10px 24px;font-family:inherit;
        font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:9px;}
   .btn:hover{background:var(--sage2);}
   .btn:disabled{background:var(--warm);color:var(--stone);cursor:not-allowed;}
@@ -81,14 +82,14 @@
   .prev th,.prev td{font-size:12px;padding:4px 6px;}
   .sw{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:var(--slate);cursor:pointer;}
   .sw input{width:auto;}
-  .log{max-height:340px;overflow:auto;}
+  .log{max-height:260px;overflow:auto;}
   .li{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--wl);font-size:12.5px;}
   .li .ic{width:18px;text-align:center;font-weight:700;}
   .li.ok .ic{color:var(--sage);} .li.wait .ic{color:var(--tan);} .li.err .ic{color:var(--rose);}
   .li.anul .ic{color:var(--stone);}
   .li .d{flex:1;} .li .d b{color:#333;} .li .m{color:var(--stone);font-size:11.5px;}
   .ayuda{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--tan);border-radius:6px;
-         padding:10px 14px;font-size:11.5px;color:var(--stone);line-height:1.7;margin-top:14px;}
+         padding:8px 13px;font-size:11px;color:var(--stone);line-height:1.6;margin-top:10px;}
   .ayuda kbd{background:var(--wl);border:1px solid var(--warm);border-bottom-width:2px;border-radius:4px;
              padding:1px 6px;font-family:Consolas,monospace;font-size:11px;color:var(--petrol);font-weight:700;}
   .li .acc{display:flex;gap:6px;margin-top:5px;}
@@ -102,9 +103,9 @@
            margin-bottom:12px;font-size:13px;display:none;align-items:center;gap:12px;flex-wrap:wrap;}
   .edicion.on{display:flex;}
   .edicion b{color:#1E40AF;}
-  .tipoBar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .tipoBar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
   .tipoBtn{background:#fff;border:1.5px solid var(--warm);border-radius:10px;
-        padding:11px 20px;font-family:inherit;font-size:14.5px;font-weight:700;
+        padding:8px 16px;font-family:inherit;font-size:14.5px;font-weight:700;
         color:var(--slate);cursor:pointer;display:flex;align-items:center;gap:9px;
         transition:all .12s ease;}
   .tipoBtn:hover{border-color:var(--sage);color:var(--sage);}
@@ -148,9 +149,7 @@
 </div>
 
 <div class="wrap">
-<div class="grid">
-
-  <!-- ============ COLUMNA IZQUIERDA: CAPTURA ============ -->
+<div class="uno">
   <div>
     <div class="tipoBar" id="tipoBar" role="tablist"></div>
     <select id="tipo" style="display:none">
@@ -168,12 +167,12 @@
           <label for="fecha">Fecha</label>
           <input type="date" id="fecha">
         </div>
-        <div class="f ac">
+        <div class="f ac" id="wAuditor">
           <label for="auditor">Auditora</label>
           <input type="text" id="auditor" autocomplete="off" placeholder="Escribe…">
           <div class="drop" id="dAuditor"></div>
         </div>
-        <div class="f ac">
+        <div class="f ac" id="wInspector">
           <label for="inspector">Inspectora</label>
           <input type="text" id="inspector" autocomplete="off" placeholder="Escribe…">
           <div class="drop" id="dInspector"></div>
@@ -245,6 +244,10 @@
           <label for="destino">Destino</label>
           <input type="text" id="destino" autocomplete="off" placeholder="USA, ECO…">
           <div class="drop" id="dDestino"></div>
+        </div>
+        <div class="f" id="wPedido">
+          <label for="pedido">Pedido</label>
+          <input type="text" id="pedido" autocomplete="off">
         </div>
         <div class="f sm" id="wVia">
           <label for="via">Vía</label>
@@ -337,13 +340,10 @@
     </div>
   </div>
 
-  <!-- ============ COLUMNA DERECHA: REGISTRO ============ -->
-  <div>
-    <div class="card">
-      <h2>Guardado en esta sesión</h2>
-      <div class="sub" id="resumen">Todavía no has guardado nada.</div>
-      <div class="log" id="log"></div>
-    </div>
+  <div class="card" id="cardLog">
+    <h2>Historial de digitación</h2>
+    <div class="sub" id="resumen">Todavía no has guardado nada.</div>
+    <div class="log" id="log"></div>
   </div>
 
 </div>
@@ -393,16 +393,22 @@ var NOMBRE_TIPO = { LINEAS:'Líneas de costura', SERVINSP:'Servicio de inspecci�
 
 /* Qué campos se ven en cada tipo. Se define acá y no en el HTML para que
    agregar o quitar uno sea cambiar una línea, no buscar por todo el archivo. */
+/* En Auditoría de Cliente NO hay auditora ni inspectora: la auditoría la hace
+   el cliente, no personal de LIVES. Se verificó en el histórico: esas columnas
+   no existen en ese archivo. La inspectora solo va en Líneas y Serv. Inspección. */
 var CAMPOS = {
-  LINEAS:   ['wLinea'],
-  SERVINSP: [],
-  EMPAQUE:  ['wServicio','wPo','wDestino','wVia','wCajas','wResultado'],
-  CLIENTE:  ['wPo','wDestino','wVia','wResultado'],
-  FINAL:    ['wIntExt','wProceso','wServicio','wPo','wDestino','wVia',
-             'wDerivados','wLicencia','wResultado','wNivelAql']
+  LINEAS:   ['wAuditor','wInspector','wLinea'],
+  SERVINSP: ['wAuditor','wInspector'],
+  EMPAQUE:  ['wAuditor','wServicio','wPo','wDestino','wVia','wCajas','wResultado'],
+  CLIENTE:  ['wPo','wPedido','wDestino','wVia','wResultado'],
+  FINAL:    ['wAuditor','wIntExt','wProceso','wServicio','wPo','wPedido','wDestino',
+             'wVia','wDerivados','wLicencia','wResultado','wNivelAql']
 };
-var TODOS_COND = ['wLinea','wIntExt','wProceso','wServicio','wPo','wDestino','wVia',
-                  'wCajas','wDerivados','wLicencia','wResultado','wNivelAql'];
+var TODOS_COND = ['wAuditor','wInspector','wLinea','wIntExt','wProceso','wServicio',
+                  'wPo','wPedido','wDestino','wVia','wCajas','wDerivados','wLicencia',
+                  'wResultado','wNivelAql'];
+/* Dónde es obligatorio decir quién auditó. */
+var PIDE_AUDITOR = { LINEAS:true, SERVINSP:true, EMPAQUE:true, FINAL:true, CLIENTE:false };
 
 /* En Empaque los nombres engañan: el "lote" son CAJAS revisadas y la "muestra"
    son PRENDAS que había dentro. Se renombra en pantalla para que nadie
@@ -745,7 +751,7 @@ function veredicto(){
 /* ---------------- guardado optimista ---------------- */
 function validar(){
   if(!T($('fecha').value)) return 'Falta la fecha.';
-  if(!T($('auditor').value)) return 'Falta la auditora.';
+  if(PIDE_AUDITOR[$('tipo').value] && !T($('auditor').value)) return 'Falta la auditora.';
   if(!T($('grupo').value)) return 'Falta el grupo.';
   if(!T($('cliente').value)) return 'El prefijo del grupo no está en el catálogo.';
   if(!T($('estilo').value)) return 'Falta el estilo.';
@@ -776,7 +782,9 @@ function guardar(){
     fecha:$('fecha').value,
     grupo:U($('grupo').value), estilo:U($('estilo').value), color:U($('color').value),
     lote:N($('lote').value), muestra:N($('muestra').value),
-    auditores:JSON.stringify([U($('auditor').value)]),
+    auditores:JSON.stringify(
+      PIDE_AUDITOR[t] && T($('auditor').value) ? [U($('auditor').value)] : []),
+    pedido: U($('pedido').value),
     inspector:U($('inspector').value),
     linea: t==='LINEAS' ? $('linea').value : '',
     colores:JSON.stringify([{color:U($('color').value), po:U($('po').value)}]),
@@ -844,6 +852,30 @@ function procesarCola(){
   })(it);
 }
 
+/* La cola se guarda en el navegador. Antes vivía solo en memoria: recargar la
+   página borraba lo que estaba en camino y ese trabajo se perdía sin aviso. */
+function guardarCola(){
+  try{
+    localStorage.setItem('lives_cola_aud', JSON.stringify(
+      cola.filter(function(i){ return i.estado!=='ok' || i.idAud; }).slice(-60)
+    ));
+  }catch(e){}
+}
+function restaurarCola(){
+  var g=leerLocal('lives_cola_aud');
+  if(!g || !g.length) return;
+  cola = g.map(function(i){ i.enviando=false; return i; });
+  guardados = cola.filter(function(i){ return i.estado==='ok'; }).length;
+  fallidos  = cola.filter(function(i){ return i.estado==='err'; }).length;
+  var pend = cola.filter(function(i){ return i.estado==='wait'; }).length;
+  pintarLog();
+  if(pend){
+    $('hGuardar').className='hint';
+    $('hGuardar').textContent='Se reanudaron '+pend+' envío(s) que habían quedado pendientes.';
+    procesarCola();
+  }
+}
+
 function pintarLog(){
   var pend=cola.filter(function(i){ return i.estado==='wait'; }).length;
   var pill=$('pillCola');
@@ -855,6 +887,7 @@ function pintarLog(){
     ? (guardados+' auditoría(s) guardada(s)'+(fallidos?' · '+fallidos+' con error':''))
     : 'Todavía no has guardado nada.';
 
+  guardarCola();
   $('log').innerHTML = cola.slice().reverse().map(function(i){
     var ic = i.estado==='ok' ? '✓' : (i.estado==='err' ? '!' : (i.estado==='anul' ? '⊘' : '⟳'));
     var acc = '';
@@ -879,7 +912,7 @@ function pintarLog(){
 
 /* Limpia solo lo del registro; lo fijo (auditora, línea, fecha) se queda. */
 function limpiarRegistro(exito){
-  ['grupo','estilo','color','lote','muestra','po','cajas','derivados','destino'].forEach(
+  ['grupo','estilo','color','lote','muestra','po','cajas','derivados','destino','pedido'].forEach(
     function(id){ var e=$(id); if(e) e.value=''; });
   $('cliente').value=''; $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
@@ -960,7 +993,9 @@ function guardarEdicion(){
   var envio={
     accion:'editar', clave:CLAVE, id:id, usuario:U($('digitador').value),
     cambios:JSON.stringify(cambios),
-    auditores:JSON.stringify([U($('auditor').value)]),
+    auditores:JSON.stringify(
+      PIDE_AUDITOR[t] && T($('auditor').value) ? [U($('auditor').value)] : []),
+    pedido: U($('pedido').value),
     defectos:JSON.stringify(defs.map(function(d){
       return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,
               nombre:d.nombre, cantidad:d.cantidad};
@@ -1109,6 +1144,30 @@ window.addEventListener('beforeunload', function(e){
   if(cola.some(function(i){ return i.estado==='wait'; })){ e.preventDefault(); e.returnValue=''; }
 });
 
+/* Al abrir se traen los últimos registros guardados, para que el historial no
+   arranque vacío y ella pueda editar o anular algo de antes de recargar. */
+function cargarRecientes(){
+  var quien=U($('digitador').value);
+  jsonp({accion:'recientes', n:25, digitador:quien}, function(r){
+    if(!r||!r.ok||!r.filas) return;
+    var yaHay={};
+    cola.forEach(function(i){ if(i.idAud) yaHay[i.idAud]=true; });
+    r.filas.slice().reverse().forEach(function(f){
+      if(yaHay[f.id]) return;
+      cola.unshift({
+        id:'g'+f.id, idAud:f.id,
+        etiqueta: f.grupo+' · '+f.estilo+' · lote '+f.lote+' · '+
+                  (f.resultado||'').toLowerCase()+(f.defectuosas?' ('+f.defectuosas+')':''),
+        estado: f.estado==='ANULADO' ? 'anul' : 'ok',
+        msg: f.estado==='ANULADO' ? 'Anulada' : ('Guardada '+(f.guardado||'')),
+        intentos:1
+      });
+    });
+    guardados = cola.filter(function(i){ return i.estado==='ok'; }).length;
+    pintarLog();
+  });
+}
+
 (function inicio(){
   var f=leerLocal('lives_fijo_aud');
   if(f){ $('tipo').value=f.tipo||'LINEAS'; $('auditor').value=f.auditor||'';
@@ -1117,7 +1176,9 @@ window.addEventListener('beforeunload', function(e){
   $('fecha').value = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2)+'-'+('0'+hoy.getDate()).slice(-2);
   aplicarTipo();
   cargarCatalogos();
+  restaurarCola();
   setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
+  setTimeout(cargarRecientes, 900);
   pintarDefs();
   $('grupo').focus();
 })();

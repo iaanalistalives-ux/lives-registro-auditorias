@@ -727,7 +727,7 @@ function agregarDef(d){
 function pintarDefs(){
   var tb=$('tb');
   tb.innerHTML=defs.map(function(d,i){
-    return '<tr data-i="'+i+'"><td>'+esc(d.nombre)+' <span class="tag">'+esc(d.seccion)+'</span></td>'+
+    return '<tr data-i="'+i+'"><td>'+esc(d.nombre)+'</td>'+
       '<td class="q"><input type="number" min="1" value="'+d.cantidad+'" data-i="'+i+'"></td>'+
       '<td><button class="del" type="button" data-i="'+i+'">&times;</button></td></tr>';
   }).join('');
@@ -1211,9 +1211,11 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
   function pintar(q){
     if(!opts.length){ dr.classList.remove('on'); dr.innerHTML=''; return; }
     dr.innerHTML=opts.map(function(o,i){
+      /* Sin la etiqueta de sección al costado: el nombre del defecto ya dice
+         qué es, y la sección solo agregaba ruido en pantallas chicas.
+         La sección se sigue guardando en el Sheet, no se pierde el dato. */
       return '<div class="opt'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
-        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span>'+
-        '<span class="tag">'+esc(o[1])+'</span></div>';
+        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span></div>';
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){

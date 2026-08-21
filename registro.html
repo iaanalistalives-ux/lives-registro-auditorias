@@ -143,6 +143,35 @@
   .pi .rs.ok{background:#ECFDF5;color:#065F46;} .pi .rs.no{background:#FEF2F2;color:#991B1B;}
   .pi .x{background:none;border:none;color:var(--rose);font-size:19px;cursor:pointer;padding:0 6px;line-height:1;}
   .pi .ed{background:none;border:none;color:var(--sage);font-size:12px;font-weight:700;cursor:pointer;}
+  /* Pensado para 1366x768: descontando el navegador quedan ~600px de alto.
+     Todo lo de digitar entra sin bajar; el historial va debajo. */
+  .cap2{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start;}
+  .capL,.capR{min-width:0;}
+  .capR{border-left:1px solid var(--warm);padding-left:14px;}
+  .rot{font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;
+       letter-spacing:.4px;margin-bottom:6px;}
+  .ayuda2{font-size:11px;color:var(--stone);margin-top:8px;}
+  .ayuda2 summary{cursor:pointer;font-weight:700;color:var(--sage);}
+  .ayuda2 kbd{background:var(--wl);border:1px solid var(--warm);border-radius:4px;
+       padding:1px 5px;font-family:Consolas,monospace;font-size:10.5px;color:var(--petrol);}
+  @media(max-width:1100px){ .cap2{grid-template-columns:1fr;} .capR{border-left:none;padding-left:0;} }
+  @media(max-height:820px){
+    .header{min-height:50px;} .header img{height:30px;}
+    .wrap{padding:8px 16px 24px;}
+    .card{padding:10px 13px;margin-bottom:8px;}
+    label{font-size:10.5px;margin-bottom:2px;}
+    input,select{font-size:14px;padding:5px 8px;}
+    .row{gap:9px;}
+    .tipoBtn{padding:6px 13px;font-size:13.5px;}
+    .chip{padding:4px 11px;font-size:12.5px;}
+    .chips{gap:5px;}
+    td,th{padding:4px 5px;font-size:13px;}
+    .ver{padding:9px 13px;font-size:13.5px;}
+    .btn{padding:8px 20px;font-size:14px;}
+    .log,.pend{max-height:150px;}
+    .fija{padding:7px 11px;margin-bottom:8px;}
+    .hint{min-height:0;}
+  }
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -174,7 +203,6 @@
     </select>
 
     <div class="fija">
-      <div class="t">Se mantiene entre registros — cámbialo solo cuando cambie</div>
       <div class="row">
         <div class="f sm">
           <label for="fecha">Fecha</label>
@@ -220,9 +248,9 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Datos de la auditoría</h2>
-      <div class="sub">Sigue el orden del reporte. Al salir del lote se revisa si ya fue auditado antes.</div>
+    <div class="card cap">
+     <div class="cap2">
+      <div class="capL">
 
       <div class="row">
         <div class="f ac">
@@ -301,20 +329,21 @@
 
       <div class="edicion" id="edicion"></div>
       <div class="prev" id="prev"></div>
-    </div>
+      </div>
 
-    <div class="card">
-      <h2>Defectos</h2>
-      <div class="sub">Los más comunes están como botón. Para el resto, escribe: <b>man ace</b>, <b>punt cort</b>.</div>
+      <div class="capR">
+      <div class="rot">Defectos</div>
       <div class="chips" id="chips"></div>
       <div class="ac">
         <input type="text" id="qdef" autocomplete="off" placeholder="Buscar defecto…">
         <div class="drop" id="dDef"></div>
       </div>
-      <table>
-        <thead><tr><th>Defecto</th><th style="width:110px">Prendas</th><th style="width:40px"></th></tr></thead>
-        <tbody id="tb"></tbody>
-      </table>
+      <div style="max-height:132px;overflow:auto">
+        <table>
+          <thead><tr><th>Defecto</th><th style="width:92px">Prendas</th><th style="width:34px"></th></tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
       <div class="vacio" id="vacio">Sin defectos. Si la auditoría salió limpia, guarda directo.</div>
 
       <div class="row" id="wResultado" style="margin-top:6px;display:none">
@@ -345,19 +374,21 @@
         <span class="hint" id="hGuardar" style="margin:0"></span>
       </div>
 
-      <div class="ayuda">
-        <kbd>Tab</kbd> avanza de campo &nbsp;·&nbsp; <kbd>Enter</kbd> en el buscador agrega el defecto y salta a la cantidad
-        &nbsp;·&nbsp; <kbd>Enter</kbd> en la cantidad vuelve al buscador &nbsp;·&nbsp; <kbd>F2</kbd> guarda &nbsp;·&nbsp;
-        <kbd>Esc</kbd> limpia. No hace falta el mouse.<br>
-        Al guardar, el formulario se limpia al instante y el envío sigue en segundo plano: no hay que esperar.
       </div>
+     </div>
+
+      <details class="ayuda2">
+        <summary>Atajos de teclado</summary>
+        <kbd>Tab</kbd> avanza de campo · <kbd>Enter</kbd> en el buscador agrega el defecto y salta a la
+        cantidad · <kbd>Enter</kbd> en la cantidad vuelve al buscador · <kbd>F2</kbd> agrega a la lista ·
+        <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia.
+      </details>
     </div>
   </div>
 
   <div class="card" id="cardPend">
     <h2>Por guardar <span class="cnt" id="pendCnt">0</span></h2>
-    <div class="sub">Se quedan aquí hasta que pulses <b>Guardar todo</b>. Puedes quitar
-      cualquiera al instante: todavía no salieron al servidor.</div>
+    <div class="sub">Se quedan aquí hasta que pulses <b>Guardar todo</b>. Quitar es inmediato.</div>
     <div class="pend" id="pend"></div>
     <div class="vacio" id="pendVacio">Nada pendiente. Digita una auditoría y pulsa Agregar a la lista.</div>
   </div>

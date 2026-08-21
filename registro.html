@@ -172,6 +172,34 @@
     .fija{padding:7px 11px;margin-bottom:8px;}
     .hint{min-height:0;}
   }
+  .mant{font-size:11.5px;color:var(--stone);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .mant label{display:inline-flex;align-items:center;gap:4px;font-weight:700;
+       color:var(--slate);text-transform:none;letter-spacing:0;margin:0;font-size:11.5px;}
+  .mant input{width:auto;}
+  .pi .du{background:none;border:none;color:var(--slate);font-size:12px;font-weight:700;cursor:pointer;}
+    .hjDef{background:var(--wl);border-radius:9px;padding:9px 12px;margin-bottom:9px;}
+  .hjLbl{font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;margin-bottom:6px;}
+  .hjWrap{overflow:auto;max-height:330px;}
+  table.hj{width:100%;border-collapse:collapse;}
+  table.hj th{position:sticky;top:0;background:var(--petrol);color:#fff;z-index:2;
+        font-size:10.5px;padding:6px 5px;text-transform:uppercase;letter-spacing:.3px;}
+  table.hj td{padding:2px 4px;border-bottom:1px solid var(--wl);font-size:13.5px;vertical-align:middle;}
+  table.hj tr.act td{background:#ECFDF5;}
+  table.hj input{border:1px solid transparent;background:transparent;padding:5px 6px;font-size:13.5px;border-radius:5px;}
+  table.hj input:focus{border-color:var(--sage);background:#fff;}
+  table.hj .nu{text-align:center;}
+  .hjTag{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--warm);
+        border-radius:12px;padding:2px 8px;font-size:11.5px;margin:2px 3px 2px 0;}
+  .hjTag i{font-style:normal;color:var(--rose);cursor:pointer;font-weight:700;}
+  .hjCant{width:44px;text-align:center;font-weight:700;color:var(--sage);
+        border:1px solid var(--warm);background:#fff;border-radius:4px;padding:1px 3px;font-size:12px;}
+  .hjCant:focus{border-color:var(--sage);outline:none;box-shadow:0 0 0 2px rgba(15,122,90,.16);}
+  .hjCel{min-width:260px;}
+  .hjAdd{width:118px;border:1px dashed var(--warm)!important;background:#fff!important;
+        font-size:12px;padding:3px 7px!important;border-radius:12px!important;color:var(--sage);}
+  .hjAdd:focus{border-style:solid!important;border-color:var(--sage)!important;}
+  .hjRes{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;}
+  .hjRes.ok{background:#ECFDF5;color:#065F46;} .hjRes.no{background:#FEF2F2;color:#991B1B;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -371,6 +399,12 @@
         <button class="btn" id="btnGuardar" type="button">Agregar a la lista <span class="kbd">F2</span></button>
         <button class="btn sec" id="btnLimpiar" type="button">Limpiar <span class="kbd">Esc</span></button>
         <button class="btn env" id="btnEnviar" type="button" disabled>Guardar todo</button>
+        <span class="mant">Al agregar, mantener:
+          <label><input type="checkbox" id="mGrupo" checked> Grupo</label>
+          <label><input type="checkbox" id="mEstilo" checked> Estilo</label>
+          <label><input type="checkbox" id="mColor"> Color</label>
+          <label><input type="checkbox" id="mPo"> PO</label>
+        </span>
         <span class="hint" id="hGuardar" style="margin:0"></span>
       </div>
 
@@ -383,6 +417,41 @@
         cantidad · <kbd>Enter</kbd> en la cantidad vuelve al buscador · <kbd>F2</kbd> agrega a la lista ·
         <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia.
       </details>
+    </div>
+  </div>
+
+  <div class="card" id="cardHoja" style="display:none">
+    <h2>Hoja de auditorías</h2>
+    <div class="sub">Una fila por auditoría, como en el papel. Haz clic en una fila para
+      agregarle defectos. El total y el resultado salen solos.</div>
+
+    <div class="hjDef">
+      <div class="hjLbl">Defectos frecuentes — se agregan a la fila <b id="hjFila">—</b>
+        <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--stone)">
+          · o escríbelo en el «+ defecto» de la fila; si no existe, se registra</span></div>
+      <div class="chips" id="hjChips"></div>
+      <div class="ac" style="display:none">
+        <input type="text" id="hjQ" autocomplete="off" disabled>
+        <div class="drop" id="hjDrop"></div>
+      </div>
+    </div>
+
+    <div class="drop" id="hjFloat" style="position:fixed;display:none;z-index:120;"></div>
+    <div class="hjWrap">
+      <table class="hj">
+        <thead><tr>
+          <th style="width:30px">#</th><th>Grupo</th><th>Color</th><th>Estilo</th>
+          <th style="width:74px">Lote</th><th style="width:80px">Muestra</th>
+          <th>Defectos</th><th style="width:60px">Total</th>
+          <th style="width:104px">Resultado</th><th style="width:34px"></th>
+        </tr></thead>
+        <tbody id="hjBody"></tbody>
+      </table>
+    </div>
+    <div class="acciones">
+      <button class="btn sec" id="hjMas" type="button">+ Agregar fila</button>
+      <button class="btn env" id="hjEnviar" type="button">Guardar todo</button>
+      <span class="hint" id="hjMsg" style="margin:0"></span>
     </div>
   </div>
 
@@ -507,6 +576,8 @@ function pintarTipos(){
 
 function aplicarTipo(){
   pintarTipos();
+  if(typeof verVista==='function' && $('cardHoja')) verVista();
+  if($('cardHoja') && $('cardHoja').style.display!=='none'){ pintarChipsHoja(); pintarHoja(); }
   var t=$('tipo').value;
   TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
   (CAMPOS[t]||[]).forEach(function(id){
@@ -901,6 +972,7 @@ function pintarPend(){
       '<div class="d"><b>'+esc(x.etiqueta)+'</b>'+
       '<div class="m">'+esc(x.tipo)+(x.defectuosas?' · '+x.defectuosas+' defectuosa(s)':'')+'</div></div>'+
       '<span class="rs '+(mal?'no':'ok')+'">'+esc(x.resultado||'')+'</span>'+
+      '<button class="du" type="button" data-du="'+i+'" title="Copiar esta y cambiar lo que haga falta">Duplicar</button>'+
       '<button class="ed" type="button" data-ed="'+i+'">Corregir</button>'+
       '<button class="x" type="button" data-q="'+i+'" title="Quitar">&times;</button></div>';
   }).join('');
@@ -910,12 +982,13 @@ function pintarPend(){
   Array.prototype.forEach.call($('pend').querySelectorAll('[data-ed]'),function(b){
     b.onclick=function(){ corregirPend(+b.dataset.ed); };
   });
+  Array.prototype.forEach.call($('pend').querySelectorAll('[data-du]'),function(b){
+    b.onclick=function(){ duplicarPend(+b.dataset.du); };
+  });
 }
 
 /* Devuelve una pendiente al formulario para corregirla y la saca de la lista. */
-function corregirPend(i){
-  var x=pend[i]; if(!x) return;
-  var e=x.envio;
+function cargarEnvioEnForm(e){
   $('tipo').value=e.tipo; aplicarTipo();
   $('fecha').value=e.fecha;
   if(e.auditores){ try{ $('auditor').value=(JSON.parse(e.auditores)[0])||''; }catch(err){} }
@@ -931,10 +1004,28 @@ function corregirPend(i){
   try{ $('destino').value=(JSON.parse(e.destinos)[0]||{}).codigo||''; }catch(err){}
   try{ defs=JSON.parse(e.defectos)||[]; }catch(err){ defs=[]; }
   aplicarCliente(); pintarDefs();
+}
+
+/* Devuelve una pendiente al formulario para corregirla y la saca de la lista. */
+function corregirPend(i){
+  var x=pend[i]; if(!x) return;
+  cargarEnvioEnForm(x.envio);
   pend.splice(i,1); guardarPend(); pintarPend();
   $('hGuardar').className='hint';
   $('hGuardar').textContent='Corrígela y vuelve a pulsar Agregar a la lista.';
   $('grupo').focus();
+}
+
+
+/* Copia una pendiente al formulario SIN sacarla de la lista, lista para cambiar
+   el color o el estilo y agregarla como una auditoría más. */
+function duplicarPend(i){
+  var x=pend[i]; if(!x) return;
+  cargarEnvioEnForm(x.envio);
+  $('hGuardar').className='hint';
+  $('hGuardar').textContent='Copiada. Cambia lo que corresponda y pulsa Agregar a la lista.';
+  var orden=['color','estilo','lote'];
+  for(var k=0;k<orden.length;k++){ if($(orden[k]).offsetParent!==null){ $(orden[k]).focus(); $(orden[k]).select(); break; } }
 }
 
 /* Manda todas las pendientes, de una en una, mostrando el avance. */
@@ -1044,9 +1135,19 @@ function pintarLog(){
 
 /* Limpia solo lo del registro; lo fijo (auditora, línea, fecha) se queda. */
 function limpiarRegistro(exito){
+  /* Athina digita varias auditorías seguidas del mismo grupo cambiando estilo o
+     color. Al agregar a la lista se conserva lo que ella marcó arriba, así no
+     reescribe el mismo grupo veinte veces. Al limpiar a mano se borra todo. */
+  var mantener = exito ? {
+        grupo:  $('mGrupo').checked,
+        estilo: $('mEstilo').checked,
+        color:  $('mColor').checked,
+        po:     $('mPo').checked
+      } : {};
   ['grupo','estilo','color','lote','muestra','po','cajas','derivados','destino','pedido'].forEach(
-    function(id){ var e=$(id); if(e) e.value=''; });
-  $('cliente').value=''; $('reproceso').checked=false;
+    function(id){ var e=$(id); if(e && !mantener[id]) e.value=''; });
+  if(!mantener.grupo) $('cliente').value='';
+  $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
   defs=[]; prevLote=null;
   $('prev').classList.remove('on');
@@ -1177,6 +1278,317 @@ function confirmarAnular(motivo){
 }
 
 
+
+/* ==================================================================
+   MODO HOJA — replica el papel: una fila por auditoría. Los datos fijos
+   (auditora, inspectora, fecha, línea) salen de la franja de arriba.
+   Los defectos NO son 13 columnas fijas: se eligen del catálogo de 130,
+   así nada termina cayendo en «OTROS».
+   ================================================================== */
+var hoja = leerLocal('lives_hoja_aud') || [];
+var filaAct = -1;
+
+function guardarHoja(){ try{ guardarLocal('lives_hoja_aud', hoja); }catch(e){} }
+function filaNueva(){ return {grupo:'',color:'',estilo:'',lote:'',muestra:'',defs:[]}; }
+function totalFila(f){ return (f.defs||[]).reduce(function(a,d){ return a+(d.cantidad||0); },0); }
+
+function pintarHoja(){
+  if(!hoja.length) hoja.push(filaNueva());
+  $('hjBody').innerHTML = hoja.map(function(f,i){
+    var tot=totalFila(f);
+    /* La cantidad se escribe aquí mismo, como en el papel: el número al lado
+       del defecto. Antes había que pulsar el defecto tantas veces como prendas,
+       que es lento y no se parece en nada a lo que ella hace hoy. */
+    var tags=(f.defs||[]).map(function(d,k){
+      return '<span class="hjTag">'+esc(d.nombre)+
+             '<input class="hjCant" type="number" min="1" value="'+(d.cantidad||1)+'" '+
+             'data-cf="'+i+'" data-ck="'+k+'" title="Cuántas prendas">'+
+             '<i data-fx="'+i+'" data-dx="'+k+'" title="Quitar">&times;</i></span>';
+    }).join('');
+    return '<tr data-f="'+i+'" class="'+(i===filaAct?'act':'')+'">'+
+      '<td class="nu">'+(i+1)+'</td>'+
+      '<td><input data-c="grupo"  data-f="'+i+'" value="'+esc(f.grupo)+'"></td>'+
+      '<td><input data-c="color"  data-f="'+i+'" value="'+esc(f.color)+'"></td>'+
+      '<td><input data-c="estilo" data-f="'+i+'" value="'+esc(f.estilo)+'"></td>'+
+      '<td><input class="nu" data-c="lote"    data-f="'+i+'" value="'+esc(f.lote)+'" inputmode="numeric"></td>'+
+      '<td><input class="nu" data-c="muestra" data-f="'+i+'" value="'+esc(f.muestra)+'" inputmode="numeric"></td>'+
+      '<td class="hjCel">'+tags+
+        '<input class="hjAdd" data-af="'+i+'" placeholder="+ defecto…" autocomplete="off">'+
+      '</td>'+
+      '<td class="nu"><b>'+(tot||'')+'</b></td>'+
+      '<td class="nu">'+(f.muestra?('<span class="hjRes '+(tot>0?'no':'ok')+'">'+(tot>0?'RECHAZADO':'APROBADO')+'</span>'):'')+'</td>'+
+      '<td><button class="del" type="button" data-qf="'+i+'">&times;</button></td></tr>';
+  }).join('');
+
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('input'),function(inp){
+    inp.oninput=function(){ hoja[+inp.dataset.f][inp.dataset.c]=inp.value; guardarHoja(); refrescarTotales(); };
+    inp.onchange=function(){ recordar(inp.dataset.c.toUpperCase(), inp.value); };
+    inp.onfocus=function(){ activarFila(+inp.dataset.f); };
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        var i=+inp.dataset.f;
+        if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
+        var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
+        if(sig) sig.focus();
+      }
+    };
+  });
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('[data-qf]'),function(b){
+    b.onclick=function(ev){ ev.stopPropagation(); hoja.splice(+b.dataset.qf,1);
+      if(!hoja.length) hoja.push(filaNueva()); filaAct=-1; guardarHoja(); pintarHoja(); };
+  });
+  /* Un buscador por fila: se escribe el defecto ahí mismo y al elegirlo aparece
+     su cantidad al lado, y detrás otro espacio en blanco para el siguiente.
+     Es lo más parecido a como ella llena el papel. */
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('.hjAdd'),function(inp){
+    inp.onclick=function(ev){ ev.stopPropagation(); };
+    inp.onfocus=function(){ activarFila(+inp.dataset.af); };
+    inp.oninput=function(){ buscarDefFila(inp); };
+    inp.onkeydown=function(e){ tecleoDefFila(e, inp); };
+    inp.onblur=function(){ setTimeout(cerrarDropFila,150); };
+  });
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('.hjCant'),function(inp){
+    inp.onclick=function(ev){ ev.stopPropagation(); };
+    inp.onfocus=function(){ inp.select(); activarFila(+inp.dataset.cf); };
+    inp.oninput=function(){
+      hoja[+inp.dataset.cf].defs[+inp.dataset.ck].cantidad = Math.max(0, parseInt(inp.value)||0);
+      guardarHoja(); refrescarTotales();
+    };
+    /* Enter vuelve al buscador para poner el siguiente defecto de esa fila. */
+    /* Enter en la cantidad salta al espacio en blanco del siguiente defecto. */
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        var a=$('hjBody').querySelector('input.hjAdd[data-af="'+inp.dataset.cf+'"]');
+        if(a) a.focus();
+      }
+    };
+  });
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('[data-dx]'),function(b){
+    b.onclick=function(ev){ ev.stopPropagation(); hoja[+b.dataset.fx].defs.splice(+b.dataset.dx,1);
+      guardarHoja(); pintarHoja(); };
+  });
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('tr'),function(tr){
+    tr.onclick=function(){ activarFila(+tr.dataset.f); };
+  });
+}
+
+/* Solo repinta los números, para no perder el foco mientras escribe. */
+function refrescarTotales(){
+  hoja.forEach(function(f,i){
+    var tr=$('hjBody').querySelector('tr[data-f="'+i+'"]');
+    if(!tr) return;
+    var tds=tr.querySelectorAll('td'), tot=totalFila(f);
+    tds[7].innerHTML='<b>'+(tot||'')+'</b>';
+    tds[8].innerHTML = f.muestra ? ('<span class="hjRes '+(tot>0?'no':'ok')+'">'+(tot>0?'RECHAZADO':'APROBADO')+'</span>') : '';
+  });
+}
+
+function activarFila(i){
+  filaAct=i;
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('tr'),function(tr){
+    tr.classList.toggle('act', +tr.dataset.f===i);
+  });
+  $('hjFila').textContent=(i+1);
+  $('hjQ').disabled=false;
+}
+
+function agregarDefHoja(d){
+  if(filaAct<0){ $('hjMsg').className='hint err'; $('hjMsg').textContent='Elige primero una fila.'; return; }
+  var f=hoja[filaAct]; f.defs=f.defs||[];
+  var ya=-1;
+  for(var k=0;k<f.defs.length;k++) if(f.defs[k].cod===d[0]) ya=k;
+  if(ya>=0){ /* ya estaba: no suma solo, se corrige el número a mano */ }
+  else f.defs.push({cod:d[0],seccion:d[1],categoria:d[2],subtipo:d[3],
+                    nombre:nombreDefecto(d),cantidad:1});
+  var act=filaAct, pos=(ya>=0?ya:f.defs.length-1);
+  guardarHoja(); pintarHoja(); activarFila(act);
+  $('hjQ').value='';
+  /* El cursor cae en la cantidad recién agregada, ya seleccionada: escribe el
+     número encima sin borrar nada, y con Enter vuelve al buscador. */
+  var inp=$('hjBody').querySelector('input.hjCant[data-cf="'+act+'"][data-ck="'+pos+'"]');
+  if(inp){ inp.focus(); inp.select(); }
+  else { var a=$('hjBody').querySelector('input.hjAdd[data-af="'+act+'"]'); if(a) a.focus(); }
+  $('hjMsg').className='hint'; $('hjMsg').textContent='';
+}
+
+/* ---- buscador dentro de la fila ---- */
+var dfOpts=[], dfSel=-1, dfInp=null;
+
+function cerrarDropFila(){ $('hjFloat').style.display='none'; dfOpts=[]; dfSel=-1; }
+
+function buscarDefFila(inp){
+  dfInp=inp;
+  var q=inp.value; dfOpts=[];
+  if(!T(q)){ cerrarDropFila(); return; }
+  var base=catalogoOrdenado();
+  for(var i=0;i<base.length && dfOpts.length<20;i++)
+    if(coincide(nombreDefecto(base[i]),q)) dfOpts.push(base[i]);
+  /* Si no existe, se ofrece registrarlo: el catálogo crece con lo real en vez
+     de que el defecto se pierda o caiga en «Otros». */
+  if(!dfOpts.length && norm(q).length>=3) dfOpts.push(['__NUEVO__','Otros',norm(q),'']);
+  dfSel=dfOpts.length?0:-1;
+  pintarDropFila(q, inp);
+}
+
+function pintarDropFila(q, inp){
+  var d=$('hjFloat');
+  if(!dfOpts.length){ cerrarDropFila(); return; }
+  d.innerHTML=dfOpts.map(function(o,i){
+    var nuevo=o[0]==='__NUEVO__';
+    return '<div class="opt'+(i===dfSel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
+      '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
+  }).join('');
+  var r=inp.getBoundingClientRect();
+  d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px';
+  d.style.width=Math.max(r.width,240)+'px';
+  d.style.display='block'; d.classList.add('on');
+  Array.prototype.forEach.call(d.querySelectorAll('.opt'),function(el){
+    el.onmousedown=function(e){ e.preventDefault(); elegirDefFila(dfOpts[+el.dataset.i], inp); };
+  });
+}
+
+function tecleoDefFila(e, inp){
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(dfOpts.length){ dfSel=(dfSel+1)%dfOpts.length; pintarDropFila(inp.value,inp); } }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(dfOpts.length){ dfSel=(dfSel-1+dfOpts.length)%dfOpts.length; pintarDropFila(inp.value,inp); } }
+  else if(e.key==='Enter'){ e.preventDefault(); if(dfSel>=0&&dfOpts[dfSel]) elegirDefFila(dfOpts[dfSel], inp); }
+  else if(e.key==='Escape'){ cerrarDropFila(); inp.value=''; }
+}
+
+function elegirDefFila(o, inp){
+  var fi=+inp.dataset.af;
+  filaAct=fi;
+  if(o[0]==='__NUEVO__'){ registrarDefectoNuevo(o[2], function(d){ agregarDefHoja(d); }); }
+  else agregarDefHoja(o);
+  cerrarDropFila();
+}
+
+/* Guarda el defecto nuevo en el catálogo del Sheet y lo usa al instante. */
+function registrarDefectoNuevo(nombre, luego){
+  var d=['NUEVO','Otros',nombre,''];
+  if(!CAT.defectos.some(function(x){ return U(nombreDefecto(x))===U(nombre); })){
+    CAT.defectos.push(d);
+    guardarLocal('lives_cat_aud', CAT);
+  }
+  luego && luego(d);
+  jsonp({accion:'agregarcat', clave:CLAVE, que:'DEFECTO', valor:nombre,
+         detalle:'Otros', usuario:U($('digitador').value)}, function(r){
+    if(r && r.ok && r.agregado) setTimeout(cargarCatalogos, 400);
+  });
+}
+
+function pintarChipsHoja(){
+  var c=$('hjChips'); if(!c) return;
+  c.innerHTML='';
+  var t=$('tipo').value;
+  (FRECUENTES[t]||[]).slice(0,10).forEach(function(cod){
+    var d=null;
+    for(var i=0;i<CAT.defectos.length;i++) if(CAT.defectos[i][0]===cod){ d=CAT.defectos[i]; break; }
+    if(!d) return;
+    var b=document.createElement('button');
+    b.type='button'; b.className='chip'; b.textContent=nombreDefecto(d);
+    b.onclick=function(){ agregarDefHoja(d); };
+    c.appendChild(b);
+  });
+}
+
+(function(){
+  var inp=$('hjQ'), dr=$('hjDrop'), opts=[], sel=-1;
+  if(!inp) return;
+  function buscar(){
+    var q=inp.value; opts=[];
+    if(!T(q)){ dr.classList.remove('on'); return; }
+    var base=catalogoOrdenado();
+    for(var i=0;i<base.length && opts.length<25;i++)
+      if(coincide(nombreDefecto(base[i]),q)) opts.push(base[i]);
+    sel=opts.length?0:-1; pintar(q);
+  }
+  function pintar(q){
+    if(!opts.length){ dr.classList.remove('on'); dr.innerHTML=''; return; }
+    dr.innerHTML=opts.map(function(o,i){
+      return '<div class="opt'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
+        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span></div>';
+    }).join('');
+    dr.classList.add('on');
+    Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
+      el.onmousedown=function(e){ e.preventDefault(); agregarDefHoja(opts[+el.dataset.i]); dr.classList.remove('on'); };
+    });
+  }
+  inp.addEventListener('input',buscar);
+  inp.addEventListener('blur',function(){ setTimeout(function(){ dr.classList.remove('on'); },140); });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(opts.length){ sel=(sel+1)%opts.length; pintar(inp.value); } }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); if(opts.length){ sel=(sel-1+opts.length)%opts.length; pintar(inp.value); } }
+    else if(e.key==='Enter'){ e.preventDefault(); if(sel>=0&&opts[sel]) agregarDefHoja(opts[sel]); }
+    else if(e.key==='Escape'){ dr.classList.remove('on'); inp.value=''; }
+  });
+})();
+
+if($('hjMas')) $('hjMas').onclick=function(){
+  hoja.push(filaNueva()); guardarHoja(); pintarHoja();
+  var last=$('hjBody').querySelector('tr[data-f="'+(hoja.length-1)+'"] input'); if(last) last.focus();
+};
+
+if($('hjEnviar')) $('hjEnviar').onclick=function(){
+  var t=$('tipo').value, listas=[], errores=[];
+  hoja.forEach(function(f,i){
+    if(!T(f.grupo)&&!T(f.estilo)&&!N(f.lote)&&!N(f.muestra)) return;
+    var cli=clienteDeGrupo(f.grupo);
+    if(!cli){ errores.push('Fila '+(i+1)+': el prefijo del grupo no está en el catálogo.'); return; }
+    if(N(f.muestra)<=0){ errores.push('Fila '+(i+1)+': falta la muestra.'); return; }
+    if(N(f.lote)>0 && N(f.muestra)>N(f.lote)){ errores.push('Fila '+(i+1)+': la muestra es mayor que el lote.'); return; }
+    if(totalFila(f)>N(f.muestra)){ errores.push('Fila '+(i+1)+': hay más defectuosas que la muestra.'); return; }
+    listas.push({f:f});
+  });
+  if(PIDE_AUDITOR[t] && !T($('auditor').value)) errores.unshift('Falta la auditora en la franja de arriba.');
+  if(errores.length){
+    $('hjMsg').className='hint err';
+    $('hjMsg').textContent=errores[0]+(errores.length>1?(' (y '+(errores.length-1)+' más)'):'');
+    return;
+  }
+  if(!listas.length){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No hay filas con datos.'; return; }
+  if(!confirm('Se van a guardar '+listas.length+' auditoría(s). ¿Continuar?')) return;
+
+  listas.forEach(function(x){
+    var f=x.f, tot=totalFila(f);
+    var envio={
+      accion:'guardar', clave:CLAVE, tipo:t, fecha:$('fecha').value,
+      grupo:U(f.grupo), estilo:U(f.estilo), color:U(f.color),
+      lote:N(f.lote), muestra:N(f.muestra),
+      auditores:JSON.stringify(PIDE_AUDITOR[t]&&T($('auditor').value)?[U($('auditor').value)]:[]),
+      inspector:U($('inspector').value),
+      linea: t==='LINEAS' ? $('linea').value : '',
+      colores:JSON.stringify([{color:U(f.color),po:''}]),
+      defectos:JSON.stringify(f.defs||[]),
+      reproceso:'0', captura:'DIGITADO', digitador:U($('digitador').value),
+      token:'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9)
+    };
+    cola.push({ id:envio.token, envio:envio,
+      etiqueta:U(f.grupo)+' · '+U(f.estilo)+' · lote '+N(f.lote)+' · '+(tot?('rechazado ('+tot+')'):'aprobado'),
+      estado:'wait', intentos:0 });
+  });
+  hoja=[filaNueva()]; filaAct=-1; guardarHoja(); pintarHoja();
+  $('hjMsg').className='hint ok'; $('hjMsg').textContent='Enviadas. Mira el historial abajo.';
+  pintarLog(); procesarCola();
+};
+
+/* La vista la decide el tipo de auditoría, no la elige la persona:
+   Líneas y Servicio de Inspección se digitan en hoja, porque su papel es una
+   hoja de conteo con muchas filas. Empaque, Cliente y Final van en formulario
+   porque llevan campos que no caben en una cuadrícula (cajas del despacho,
+   destino y vía, licencia, nivel AQL, derivados, origen y proceso). */
+var VISTA_HOJA = { LINEAS:true, SERVINSP:true, EMPAQUE:false, CLIENTE:false, FINAL:false };
+
+function verVista(){
+  var esHoja = !!VISTA_HOJA[$('tipo').value];
+  Array.prototype.forEach.call(document.querySelectorAll('.cap, #cardPend'),function(e){
+    e.style.display = esHoja ? 'none' : '';
+  });
+  $('cardHoja').style.display = esHoja ? '' : 'none';
+  if(esHoja){ pintarChipsHoja(); pintarHoja(); }
+}
+
 /* ---------------- arranque ---------------- */
 autocompletar('auditor','dAuditor', function(){
   return CAT.personal.filter(function(p){ return (p[1]||'').indexOf('AUDITORA')>=0; })
@@ -1235,6 +1647,19 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
   });
 })();
 
+/* Lo que escribe se suma a las sugerencias al instante, sin esperar a guardar:
+   así el segundo registro del día ya le propone el grupo y el estilo del primero. */
+function recordar(campo, valor){
+  valor=U(valor);
+  if(!valor || valor.length<2) return;
+  if(!SUG[campo]) SUG[campo]=[];
+  if(SUG[campo].indexOf(valor)<0) SUG[campo].unshift(valor);
+}
+['grupo','estilo','color','po'].forEach(function(id){
+  var e=$(id); if(!e) return;
+  e.addEventListener('change', function(){ recordar(id.toUpperCase(), e.value); });
+});
+
 $('grupo').addEventListener('input', aplicarCliente);
 $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ if(N($('lote').value)>0) buscarLote(); });
@@ -1271,9 +1696,11 @@ document.addEventListener('keydown', function(e){
 /* lo fijo se recuerda entre sesiones: la auditora no lo reescribe cada mañana */
 function datosFijos(){
   return { tipo:$('tipo').value, auditor:$('auditor').value, inspector:$('inspector').value,
-           linea:$('linea').value, digitador:$('digitador').value };
+           linea:$('linea').value, digitador:$('digitador').value,
+           mGrupo:$('mGrupo').checked, mEstilo:$('mEstilo').checked,
+           mColor:$('mColor').checked, mPo:$('mPo').checked };
 }
-['auditor','inspector','linea','digitador'].forEach(function(id){
+['auditor','inspector','linea','digitador','mGrupo','mEstilo','mColor','mPo'].forEach(function(id){
   $(id).addEventListener('change', function(){ guardarLocal('lives_fijo_aud', datosFijos()); });
 });
 window.addEventListener('beforeunload', function(e){
@@ -1311,13 +1738,20 @@ function cargarRecientes(){
 (function inicio(){
   var f=leerLocal('lives_fijo_aud');
   if(f){ $('tipo').value=f.tipo||'LINEAS'; $('auditor').value=f.auditor||'';
-         $('inspector').value=f.inspector||''; $('digitador').value=f.digitador||''; }
+         $('inspector').value=f.inspector||''; $('digitador').value=f.digitador||'';
+         if(f.mGrupo!==undefined){
+           $('mGrupo').checked=!!f.mGrupo; $('mEstilo').checked=!!f.mEstilo;
+           $('mColor').checked=!!f.mColor; $('mPo').checked=!!f.mPo;
+         } }
   var hoy=new Date();
   $('fecha').value = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2)+'-'+('0'+hoy.getDate()).slice(-2);
   aplicarTipo();
   cargarCatalogos();
   restaurarCola();
   pintarPend();
+  setTimeout(verVista, 1100);
+  var vg=leerLocal('lives_vista_aud');
+  setTimeout(function(){ verVista(vg==='hoja'?'hoja':'form'); }, 1000);
   setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
   setTimeout(cargarRecientes, 900);
   pintarDefs();

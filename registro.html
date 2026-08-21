@@ -114,6 +114,21 @@
   .tipoBtn .n{background:var(--wl);color:var(--stone);border-radius:9px;
         font-size:10.5px;padding:1px 7px;font-weight:700;}
   .tipoBtn.on .n{background:rgba(255,255,255,.25);color:#fff;}
+  .mtWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
+        align-items:center;justify-content:center;z-index:300;padding:20px;}
+  .mtCard{background:#fff;border-radius:12px;max-width:520px;width:100%;
+        box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden;}
+  .mtHead{background:var(--petrol);color:#fff;padding:13px 18px;font-weight:700;font-size:15px;
+        border-bottom:3px solid var(--emer);}
+  .mtBody{padding:16px 18px;}
+  .mtLote{background:var(--wl);border-radius:8px;padding:9px 13px;font-size:13.5px;
+        font-weight:700;color:var(--petrol);margin-bottom:10px;}
+  .mtTxt{font-size:13px;color:var(--stone);margin:0 0 12px;line-height:1.6;}
+  .mtBtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .mtBtn{background:var(--wl);border:1.5px solid var(--warm);border-radius:8px;padding:9px 14px;
+        font-family:inherit;font-size:13.5px;font-weight:700;color:var(--sage);cursor:pointer;}
+  .mtBtn:hover{border-color:var(--sage);background:#fff;}
+  .mtPie{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -334,6 +349,30 @@
 </div>
 </div>
 
+<div class="mtWrap" id="modalAnular" onclick="if(event.target===this)this.style.display='none'">
+  <div class="mtCard">
+    <div class="mtHead">Anular esta auditoría</div>
+    <div class="mtBody">
+      <div class="mtLote" id="anulLote"></div>
+      <p class="mtTxt">No se borra: queda guardada como anulada, con el motivo y quién la anuló,
+        y deja de contar en los indicadores. <b>Elige por qué se anula.</b></p>
+      <div class="mtBtns">
+        <button type="button" class="mtBtn" onclick="confirmarAnular('Digitada dos veces')">Digitada dos veces</button>
+        <button type="button" class="mtBtn" onclick="confirmarAnular('Datos equivocados')">Datos equivocados</button>
+        <button type="button" class="mtBtn" onclick="confirmarAnular('Lote equivocado')">Lote equivocado</button>
+        <button type="button" class="mtBtn" onclick="confirmarAnular('No corresponde registrarla')">No corresponde</button>
+      </div>
+      <label for="anulOtro">Otro motivo</label>
+      <input type="text" id="anulOtro" placeholder="Escríbelo aquí…" autocomplete="off">
+      <div class="hint err" id="anulErr"></div>
+      <div class="mtPie">
+        <button type="button" class="btn sec" onclick="document.getElementById('modalAnular').style.display='none'">Cancelar</button>
+        <button type="button" class="btn" onclick="confirmarAnular()">Anular</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =====================================================================
    Registro de auditorías · Líneas y Servicio de Inspección
@@ -471,7 +510,7 @@ var jn=0;
 function jsonp(params, ok, fallo){
   var cb='cb'+(++jn)+'_'+Date.now();
   var s=document.createElement('script');
-  var t=setTimeout(function(){ limpiar(); fallo && fallo('tiempo agotado'); }, 30000);
+  var t=setTimeout(function(){ limpiar(); fallo && fallo('tiempo agotado'); }, 60000);
   function limpiar(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
     if(s.parentNode) s.parentNode.removeChild(s); }
   window[cb]=function(r){ limpiar(); ok(r); };
@@ -639,7 +678,9 @@ function pintarDefs(){
     inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); $('qdef').focus(); } };
   });
   Array.prototype.forEach.call(tb.querySelectorAll('.del'),function(b){
-    b.onclick=function(){ defs.splice(+b.dataset.i,1); pintarDefs(); $('qdef').focus(); };
+    /* Al eliminar NO se enfoca el buscador: enfocarlo abría la lista completa
+       de defectos sin que ella la pidiera. La lista sale solo al escribir. */
+    b.onclick=function(){ defs.splice(+b.dataset.i,1); pintarDefs(); };
   });
   veredicto();
 }
@@ -758,6 +799,9 @@ function guardar(){
     captura:'DIGITADO',
     digitador:U($('digitador').value)
   };
+  /* Identificador único del registro. Si la respuesta se pierde por lentitud de
+     red y se reintenta, el servidor reconoce que ya lo guardó y no lo duplica. */
+  envio.token = 'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
   var etiqueta=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
                ' · '+(totalDef()===0?'aprobado':'rechazado ('+totalDef()+')');
   var item={id:'t'+Date.now()+Math.random(), envio:envio, etiqueta:etiqueta, estado:'wait', intentos:0};
@@ -767,23 +811,37 @@ function guardar(){
   procesarCola();
 }
 
+/* Se manda de uno en uno. Antes salían todos a la vez y Apps Script los ponía
+   en fila esperando el mismo candado: los últimos se quedaban sin tiempo y
+   fallaban aunque no hubiera nada mal. */
 function procesarCola(){
-  cola.forEach(function(it){
-    if(it.estado!=='wait' || it.enviando) return;
+  if(cola.some(function(i){ return i.enviando; })) return;
+  var it = null;
+  for(var k=0;k<cola.length;k++) if(cola[k].estado==='wait' && !cola[k].enviando){ it=cola[k]; break; }
+  if(!it) return;
+  (function(it){
     it.enviando=true; it.intentos++;
     jsonp(it.envio, function(r){
       it.enviando=false;
       if(r && r.ok){ it.estado='ok'; it.msg=r.mensaje||''; it.nAud=r.nAuditoria;
                      it.idAud=r.id; guardados++; }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; fallidos++; }
-      pintarLog();
+      pintarLog(); procesarCola();
     }, function(motivo){
       it.enviando=false;
-      if(it.intentos<4){ it.estado='wait'; setTimeout(procesarCola, 4000*it.intentos); }
-      else { it.estado='err'; it.msg='no se pudo enviar ('+motivo+')'; fallidos++; }
+      if(it.intentos<6){
+        it.estado='wait';
+        it.msg='reintentando ('+it.intentos+' de 6)…';
+        setTimeout(procesarCola, 3000*it.intentos);
+      } else {
+        it.estado='err';
+        it.msg='No llegó respuesta. Revisa en el Sheet si quedó guardada antes de volver a digitarla.';
+        fallidos++;
+        setTimeout(procesarCola, 500);
+      }
       pintarLog();
     });
-  });
+  })(it);
 }
 
 function pintarLog(){
@@ -925,11 +983,21 @@ function guardarEdicion(){
 
 function anular(idAud){
   var it=itemPorId(idAud);
-  var motivo=prompt('¿Por qué se anula esta auditoría?\n\n'+((it&&it.etiqueta)||'')+
-                    '\n\nLa fila no se borra: queda registrada como anulada y deja de contar.');
-  if(motivo===null) return;
-  motivo=T(motivo);
-  if(motivo.length<3){ alert('Escribe el motivo para poder anularla.'); return; }
+  var m=$('modalAnular');
+  m.dataset.id=idAud;
+  $('anulLote').textContent=(it&&it.etiqueta)||'';
+  $('anulOtro').value='';
+  $('anulErr').textContent='';
+  m.style.display='flex';
+  var b=m.querySelector('.mtBtn'); if(b) b.focus();
+}
+
+function confirmarAnular(motivo){
+  var m=$('modalAnular'), idAud=m.dataset.id;
+  motivo=T(motivo||$('anulOtro').value);
+  if(motivo.length<3){ $('anulErr').textContent='Elige un motivo o escríbelo.'; return; }
+  var it=itemPorId(idAud);
+  m.style.display='none';
   jsonp({accion:'anular', clave:CLAVE, id:idAud, motivo:motivo, usuario:U($('digitador').value)},
     function(r){
       if(r&&r.ok){ if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; } guardados=Math.max(0,guardados-1); }
@@ -940,6 +1008,7 @@ function anular(idAud){
       pintarLog();
     });
 }
+
 
 /* ---------------- arranque ---------------- */
 autocompletar('auditor','dAuditor', function(){
@@ -985,7 +1054,9 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
     });
   }
   inp.addEventListener('input',buscar);
-  inp.addEventListener('focus',buscar);
+  /* Al enfocar solo se abre si ya hay algo escrito: entrar al campo no debe
+     desplegar los 130 defectos de golpe. */
+  inp.addEventListener('focus',function(){ if(T(inp.value)) buscar(); });
   inp.addEventListener('blur',function(){ setTimeout(function(){ dr.classList.remove('on'); },140); });
   inp.addEventListener('keydown',function(e){
     if(e.key==='ArrowDown'){ e.preventDefault(); if(opts.length){ sel=(sel+1)%opts.length; pintar(inp.value); } }

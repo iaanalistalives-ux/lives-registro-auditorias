@@ -85,11 +85,35 @@
   .li{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--wl);font-size:12.5px;}
   .li .ic{width:18px;text-align:center;font-weight:700;}
   .li.ok .ic{color:var(--sage);} .li.wait .ic{color:var(--tan);} .li.err .ic{color:var(--rose);}
+  .li.anul .ic{color:var(--stone);}
   .li .d{flex:1;} .li .d b{color:#333;} .li .m{color:var(--stone);font-size:11.5px;}
   .ayuda{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--tan);border-radius:6px;
          padding:10px 14px;font-size:11.5px;color:var(--stone);line-height:1.7;margin-top:14px;}
   .ayuda kbd{background:var(--wl);border:1px solid var(--warm);border-bottom-width:2px;border-radius:4px;
              padding:1px 6px;font-family:Consolas,monospace;font-size:11px;color:var(--petrol);font-weight:700;}
+  .li .acc{display:flex;gap:6px;margin-top:5px;}
+  .mini{background:#fff;border:1px solid var(--warm);border-radius:6px;padding:3px 10px;
+        font-family:inherit;font-size:11.5px;font-weight:700;color:var(--sage);cursor:pointer;}
+  .mini:hover{border-color:var(--sage);}
+  .mini.danger{color:var(--rose);}
+  .mini:disabled{color:var(--stone);cursor:not-allowed;opacity:.55;}
+  .li.anul .d b{text-decoration:line-through;color:var(--stone);}
+  .edicion{background:#EFF6FF;border:1px solid #3B82F6;border-radius:9px;padding:10px 14px;
+           margin-bottom:12px;font-size:13px;display:none;align-items:center;gap:12px;flex-wrap:wrap;}
+  .edicion.on{display:flex;}
+  .edicion b{color:#1E40AF;}
+  .tipoBar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .tipoBtn{background:#fff;border:1.5px solid var(--warm);border-radius:10px;
+        padding:11px 20px;font-family:inherit;font-size:14.5px;font-weight:700;
+        color:var(--slate);cursor:pointer;display:flex;align-items:center;gap:9px;
+        transition:all .12s ease;}
+  .tipoBtn:hover{border-color:var(--sage);color:var(--sage);}
+  .tipoBtn.on{background:var(--sage);border-color:var(--sage);color:#fff;
+        box-shadow:0 2px 6px rgba(15,122,90,.28);}
+  .tipoBtn .ic{font-size:16px;line-height:1;}
+  .tipoBtn .n{background:var(--wl);color:var(--stone);border-radius:9px;
+        font-size:10.5px;padding:1px 7px;font-weight:700;}
+  .tipoBtn.on .n{background:rgba(255,255,255,.25);color:#fff;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -113,16 +137,18 @@
 
   <!-- ============ COLUMNA IZQUIERDA: CAPTURA ============ -->
   <div>
+    <div class="tipoBar" id="tipoBar" role="tablist"></div>
+    <select id="tipo" style="display:none">
+      <option value="LINEAS">Líneas de costura</option>
+      <option value="SERVINSP">Servicio de inspección</option>
+      <option value="EMPAQUE">Empaque (encajado)</option>
+      <option value="CLIENTE">Auditoría de cliente</option>
+      <option value="FINAL">Auditoría final</option>
+    </select>
+
     <div class="fija">
       <div class="t">Se mantiene entre registros — cámbialo solo cuando cambie</div>
       <div class="row">
-        <div class="f">
-          <label for="tipo">Tipo de auditoría</label>
-          <select id="tipo">
-            <option value="LINEAS">Líneas de costura</option>
-            <option value="SERVINSP">Servicio de inspección</option>
-          </select>
-        </div>
         <div class="f sm">
           <label for="fecha">Fecha</label>
           <input type="date" id="fecha">
@@ -140,6 +166,25 @@
         <div class="f sm" id="wLinea">
           <label for="linea">Línea</label>
           <select id="linea"></select>
+        </div>
+        <div class="f sm" id="wIntExt">
+          <label for="intExt">Origen</label>
+          <select id="intExt">
+            <option value="INTERNO">LIVES (interno)</option>
+            <option value="EXTERNO">Taller externo</option>
+          </select>
+        </div>
+        <div class="f sm" id="wProceso">
+          <label for="proceso">Proceso</label>
+          <select id="proceso">
+            <option value="COSTURA">Costura</option>
+            <option value="ACABADOS">Acabados</option>
+          </select>
+        </div>
+        <div class="f ac" id="wServicio">
+          <label for="servicio">Taller</label>
+          <input type="text" id="servicio" autocomplete="off" placeholder="Escribe…">
+          <div class="drop" id="dServicio"></div>
         </div>
         <div class="f sm">
           <label for="digitador">Digita</label>
@@ -175,22 +220,55 @@
         </div>
       </div>
 
-      <div class="row" style="margin-top:10px">
-        <div class="f sm">
-          <label for="lote">Lote</label>
-          <input type="number" id="lote" min="1" inputmode="numeric">
+      <div class="row" id="wPo" style="margin-top:10px">
+        <div class="f ac">
+          <label for="po">PO</label>
+          <input type="text" id="po" autocomplete="off">
+          <div class="drop" id="dPo"></div>
         </div>
-        <div class="f sm">
-          <label for="muestra">Muestra</label>
-          <input type="number" id="muestra" min="1" inputmode="numeric">
-          <div class="hint" id="hMuestra"></div>
+        <div class="f ac" id="wDestino">
+          <label for="destino">Destino</label>
+          <input type="text" id="destino" autocomplete="off" placeholder="USA, ECO…">
+          <div class="drop" id="dDestino"></div>
         </div>
-        <div class="f" style="display:flex;align-items:flex-end;gap:18px;padding-bottom:4px;flex-wrap:wrap">
-          <label class="sw"><input type="checkbox" id="reproceso"> Es reproceso</label>
-          <span class="hint" style="margin:0">No suma en los indicadores, pero queda registrado</span>
+        <div class="f sm" id="wVia">
+          <label for="via">Vía</label>
+          <select id="via">
+            <option value="">—</option>
+            <option value="AIR">Aéreo</option>
+            <option value="SEA">Marítimo</option>
+          </select>
         </div>
       </div>
 
+      <div class="row" style="margin-top:10px">
+        <div class="f sm" id="wCajas">
+          <label for="cajas">Cajas del despacho</label>
+          <input type="number" id="cajas" min="1" inputmode="numeric">
+        </div>
+        <div class="f sm">
+          <label for="lote" id="lblLote">Lote</label>
+          <input type="number" id="lote" min="1" inputmode="numeric">
+          <div class="hint" id="hLote"></div>
+        </div>
+        <div class="f sm">
+          <label for="muestra" id="lblMuestra">Muestra</label>
+          <input type="number" id="muestra" min="1" inputmode="numeric">
+          <div class="hint" id="hMuestra"></div>
+        </div>
+        <div class="f sm" id="wDerivados">
+          <label for="derivados">Derivados</label>
+          <input type="number" id="derivados" min="0" inputmode="numeric" placeholder="0">
+          <div class="hint">Prendas del lote completo</div>
+        </div>
+        <div class="f" style="display:flex;align-items:flex-end;gap:18px;padding-bottom:4px;flex-wrap:wrap">
+          <label class="sw"><input type="checkbox" id="reproceso"> Es reproceso</label>
+          <label class="sw" id="wLicencia"><input type="checkbox" id="licencia"> Es licencia (100%)</label>
+          <span class="hint" style="margin:0">No suman lote en los indicadores, pero la auditoría sí cuenta</span>
+        </div>
+      </div>
+
+      <div class="edicion" id="edicion"></div>
       <div class="prev" id="prev"></div>
     </div>
 
@@ -207,6 +285,25 @@
         <tbody id="tb"></tbody>
       </table>
       <div class="vacio" id="vacio">Sin defectos. Si la auditoría salió limpia, guarda directo.</div>
+
+      <div class="row" id="wResultado" style="margin-top:6px;display:none">
+        <div class="f sm">
+          <label for="resultado">Resultado</label>
+          <select id="resultado">
+            <option value="">Elegir…</option>
+            <option value="APROBADO">APROBADO</option>
+            <option value="RECHAZADO">RECHAZADO</option>
+          </select>
+        </div>
+        <div class="f sm" id="wNivelAql" style="display:none">
+          <label for="nivelAql">Nivel AQL</label>
+          <select id="nivelAql">
+            <option value="1.0">1.0</option>
+            <option value="1.5" selected>1.5</option>
+            <option value="2.5">2.5</option>
+          </select>
+        </div>
+      </div>
 
       <div class="ver ok" id="ver"></div>
 
@@ -248,17 +345,89 @@ var CLAVE = 'livessac';
 
 /* Defectos más frecuentes por tipo, en orden, según el histórico 2025-2026.
    Solo definen qué sale como botón: el catálogo completo viene del Sheet. */
-var FRECUENTES = {"LINEAS": ["CO02", "CO01-2", "CO34", "AC23", "CO02-3", "CO01", "CO17", "DE03-3", "DE02", "AC32", "CO14", "AC27", "AC33", "CO13"], "SERVINSP": ["CO02", "CO02-3", "DE02", "AC32", "CO01-2", "DE03-3", "CO17", "AC23", "CO14", "CO01", "AC25", "AC16", "CO13", "CO28"]};
+var FRECUENTES = {"LINEAS": ["CO02", "CO01-2", "CO34", "AC23", "CO02-3", "CO01", "CO17", "DE03-3", "DE02", "AC32", "CO14", "AC27", "AC33", "CO13"], "SERVINSP": ["CO02", "CO02-3", "DE02", "AC32", "CO01-2", "DE03-3", "CO17", "AC23", "CO14", "CO01", "AC25", "AC16", "CO13", "CO28"], "EMPAQUE": ["AC08", "EM01", "EM02", "CO02-3", "CO15-2", "CO17", "CO21", "EM05", "DE02", "EM03-2", "EM07", "EM06", "EM03-3", "CO06"], "CLIENTE": ["CO01-2", "CO21", "CO23", "CO35", "CO02-3", "CO02", "AC40", "AC23", "CO09-2", "DE02", "CO09", "AC18", "EM03-3", "CO17"], "FINAL": ["AC17", "CO02", "AC31", "CO01-2", "CO02-3", "CO17-2", "AC18", "CO01", "AC01", "CO17", "AC20", "AC25", "AC19", "AC23"]};
 
 /* Tolerancia cero: el sistema decide el resultado, no la persona. */
 var TOL0 = { LINEAS: true, SERVINSP: true };
-var NOMBRE_TIPO = { LINEAS: 'Líneas de costura', SERVINSP: 'Servicio de inspección' };
+var NOMBRE_TIPO = { LINEAS:'Líneas de costura', SERVINSP:'Servicio de inspección',
+                    EMPAQUE:'Empaque', CLIENTE:'Auditoría de cliente', FINAL:'Auditoría final' };
+
+/* Qué campos se ven en cada tipo. Se define acá y no en el HTML para que
+   agregar o quitar uno sea cambiar una línea, no buscar por todo el archivo. */
+var CAMPOS = {
+  LINEAS:   ['wLinea'],
+  SERVINSP: [],
+  EMPAQUE:  ['wServicio','wPo','wDestino','wVia','wCajas','wResultado'],
+  CLIENTE:  ['wPo','wDestino','wVia','wResultado'],
+  FINAL:    ['wIntExt','wProceso','wServicio','wPo','wDestino','wVia',
+             'wDerivados','wLicencia','wResultado','wNivelAql']
+};
+var TODOS_COND = ['wLinea','wIntExt','wProceso','wServicio','wPo','wDestino','wVia',
+                  'wCajas','wDerivados','wLicencia','wResultado','wNivelAql'];
+
+/* En Empaque los nombres engañan: el "lote" son CAJAS revisadas y la "muestra"
+   son PRENDAS que había dentro. Se renombra en pantalla para que nadie
+   lo interprete al revés, como nos pasó al construir el dashboard. */
+var ETIQUETAS = {
+  EMPAQUE: { lote:'Cajas revisadas', muestra:'Prendas revisadas',
+             hLote:'De las cajas del despacho', hMuestra:'Las que había dentro' },
+  DEFECTO: { lote:'Lote', muestra:'Muestra', hLote:'', hMuestra:'' }
+};
+
+/* Botones de tipo arriba. El <select> sigue existiendo oculto: es la única
+   fuente de verdad del tipo activo, así el resto del código no cambia. */
+var TIPOS_UI=[
+  {v:'LINEAS',   n:'Líneas',            ic:'🧵'},
+  {v:'SERVINSP', n:'Serv. Inspección',  ic:'🔍'},
+  {v:'EMPAQUE',  n:'Empaque',           ic:'📦'},
+  {v:'CLIENTE',  n:'Cliente',           ic:'👔'},
+  {v:'FINAL',    n:'Final',             ic:'✅'}
+];
+function pintarTipos(){
+  var bar=$('tipoBar'); if(!bar) return;
+  bar.innerHTML='';
+  var act=$('tipo').value;
+  TIPOS_UI.forEach(function(t){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='tipoBtn'+(t.v===act?' on':'');
+    b.innerHTML='<span class="ic">'+t.ic+'</span>'+t.n;
+    b.onclick=function(){
+      if($('tipo').value===t.v) return;
+      /* si hay algo a medio digitar, avisar antes de cambiar: los campos
+         cambian según el tipo y se perdería lo escrito */
+      var hayAlgo = T($('grupo').value)||T($('estilo').value)||defs.length;
+      if(hayAlgo && !confirm('Vas a cambiar a '+t.n+'. Se limpia lo que estás digitando. ¿Continuar?')) return;
+      $('tipo').value=t.v;
+      limpiarRegistro(false);
+      aplicarTipo();
+      guardarLocal('lives_fijo_aud', datosFijos());
+    };
+    bar.appendChild(b);
+  });
+}
+
+function aplicarTipo(){
+  pintarTipos();
+  var t=$('tipo').value;
+  TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
+  (CAMPOS[t]||[]).forEach(function(id){
+    var e=$(id); if(e) e.style.display = (id==='wLicencia') ? 'inline-flex' : '';
+  });
+  var et = ETIQUETAS[t] || ETIQUETAS.DEFECTO;
+  $('lblLote').textContent=et.lote; $('lblMuestra').textContent=et.muestra;
+  $('hLote').textContent=et.hLote||'';
+  /* el resultado solo es obligatorio donde no lo calcula el sistema */
+  var sel=$('resultado'); if(sel) sel.required = (t==='EMPAQUE'||t==='CLIENTE');
+  pintarChips(); veredicto();
+}
 
 var CAT = { defectos: [], personal: [], clientes: [], lineas: [], talleres: [] };
 var defs = [];            // defectos del registro actual
 var cola = [];            // envíos pendientes
 var guardados = 0, fallidos = 0;
 var prevLote = null;      // resultado de la última búsqueda de lote
+var editando = null;      // id de la auditoría que se está corrigiendo
 
 function $(id){ return document.getElementById(id); }
 function T(v){ return String(v==null?'':v).trim(); }
@@ -476,20 +645,60 @@ function pintarDefs(){
 }
 function totalDef(){ return defs.reduce(function(s,d){ return s+(d.cantidad||0); },0); }
 
+/* Tabla AQL, la misma que usa el sistema del piloto. */
+var AQL=[[2,8,2,{'1.0':0,'1.5':0,'2.5':0}],[9,15,3,{'1.0':0,'1.5':0,'2.5':0}],
+[16,25,5,{'1.0':0,'1.5':0,'2.5':0}],[26,50,8,{'1.0':0,'1.5':0,'2.5':0}],
+[51,90,13,{'1.0':0,'1.5':0,'2.5':1}],[91,150,20,{'1.0':0,'1.5':1,'2.5':1}],
+[151,280,32,{'1.0':1,'1.5':1,'2.5':2}],[281,500,50,{'1.0':1,'1.5':2,'2.5':3}],
+[501,1200,80,{'1.0':2,'1.5':3,'2.5':5}],[1201,3200,125,{'1.0':3,'1.5':5,'2.5':7}],
+[3201,10000,200,{'1.0':5,'1.5':7,'2.5':10}]];
+function aqlFor(lote,niv){
+  for(var i=0;i<AQL.length;i++) if(lote>=AQL[i][0]&&lote<=AQL[i][1])
+    return {muestra:AQL[i][2], acepta:AQL[i][3][niv||'1.5']};
+  return null;
+}
+
 function veredicto(){
   var t=$('tipo').value, tot=totalDef(), mu=N($('muestra').value), v=$('ver');
   var h=$('hMuestra');
-  if(mu>0 && tot>mu){ h.className='hint err'; h.textContent='Hay más defectuosas ('+tot+') que muestra ('+mu+').'; }
+  if(mu>0 && tot>mu){ h.className='hint err'; h.textContent='Hay más defectuosas ('+tot+') que la muestra ('+mu+').'; }
   else { h.className='hint'; h.textContent = mu>0 ? ((tot/mu*100).toFixed(1)+'% defectuosas') : ''; }
-  if(tot===0){
-    v.className='ver ok';
-    v.innerHTML='APROBADO<span class="exp">En '+NOMBRE_TIPO[t]+' no se acepta ningún defecto. '+
-      'Como no hay ninguno, el sistema aprueba solo.</span>';
-  } else {
-    v.className='ver no';
-    v.innerHTML='RECHAZADO<span class="exp">En '+NOMBRE_TIPO[t]+' un solo defecto ya es rechazo. '+
-      'Hay '+tot+' prenda(s). Lo decide el sistema, no quien digita.</span>';
+
+  if(TOL0[t]){
+    if(tot===0){ v.className='ver ok';
+      v.innerHTML='APROBADO<span class="exp">En '+NOMBRE_TIPO[t]+' no se acepta ningún defecto. '+
+        'Como no hay ninguno, el sistema aprueba solo.</span>'; }
+    else { v.className='ver no';
+      v.innerHTML='RECHAZADO<span class="exp">En '+NOMBRE_TIPO[t]+' un solo defecto ya es rechazo. '+
+        'Hay '+tot+' prenda(s). Lo decide el sistema, no quien digita.</span>'; }
+    return;
   }
+
+  if(t==='FINAL'){
+    if($('licencia').checked){
+      v.className='ver ok';
+      v.innerHTML='LICENCIA · inspección al 100%<span class="exp">La muestra es el lote entero. '+
+        'La auditoría cuenta, pero el lote no vuelve a sumar en los indicadores.</span>';
+      return;
+    }
+    var lote=N($('lote').value), niv=$('nivelAql').value;
+    var a = lote>=2 ? aqlFor(lote,niv) : null;
+    if(!a){ v.className='ver ok';
+      v.innerHTML='Falta el lote<span class="exp">Con el tamaño del lote, la norma AQL dice sola '+
+        'cuántas defectuosas se aceptan.</span>'; return; }
+    var ok = tot<=a.acepta;
+    v.className='ver '+(ok?'ok':'no');
+    v.innerHTML=(ok?'APROBADO':'RECHAZADO')+' según AQL '+niv+
+      '<span class="exp">Lote de '+lote.toLocaleString('es-PE')+' prendas · la norma pide revisar '+
+      a.muestra+' y acepta hasta '+a.acepta+' defectuosa(s). Hay '+tot+'. '+
+      'Si Calidad decide otra cosa, elige el resultado abajo y queda registrado que fue contra la norma.</span>';
+    return;
+  }
+
+  v.className='ver ok';
+  v.innerHTML='El resultado lo eliges tú<span class="exp">'+NOMBRE_TIPO[t]+
+    ' no tiene todavía una regla automática definida por Calidad. '+
+    (mu>0?('Hay '+tot+' defectuosas sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%).'):'')+'</span>';
 }
 
 /* ---------------- guardado optimista ---------------- */
@@ -502,7 +711,15 @@ function validar(){
   if(!T($('color').value)) return 'Falta el color.';
   if(N($('lote').value)<=0) return 'Falta el lote.';
   if(N($('muestra').value)<=0) return 'Falta la muestra.';
-  if(N($('muestra').value)>N($('lote').value)) return 'La muestra no puede ser mayor que el lote.';
+  var t=$('tipo').value;
+  if(t!=='EMPAQUE' && N($('muestra').value)>N($('lote').value))
+    return 'La muestra no puede ser mayor que el lote.';
+  if(t==='EMPAQUE' && N($('cajas').value)>0 && N($('lote').value)>N($('cajas').value))
+    return 'Las cajas revisadas no pueden ser más que las del despacho.';
+  if((t==='EMPAQUE'||t==='CLIENTE') && !T($('resultado').value))
+    return 'Falta elegir el resultado.';
+  if(t==='FINAL' && !T($('servicio').value) && U($('intExt').value)==='EXTERNO')
+    return 'Falta el taller.';
   if(totalDef()>N($('muestra').value)) return 'Hay más prendas defectuosas que la muestra.';
   for(var i=0;i<defs.length;i++) if(defs[i].cantidad<=0) return 'Hay un defecto con cantidad en cero.';
   return '';
@@ -511,6 +728,7 @@ function validar(){
 function guardar(){
   var err=validar();
   if(err){ $('hGuardar').className='hint err'; $('hGuardar').textContent=err; return; }
+  if(editando){ guardarEdicion(); return; }
   var t=$('tipo').value;
   var envio={
     accion:'guardar', clave:CLAVE, tipo:t,
@@ -520,11 +738,22 @@ function guardar(){
     auditores:JSON.stringify([U($('auditor').value)]),
     inspector:U($('inspector').value),
     linea: t==='LINEAS' ? $('linea').value : '',
-    colores:JSON.stringify([{color:U($('color').value), po:''}]),
+    colores:JSON.stringify([{color:U($('color').value), po:U($('po').value)}]),
     defectos:JSON.stringify(defs.map(function(d){
       return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,
               nombre:d.nombre, cantidad:d.cantidad};
     })),
+    po: U($('po').value),
+    servicio: U($('servicio').value),
+    destinos: JSON.stringify( T($('destino').value)
+        ? [{codigo:U($('destino').value), via:$('via').value}] : [] ),
+    cajas: N($('cajas').value),
+    derivados: T($('derivados').value),
+    intExt: U($('intExt').value),
+    proceso: U($('proceso').value),
+    nivelAql: $('nivelAql').value,
+    resultado: U($('resultado').value),
+    licencia: $('licencia').checked ? '1' : '0',
     reproceso: $('reproceso').checked ? '1' : '0',
     captura:'DIGITADO',
     digitador:U($('digitador').value)
@@ -544,7 +773,8 @@ function procesarCola(){
     it.enviando=true; it.intentos++;
     jsonp(it.envio, function(r){
       it.enviando=false;
-      if(r && r.ok){ it.estado='ok'; it.msg=r.mensaje||''; it.nAud=r.nAuditoria; guardados++; }
+      if(r && r.ok){ it.estado='ok'; it.msg=r.mensaje||''; it.nAud=r.nAuditoria;
+                     it.idAud=r.id; guardados++; }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; fallidos++; }
       pintarLog();
     }, function(motivo){
@@ -568,25 +798,147 @@ function pintarLog(){
     : 'Todavía no has guardado nada.';
 
   $('log').innerHTML = cola.slice().reverse().map(function(i){
-    var ic = i.estado==='ok' ? '✓' : (i.estado==='err' ? '!' : '⟳');
+    var ic = i.estado==='ok' ? '✓' : (i.estado==='err' ? '!' : (i.estado==='anul' ? '⊘' : '⟳'));
+    var acc = '';
+    if(i.estado==='ok' && i.idAud){
+      acc = '<div class="acc">'+
+        '<button class="mini" type="button" data-ed="'+esc(i.idAud)+'">Editar</button>'+
+        '<button class="mini danger" type="button" data-an="'+esc(i.idAud)+'">Anular</button></div>';
+    }
     return '<div class="li '+i.estado+'"><div class="ic">'+ic+'</div><div class="d">'+
       '<b>'+esc(i.etiqueta)+'</b>'+
       (i.msg?'<div class="m">'+esc(i.msg)+'</div>':'')+
-      (i.estado==='err'?'<div class="m">Corrige y vuelve a digitarla: no se guardó.</div>':'')+
-      '</div></div>';
+      (i.estado==='err'?'<div class="m">No se guardó. Vuelve a digitarla.</div>':'')+
+      acc+'</div></div>';
   }).join('');
+  Array.prototype.forEach.call($('log').querySelectorAll('[data-ed]'),function(b){
+    b.onclick=function(){ editar(b.dataset.ed); };
+  });
+  Array.prototype.forEach.call($('log').querySelectorAll('[data-an]'),function(b){
+    b.onclick=function(){ anular(b.dataset.an); };
+  });
 }
 
 /* Limpia solo lo del registro; lo fijo (auditora, línea, fecha) se queda. */
 function limpiarRegistro(exito){
-  ['grupo','estilo','color','lote','muestra'].forEach(function(id){ $(id).value=''; });
+  ['grupo','estilo','color','lote','muestra','po','cajas','derivados','destino'].forEach(
+    function(id){ var e=$(id); if(e) e.value=''; });
   $('cliente').value=''; $('reproceso').checked=false;
+  $('licencia').checked=false; $('resultado').value='';
   defs=[]; prevLote=null;
   $('prev').classList.remove('on');
   pintarDefs();
   $('hGuardar').className='hint '+(exito?'ok':'');
   $('hGuardar').textContent = exito ? 'Guardado. Sigue con la siguiente.' : '';
   $('grupo').focus();
+}
+
+/* ---------------- editar y anular ---------------- */
+
+function itemPorId(idAud){
+  for(var i=0;i<cola.length;i++) if(cola[i].idAud===idAud) return cola[i];
+  return null;
+}
+
+function editar(idAud){
+  if(editando===idAud) return;
+  $('hGuardar').className='hint'; $('hGuardar').textContent='Cargando la auditoría…';
+  jsonp({accion:'leer', id:idAud}, function(r){
+    if(!r||!r.ok){ $('hGuardar').className='hint err'; $('hGuardar').textContent=(r&&r.error)||'No se pudo cargar.'; return; }
+    var g=r.registro;
+    $('tipo').value=T(g.TIPO_AUDITORIA)||'LINEAS';
+    $('wLinea').style.display = $('tipo').value==='LINEAS' ? '' : 'none';
+    $('fecha').value=T(g.FECHA);
+    $('auditor').value=(r.auditores&&r.auditores[0])||T(g.AUDITOR);
+    $('inspector').value=T(g.INSPECTOR);
+    $('linea').value=T(g.LINEA);
+    $('grupo').value=T(g.GRUPO); $('estilo').value=T(g.ESTILO); $('color').value=T(g.COLOR);
+    $('lote').value=N(g.LOTE); $('muestra').value=N(g.MUESTRA);
+    $('reproceso').checked = N(g.REPROCESO)===1;
+    aplicarCliente();
+
+    /* Los defectos se recargan de verdad. Si no se recargaran y ella guardara,
+       se borrarían en silencio: ese es el error más caro de un formulario así. */
+    defs=(r.defectos||[]).map(function(d){
+      var nom = T(d.SUBTIPO) ? (T(d.CATEGORIA)+' '+T(d.SUBTIPO)) : T(d.CATEGORIA);
+      return {cod:T(d.COD), seccion:T(d.SECCION), categoria:T(d.CATEGORIA),
+              subtipo:T(d.SUBTIPO), nombre:nom, cantidad:N(d.CANTIDAD)};
+    });
+    pintarDefs(); pintarChips();
+
+    editando=idAud;
+    var e=$('edicion');
+    e.className='edicion on';
+    e.innerHTML='<b>Corrigiendo una auditoría ya guardada.</b> '+
+      '<span>Al guardar se reemplaza, no se crea una nueva.</span>'+
+      '<button class="mini" type="button" id="btnCancelarEd">Cancelar corrección</button>';
+    $('btnCancelarEd').onclick=cancelarEdicion;
+    $('btnGuardar').innerHTML='Guardar cambios <span class="kbd">F2</span>';
+    $('prev').classList.remove('on');
+    $('hGuardar').textContent='';
+    $('grupo').focus();
+  }, function(){ $('hGuardar').className='hint err'; $('hGuardar').textContent='Sin conexión.'; });
+}
+
+function cancelarEdicion(){
+  editando=null;
+  $('edicion').className='edicion';
+  $('btnGuardar').innerHTML='Guardar <span class="kbd">F2</span>';
+  limpiarRegistro(false);
+}
+
+function guardarEdicion(){
+  var id=editando;
+  var cambios={
+    FECHA:$('fecha').value, TIPO_AUDITORIA:$('tipo').value,
+    GRUPO:U($('grupo').value), ESTILO:U($('estilo').value), COLOR:U($('color').value),
+    CLIENTE:U($('cliente').value),
+    LOTE:N($('lote').value), MUESTRA:N($('muestra').value),
+    INSPECTOR:U($('inspector').value),
+    LINEA: $('tipo').value==='LINEAS' ? $('linea').value : '',
+    RESULTADO: totalDef()>0 ? 'RECHAZADO' : 'APROBADO',
+    REPROCESO: $('reproceso').checked ? 1 : 0
+  };
+  var envio={
+    accion:'editar', clave:CLAVE, id:id, usuario:U($('digitador').value),
+    cambios:JSON.stringify(cambios),
+    auditores:JSON.stringify([U($('auditor').value)]),
+    defectos:JSON.stringify(defs.map(function(d){
+      return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,
+              nombre:d.nombre, cantidad:d.cantidad};
+    }))
+  };
+  var etq=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
+          ' · '+(totalDef()===0?'aprobado':'rechazado ('+totalDef()+')');
+  cancelarEdicion();
+  jsonp(envio, function(r){
+    var it=itemPorId(id);
+    if(r&&r.ok){ if(it){ it.etiqueta=etq; it.msg='Corregida'; it.estado='ok'; } }
+    else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo corregir'; }
+    pintarLog();
+  }, function(){
+    var it=itemPorId(id);
+    if(it){ it.estado='err'; it.msg='sin conexión al corregir'; }
+    pintarLog();
+  });
+}
+
+function anular(idAud){
+  var it=itemPorId(idAud);
+  var motivo=prompt('¿Por qué se anula esta auditoría?\n\n'+((it&&it.etiqueta)||'')+
+                    '\n\nLa fila no se borra: queda registrada como anulada y deja de contar.');
+  if(motivo===null) return;
+  motivo=T(motivo);
+  if(motivo.length<3){ alert('Escribe el motivo para poder anularla.'); return; }
+  jsonp({accion:'anular', clave:CLAVE, id:idAud, motivo:motivo, usuario:U($('digitador').value)},
+    function(r){
+      if(r&&r.ok){ if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; } guardados=Math.max(0,guardados-1); }
+      else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo anular'; }
+      pintarLog();
+    }, function(){
+      if(it){ it.estado='err'; it.msg='sin conexión al anular'; }
+      pintarLog();
+    });
 }
 
 /* ---------------- arranque ---------------- */
@@ -603,8 +955,8 @@ autocompletar('estilo','dEstilo', function(){ return SUG.ESTILO.map(function(v){
 autocompletar('color','dColor', function(){ return SUG.COLOR.map(function(v){ return {texto:v}; }); });
 
 /* sugerencias de grupo/estilo/color: se piden al servidor y se guardan en memoria */
-var SUG={GRUPO:[],ESTILO:[],COLOR:[]};
-['GRUPO','ESTILO','COLOR'].forEach(function(campo){
+var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
+['GRUPO','ESTILO','COLOR','PO'].forEach(function(campo){
   jsonp({accion:'sugerir', campo:campo, tipo:''}, function(r){
     if(r && r.ok) SUG[campo]=r.valores||[];
   });
@@ -648,10 +1000,23 @@ $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ if(N($('lote').value)>0) buscarLote(); });
 $('muestra').addEventListener('input', veredicto);
 $('tipo').addEventListener('change', function(){
-  $('wLinea').style.display = $('tipo').value==='LINEAS' ? '' : 'none';
-  pintarChips(); veredicto();
+  aplicarTipo();
   guardarLocal('lives_fijo_aud', datosFijos());
 });
+['licencia','nivelAql','lote','cajas'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('input', veredicto);
+});
+$('licencia').addEventListener('change', function(){
+  if($('licencia').checked) $('muestra').value=$('lote').value;
+  veredicto();
+});
+autocompletar('servicio','dServicio', function(){
+  return (CAT.talleres||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });
+});
+autocompletar('destino','dDestino', function(){
+  return (CAT.destinos||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });
+});
+autocompletar('po','dPo', function(){ return (SUG.PO||[]).map(function(v){ return {texto:v}; }); });
 $('btnGuardar').onclick=guardar;
 $('btnLimpiar').onclick=function(){ limpiarRegistro(false); };
 
@@ -679,7 +1044,7 @@ window.addEventListener('beforeunload', function(e){
          $('inspector').value=f.inspector||''; $('digitador').value=f.digitador||''; }
   var hoy=new Date();
   $('fecha').value = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2)+'-'+('0'+hoy.getDate()).slice(-2);
-  $('wLinea').style.display = $('tipo').value==='LINEAS' ? '' : 'none';
+  aplicarTipo();
   cargarCatalogos();
   setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
   pintarDefs();

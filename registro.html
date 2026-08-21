@@ -422,8 +422,9 @@
 
   <div class="card" id="cardHoja" style="display:none">
     <h2>Hoja de auditorías</h2>
-    <div class="sub">Una fila por auditoría, como en el papel. Haz clic en una fila para
-      agregarle defectos. El total y el resultado salen solos.</div>
+    <div class="sub">Una fila por auditoría, como en el papel. Un bloque por auditora:
+      al terminar el bloque pulsa <b>Agregar bloque a la lista</b>, cambia la auditora
+      arriba y sigue con el siguiente. El total y el resultado salen solos.</div>
 
     <div class="hjDef">
       <div class="hjLbl">Defectos frecuentes — se agregan a la fila <b id="hjFila">—</b>
@@ -450,6 +451,7 @@
     </div>
     <div class="acciones">
       <button class="btn sec" id="hjMas" type="button">+ Agregar fila</button>
+      <button class="btn" id="hjBloque" type="button">Agregar bloque a la lista</button>
       <button class="btn env" id="hjEnviar" type="button">Guardar todo</button>
       <span class="hint" id="hjMsg" style="margin:0"></span>
     </div>
@@ -1555,7 +1557,10 @@ if($('hjMas')) $('hjMas').onclick=function(){
   var last=$('hjBody').querySelector('tr[data-f="'+(hoja.length-1)+'"] input'); if(last) last.focus();
 };
 
-if($('hjEnviar')) $('hjEnviar').onclick=function(){
+/* Convierte las filas de la hoja en envíos, tomando los datos fijos de arriba.
+   Cada bloque conserva SU auditora e inspectora, aunque después se cambien
+   para el bloque siguiente: por eso se copian acá y no al momento de enviar. */
+function bloqueDeHoja(){
   var t=$('tipo').value, listas=[], errores=[];
   hoja.forEach(function(f,i){
     if(!T(f.grupo)&&!T(f.estilo)&&!N(f.lote)&&!N(f.muestra)) return;
@@ -1570,12 +1575,11 @@ if($('hjEnviar')) $('hjEnviar').onclick=function(){
   if(errores.length){
     $('hjMsg').className='hint err';
     $('hjMsg').textContent=errores[0]+(errores.length>1?(' (y '+(errores.length-1)+' más)'):'');
-    return;
+    return null;
   }
-  if(!listas.length){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No hay filas con datos.'; return; }
-  if(!confirm('Se van a guardar '+listas.length+' auditoría(s). ¿Continuar?')) return;
+  if(!listas.length){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No hay filas con datos.'; return null; }
 
-  listas.forEach(function(x){
+  return listas.map(function(x){
     var f=x.f, tot=totalFila(f);
     var envio={
       accion:'guardar', clave:CLAVE, tipo:t, fecha:$('fecha').value,
@@ -1587,12 +1591,46 @@ if($('hjEnviar')) $('hjEnviar').onclick=function(){
       colores:JSON.stringify([{color:U(f.color),po:''}]),
       defectos:JSON.stringify(f.defs||[]),
       reproceso:'0', captura:'DIGITADO', digitador:U($('digitador').value),
-      token:'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9)
+      token:'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9)+'-'+Math.floor(Math.random()*1000)
     };
-    cola.push({ id:envio.token, envio:envio,
-      etiqueta:U(f.grupo)+' · '+U(f.estilo)+' · lote '+N(f.lote)+' · '+(tot?('rechazado ('+tot+')'):'aprobado'),
-      estado:'wait', intentos:0 });
+    return { id:envio.token, envio:envio,
+      tipo:NOMBRE_TIPO[t],
+      resultado: tot>0 ? 'RECHAZADO' : 'APROBADO',
+      defectuosas: tot,
+      etiqueta:U(f.grupo)+' · '+U(f.estilo)+' · lote '+N(f.lote)+
+               ' · '+U($('auditor').value) };
   });
+}
+
+/* Cierra el bloque: pasa sus filas a la lista de pendientes y deja la hoja
+   vacía para el siguiente, con otra auditora. Nada sale al servidor todavía. */
+if($('hjBloque')) $('hjBloque').onclick=function(){
+  var lista=bloqueDeHoja();
+  if(!lista) return;
+  lista.forEach(function(x){ pend.push(x); });
+  hoja=[filaNueva()]; filaAct=-1; guardarHoja(); pintarHoja();
+  guardarPend(); pintarPend();
+  $('hjMsg').className='hint ok';
+  $('hjMsg').textContent=lista.length+' auditoría(s) en la lista. Cambia la auditora arriba y sigue.';
+  var a=$('auditor'); if(a){ a.focus(); a.select(); }
+};
+
+if($('hjEnviar')) $('hjEnviar').onclick=function(){
+  /* Manda lo que esté en la lista más lo que quede en la hoja sin cerrar. */
+  var lista=[];
+  if(hoja.some(function(f){ return T(f.grupo)||T(f.estilo)||N(f.lote)||N(f.muestra); })){
+    var b=bloqueDeHoja();
+    if(!b) return;
+    lista=lista.concat(b);
+  }
+  lista=pend.concat(lista);
+  if(!lista.length){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No hay nada que guardar.'; return; }
+  if(!confirm('Se van a guardar '+lista.length+' auditoría(s). ¿Continuar?')) return;
+
+  lista.forEach(function(x){
+    cola.push({ id:x.id, envio:x.envio, etiqueta:x.etiqueta, estado:'wait', intentos:0 });
+  });
+  pend=[]; guardarPend(); pintarPend();
   hoja=[filaNueva()]; filaAct=-1; guardarHoja(); pintarHoja();
   $('hjMsg').className='hint ok'; $('hjMsg').textContent='Enviadas. Mira el historial abajo.';
   pintarLog(); procesarCola();
@@ -1607,9 +1645,12 @@ var VISTA_HOJA = { LINEAS:true, SERVINSP:true, EMPAQUE:false, CLIENTE:false, FIN
 
 function verVista(){
   var esHoja = !!VISTA_HOJA[$('tipo').value];
-  Array.prototype.forEach.call(document.querySelectorAll('.cap, #cardPend'),function(e){
+  Array.prototype.forEach.call(document.querySelectorAll('.cap'),function(e){
     e.style.display = esHoja ? 'none' : '';
   });
+  /* La lista de pendientes se ve en las dos vistas: en la hoja guarda los
+     bloques ya cerrados de otras auditoras. */
+  $('cardPend').style.display='';
   $('cardHoja').style.display = esHoja ? '' : 'none';
   if(esHoja){ pintarChipsHoja(); pintarHoja(); }
 }

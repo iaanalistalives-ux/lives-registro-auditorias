@@ -759,9 +759,18 @@ function aplicarCliente(){
   var g=$('grupo').value, c=clienteDeGrupo(g);
   $('cliente').value=c||'';
   var h=$('hGrupo');
-  if(g && !c){ h.className='hint err'; h.textContent='Ese prefijo no está en el catálogo de clientes.'; }
+  if(g && U(g).length>=3 && !c){
+    /* El catálogo de clientes lo mantiene el analista en el Sheet, no se da de
+       alta desde el formulario: un cliente mal escrito obliga a corregir todas
+       las auditorías que entraron con él. Acá solo se avisa y se bloquea. */
+    h.className='hint err';
+    h.textContent='«'+U(g).substring(0,3)+'» no está en la base de clientes. '+
+                  'Salta esta auditoría y avisa para que se agregue.';
+  }
   else { h.className='hint'; h.textContent='El cliente sale solo del prefijo'; }
 }
+
+
 
 /* ---------------- búsqueda de lote ---------------- */
 function buscarLote(){
@@ -1349,7 +1358,14 @@ function pintarHoja(){
 
   Array.prototype.forEach.call($('hjBody').querySelectorAll('input'),function(inp){
     inp.oninput=function(){ hoja[+inp.dataset.f][inp.dataset.c]=inp.value; guardarHoja(); refrescarTotales(); };
-    inp.onchange=function(){ recordar(inp.dataset.c.toUpperCase(), inp.value); };
+    inp.onchange=function(){
+      recordar(inp.dataset.c.toUpperCase(), inp.value);
+      if(inp.dataset.c==='grupo' && U(inp.value).length>=3 && !clienteDeGrupo(inp.value)){
+        $('hjMsg').className='hint err';
+        $('hjMsg').textContent='«'+U(inp.value).substring(0,3)+'» no está en la base de clientes. '+
+          'Salta esa fila y avisa para que se agregue.';
+      }
+    };
     inp.onfocus=function(){ activarFila(+inp.dataset.f); };
     inp.onkeydown=function(e){
       if(e.key==='Enter'){
@@ -1561,11 +1577,15 @@ if($('hjMas')) $('hjMas').onclick=function(){
    Cada bloque conserva SU auditora e inspectora, aunque después se cambien
    para el bloque siguiente: por eso se copian acá y no al momento de enviar. */
 function bloqueDeHoja(){
-  var t=$('tipo').value, listas=[], errores=[];
+  var t=$('tipo').value, listas=[], errores=[], faltaCli='';
   hoja.forEach(function(f,i){
     if(!T(f.grupo)&&!T(f.estilo)&&!N(f.lote)&&!N(f.muestra)) return;
     var cli=clienteDeGrupo(f.grupo);
-    if(!cli){ errores.push('Fila '+(i+1)+': el prefijo del grupo no está en el catálogo.'); return; }
+    if(!cli){
+      errores.push('Fila '+(i+1)+': «'+U(f.grupo).substring(0,3)+'» no está en la base de clientes.');
+      faltaCli = faltaCli || U(f.grupo).substring(0,3);
+      return;
+    }
     if(N(f.muestra)<=0){ errores.push('Fila '+(i+1)+': falta la muestra.'); return; }
     if(N(f.lote)>0 && N(f.muestra)>N(f.lote)){ errores.push('Fila '+(i+1)+': la muestra es mayor que el lote.'); return; }
     if(totalFila(f)>N(f.muestra)){ errores.push('Fila '+(i+1)+': hay más defectuosas que la muestra.'); return; }
@@ -1574,7 +1594,8 @@ function bloqueDeHoja(){
   if(PIDE_AUDITOR[t] && !T($('auditor').value)) errores.unshift('Falta la auditora en la franja de arriba.');
   if(errores.length){
     $('hjMsg').className='hint err';
-    $('hjMsg').textContent=errores[0]+(errores.length>1?(' (y '+(errores.length-1)+' más)'):'');
+    $('hjMsg').textContent=errores[0]+(errores.length>1?(' (y '+(errores.length-1)+' más)'):'')+
+      (faltaCli?' — salta esa fila y avisa para que se agregue al catálogo.':'');
     return null;
   }
   if(!listas.length){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No hay filas con datos.'; return null; }
@@ -1684,6 +1705,9 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
     opts=[];
     for(var i=0;i<base.length && opts.length<30;i++)
       if(coincide(nombreDefecto(base[i]), q)) opts.push(base[i]);
+    /* Igual que en la hoja: si el defecto no existe se puede registrar en vez de
+       perderlo o meterlo en «Otros». Aplica a Empaque, Cliente y Final. */
+    if(!opts.length && norm(q).length>=3) opts.push(['__NUEVO__','Otros',norm(q),'']);
     sel=opts.length?0:-1; pintar(q);
   }
   function pintar(q){
@@ -1692,12 +1716,13 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
       /* Sin la etiqueta de sección al costado: el nombre del defecto ya dice
          qué es, y la sección solo agregaba ruido en pantallas chicas.
          La sección se sigue guardando en el Sheet, no se pierde el dato. */
-      return '<div class="opt'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
-        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span></div>';
+      var nuevo=o[0]==='__NUEVO__';
+      return '<div class="opt'+(i===sel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
+        '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
-      el.onmousedown=function(e){ e.preventDefault(); agregarDef(opts[+el.dataset.i]); dr.classList.remove('on'); };
+      el.onmousedown=function(e){ e.preventDefault(); elegirDef(opts[+el.dataset.i]); dr.classList.remove('on'); };
     });
   }
   inp.addEventListener('input',buscar);
@@ -1708,9 +1733,14 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
   inp.addEventListener('keydown',function(e){
     if(e.key==='ArrowDown'){ e.preventDefault(); if(opts.length){ sel=(sel+1)%opts.length; pintar(inp.value); } }
     else if(e.key==='ArrowUp'){ e.preventDefault(); if(opts.length){ sel=(sel-1+opts.length)%opts.length; pintar(inp.value); } }
-    else if(e.key==='Enter'){ e.preventDefault(); if(sel>=0 && opts[sel]) agregarDef(opts[sel]); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(sel>=0 && opts[sel]) elegirDef(opts[sel]); }
     else if(e.key==='Escape'){ dr.classList.remove('on'); inp.value=''; }
   });
+
+  function elegirDef(o){
+    if(o[0]==='__NUEVO__') registrarDefectoNuevo(o[2], function(d){ agregarDef(d); });
+    else agregarDef(o);
+  }
 })();
 
 /* Lo que escribe se suma a las sugerencias al instante, sin esperar a guardar:

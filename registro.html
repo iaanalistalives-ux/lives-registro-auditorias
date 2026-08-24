@@ -216,6 +216,10 @@
   .hjAdd:focus{border-style:solid!important;border-color:var(--sage)!important;}
   .hjRes{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;}
   .hjRes.ok{background:#ECFDF5;color:#065F46;} .hjRes.no{background:#FEF2F2;color:#991B1B;}
+  .envio{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(14,59,54,.10);
+        padding:10px 14px;margin-bottom:10px;border-left:4px solid var(--sage);}
+  .envio.mal{border-left-color:var(--rose);}
+  .envTxt{font-size:13.5px;font-weight:700;color:var(--petrol);}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -518,9 +522,8 @@
     </div>
   </div>
 
-  <div class="card" id="cardLog">
-    <h2>Historial de digitación</h2>
-    <div class="sub" id="resumen">Todavía no has guardado nada.</div>
+  <div class="envio" id="cardLog" style="display:none">
+    <div class="envTxt" id="resumen"></div>
     <div class="log" id="log"></div>
   </div>
 
@@ -1231,10 +1234,12 @@ function procesarCola(){
 
 /* La cola se guarda en el navegador. Antes vivía solo en memoria: recargar la
    página borraba lo que estaba en camino y ese trabajo se perdía sin aviso. */
+/* Solo se recuerda lo que quedó pendiente o sin confirmar. Lo ya guardado no
+   se arrastra entre sesiones: se consulta en «Buscar y corregir». */
 function guardarCola(){
   try{
     localStorage.setItem('lives_cola_aud', JSON.stringify(
-      cola.filter(function(i){ return i.estado!=='ok' || i.idAud; }).slice(-60)
+      cola.filter(function(i){ return i.estado==='wait' || i.estado==='err'; }).slice(-60)
     ));
   }catch(e){}
 }
@@ -1260,20 +1265,32 @@ function pintarLog(){
   else if(fallidos>0){ pill.style.display=''; pill.className='pill bad'; pill.textContent=fallidos+' con error'; }
   else { pill.style.display='none'; }
 
-  $('resumen').innerHTML = guardados
-    ? (guardados+' auditoría(s) guardada(s)'+
-       (fallidos?(' · <b style="color:var(--rose)">'+fallidos+' sin confirmar</b> — pulsa Reintentar en cada una'):''))
-    : 'Todavía no has guardado nada.';
+  /* Ya no se lista todo lo guardado: para eso está «Buscar y corregir», que
+     además encuentra lo de cualquier día y con filtros. Acá solo se informa el
+     avance del envío y se listan las que quedaron sin confirmar. */
+  var enCurso = cola.filter(function(i){ return i.estado==='wait'; }).length;
+  var tarj = $('cardLog');
+  if(!cola.length){ tarj.style.display='none'; return; }
+  tarj.style.display='';
+  tarj.className = 'envio'+(fallidos?' mal':'');
+
+  if(enCurso){
+    $('resumen').textContent = 'Guardando '+(guardados+fallidos+1)+' de '+cola.length+'…';
+  } else if(fallidos){
+    $('resumen').innerHTML = guardados+' guardada(s) · <b style="color:var(--rose)">'+
+      fallidos+' sin confirmar</b> — pulsa Reintentar para ver si en realidad sí entraron.';
+  } else {
+    $('resumen').textContent = guardados+' auditoría(s) guardada(s). '+
+      'Para corregir alguna, usa Buscar y corregir abajo.';
+  }
 
   guardarCola();
-  $('log').innerHTML = cola.slice().reverse().map(function(i){
+  $('log').innerHTML = cola.slice().reverse().filter(function(i){
+    return i.estado==='err';          // solo lo que necesita atención
+  }).map(function(i){
     var ic = i.estado==='ok' ? '✓' : (i.estado==='err' ? '!' : (i.estado==='anul' ? '⊘' : '⟳'));
     var acc = '';
-    if(i.estado==='ok' && i.idAud){
-      acc = '<div class="acc">'+
-        '<button class="mini" type="button" data-ed="'+esc(i.idAud)+'">Editar</button>'+
-        '<button class="mini danger" type="button" data-an="'+esc(i.idAud)+'">Anular</button></div>';
-    } else if(i.estado==='err'){
+    if(i.estado==='err'){
       /* Reintentar es seguro: cada envío lleva un identificador único y el
          servidor reconoce si ya lo había guardado, así que no se duplica. */
       acc = '<div class="acc">'+
@@ -2105,7 +2122,6 @@ function cargarRecientes(){
   var vg=leerLocal('lives_vista_aud');
   setTimeout(function(){ verVista(vg==='hoja'?'hoja':'form'); }, 1000);
   setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
-  setTimeout(cargarRecientes, 900);
   pintarDefs();
   $('grupo').focus();
 })();

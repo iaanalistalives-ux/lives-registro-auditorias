@@ -620,8 +620,11 @@ var CAMPOS = {
   SERVINSP: ['wAuditor','wInspector'],
   EMPAQUE:  ['wAuditor','wServicio','wPo','wDestino','wVia','wCajas','wResultado'],
   CLIENTE:  ['wPo','wPedido','wDestino','wVia','wResultado'],
+  /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
+     decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
+     que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
   FINAL:    ['wAuditor','wIntExt','wProceso','wServicio','wPo','wPedido','wDestino',
-             'wVia','wDerivados','wLicencia','wResultado','wNivelAql']
+             'wVia','wDerivados','wLicencia','wResultado']
 };
 var TODOS_COND = ['wAuditor','wInspector','wLinea','wIntExt','wProceso','wServicio',
                   'wPo','wPedido','wDestino','wVia','wCajas','wDerivados','wLicencia',
@@ -997,31 +1000,19 @@ function veredicto(){
     return;
   }
 
-  if(t==='FINAL'){
-    if($('licencia').checked){
-      v.className='ver ok';
-      v.innerHTML='LICENCIA · inspección al 100%<span class="exp">La muestra es el lote entero. '+
-        'La auditoría cuenta, pero el lote no vuelve a sumar en los indicadores.</span>';
-      return;
-    }
-    var lote=N($('lote').value), niv=$('nivelAql').value;
-    var a = lote>=2 ? aqlFor(lote,niv) : null;
-    if(!a){ v.className='ver ok';
-      v.innerHTML='Falta el lote<span class="exp">Con el tamaño del lote, la norma AQL dice sola '+
-        'cuántas defectuosas se aceptan.</span>'; return; }
-    var ok = tot<=a.acepta;
-    v.className='ver '+(ok?'ok':'no');
-    v.innerHTML=(ok?'APROBADO':'RECHAZADO')+' según AQL '+niv+
-      '<span class="exp">Lote de '+lote.toLocaleString('es-PE')+' prendas · la norma pide revisar '+
-      a.muestra+' y acepta hasta '+a.acepta+' defectuosa(s). Hay '+tot+'. '+
-      'Si Calidad decide otra cosa, elige el resultado abajo y queda registrado que fue contra la norma.</span>';
+  if(t==='FINAL' && $('licencia').checked){
+    v.className='ver ok';
+    v.innerHTML='LICENCIA · inspección al 100%<span class="exp">La muestra es el lote entero. '+
+      'La auditoría cuenta, pero el lote no vuelve a sumar en los indicadores.</span>';
     return;
   }
 
+  /* En Final, Empaque y Cliente el resultado viene decidido en el papel: acá
+     solo se copia. El sistema no opina para no hacerla dudar. */
   v.className='ver ok';
-  v.innerHTML='El resultado lo eliges tú<span class="exp">'+NOMBRE_TIPO[t]+
-    ' no tiene todavía una regla automática definida por Calidad. '+
-    (mu>0?('Hay '+tot+' defectuosas sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%).'):'')+'</span>';
+  v.innerHTML='Copia el resultado del papel<span class="exp">'+
+    (mu>0?('Hay '+tot+' defectuosa(s) sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%). '):'')+
+    'Elige abajo APROBADO o RECHAZADO tal como figura en la hoja.</span>';
 }
 
 /* ---------------- guardado optimista ---------------- */
@@ -1084,7 +1075,7 @@ function guardar(){
     derivados: T($('derivados').value),
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
-    nivelAql: $('nivelAql').value,
+    nivelAql: '1.5',          // fijo: el mismo del sistema del piloto
     resultado: U($('resultado').value),
     licencia: $('licencia').checked ? '1' : '0',
     esReauditoria: esReaud || 'NO',

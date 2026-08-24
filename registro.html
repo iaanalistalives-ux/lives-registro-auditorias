@@ -24,7 +24,8 @@
   @media(max-width:1050px){.grid{grid-template-columns:1fr;}}
   .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(14,59,54,.10),0 1px 2px rgba(14,59,54,.06);
         padding:12px 16px;margin-bottom:10px;}
-  .card h2{margin:0 0 2px;font-size:13.5px;color:var(--petrol);font-weight:700;}
+  .card h2{margin:0 0 2px;font-size:13.5px;color:var(--petrol);font-weight:700;
+        display:flex;align-items:center;gap:10px;}
   .card .sub{font-size:11.5px;color:var(--stone);margin-bottom:9px;}
   .row{display:flex;gap:12px;flex-wrap:wrap;}
   .f{flex:1;min-width:120px;}
@@ -479,6 +480,44 @@
     <div class="vacio" id="pendVacio">Nada pendiente. Digita una auditoría y pulsa Agregar a la lista.</div>
   </div>
 
+  <div class="card" id="cardBuscar">
+    <h2>Buscar y corregir <button type="button" class="mini" id="bqToggle">Abrir</button></h2>
+    <div class="sub">Encuentra una auditoría ya guardada y corrige lo que esté mal.</div>
+    <div id="bqCuerpo" style="display:none">
+      <div class="row">
+        <div class="f sm"><label for="bqTipo">Tipo</label>
+          <select id="bqTipo"><option value="">Todos</option>
+            <option value="LINEAS">Líneas</option><option value="SERVINSP">Serv. Inspección</option>
+            <option value="EMPAQUE">Empaque</option><option value="CLIENTE">Cliente</option>
+            <option value="FINAL">Final</option></select></div>
+        <div class="f sm"><label for="bqDesde">Desde</label><input type="date" id="bqDesde"></div>
+        <div class="f sm"><label for="bqHasta">Hasta</label><input type="date" id="bqHasta"></div>
+        <div class="f"><label for="bqGrupo">Grupo</label><input type="text" id="bqGrupo"></div>
+        <div class="f"><label for="bqEstilo">Estilo</label><input type="text" id="bqEstilo"></div>
+        <div class="f"><label for="bqColor">Color</label><input type="text" id="bqColor"></div>
+        <div class="f sm"><label for="bqPo">PO</label><input type="text" id="bqPo"></div>
+        <div class="f"><label for="bqAud">Auditora</label><input type="text" id="bqAud"></div>
+        <div class="f sm"><label for="bqRes">Resultado</label>
+          <select id="bqRes"><option value="">Todos</option>
+            <option value="APROBADO">APROBADO</option><option value="RECHAZADO">RECHAZADO</option></select></div>
+      </div>
+      <div class="acciones">
+        <button class="btn" id="bqBuscar" type="button">Buscar</button>
+        <button class="btn sec" id="bqLimpiar" type="button">Limpiar</button>
+        <label class="sw"><input type="checkbox" id="bqAnul"> Ver anuladas</label>
+        <span class="hint" id="bqMsg" style="margin:0"></span>
+      </div>
+      <div class="hjWrap" style="max-height:280px">
+        <table class="hj"><thead><tr>
+          <th>Fecha</th><th>Tipo</th><th>Grupo</th><th>Estilo</th><th>Color</th>
+          <th>PO</th><th style="width:64px">Lote</th><th style="width:74px">Muestra</th>
+          <th style="width:56px">Def.</th><th style="width:100px">Resultado</th>
+          <th>Auditora</th><th style="width:80px"></th>
+        </tr></thead><tbody id="bqBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
   <div class="card" id="cardLog">
     <h2>Historial de digitación</h2>
     <div class="sub" id="resumen">Todavía no has guardado nada.</div>
@@ -486,6 +525,43 @@
   </div>
 
 </div>
+</div>
+
+<div class="mtWrap" id="modalCorr" onclick="if(event.target===this)this.style.display='none'">
+  <div class="mtCard" style="max-width:720px">
+    <div class="mtHead">Corregir auditoría</div>
+    <div class="mtBody">
+      <div class="mtLote" id="corrTit"></div>
+      <div class="row">
+        <div class="f sm"><label for="cFecha">Fecha</label><input type="date" id="cFecha"></div>
+        <div class="f"><label for="cGrupo">Grupo</label><input type="text" id="cGrupo"></div>
+        <div class="f"><label for="cEstilo">Estilo</label><input type="text" id="cEstilo"></div>
+        <div class="f"><label for="cColor">Color</label><input type="text" id="cColor"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="f sm"><label for="cPo">PO</label><input type="text" id="cPo"></div>
+        <div class="f sm"><label for="cPedido">Pedido</label><input type="number" id="cPedido"></div>
+        <div class="f sm"><label for="cLote">Lote</label><input type="number" id="cLote"></div>
+        <div class="f sm"><label for="cMuestra">Muestra</label><input type="number" id="cMuestra"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="f"><label for="cAuditor">Auditora</label><input type="text" id="cAuditor"></div>
+        <div class="f"><label for="cInspector">Inspectora</label><input type="text" id="cInspector"></div>
+        <div class="f"><label for="cServicio">Taller</label><input type="text" id="cServicio"></div>
+        <div class="f sm"><label for="cResultado">Resultado</label>
+          <select id="cResultado"><option value="APROBADO">APROBADO</option>
+            <option value="RECHAZADO">RECHAZADO</option></select></div>
+      </div>
+      <p class="mtTxt" style="margin-top:12px">Los <b>defectos</b> no se corrigen aquí:
+        para cambiarlos usa «Abrir en el formulario», que los carga completos.</p>
+      <div class="hint err" id="corrErr"></div>
+      <div class="mtPie">
+        <button type="button" class="btn sec" onclick="document.getElementById('modalCorr').style.display='none'">Cancelar</button>
+        <button type="button" class="btn sec" id="corrForm">Abrir en el formulario</button>
+        <button type="button" class="btn" id="corrGuardar">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="mtWrap" id="modalAnular" onclick="if(event.target===this)this.style.display='none'">
@@ -1754,6 +1830,102 @@ function forzarMayusculas(inp){
 }
 ['grupo','estilo','color','po','pedido','servicio','destino','auditor','inspector',
  'digitador','qdef'].forEach(function(id){ forzarMayusculas($(id)); });
+
+/* ============ BUSCAR Y CORREGIR ============
+   Busca sobre la hoja viva, no sobre el histórico migrado: ese es data cerrada
+   y no se corrige desde el formulario. */
+var BQ=[];
+
+function bqPintar(){
+  $('bqBody').innerHTML = BQ.map(function(r,i){
+    var mal=(r.resultado||'').toUpperCase()==='RECHAZADO';
+    var anul=r.estado==='ANULADO';
+    return '<tr'+(anul?' style="opacity:.5"':'')+'>'+
+      '<td>'+esc(r.fecha)+'</td><td>'+esc(NOMBRE_TIPO[r.tipo]||r.tipo)+'</td>'+
+      '<td>'+esc(r.grupo)+'</td><td>'+esc(r.estilo)+'</td><td>'+esc(r.color)+'</td>'+
+      '<td>'+esc(r.po)+'</td><td class="nu">'+(r.lote||'')+'</td>'+
+      '<td class="nu">'+(r.muestra||'')+'</td><td class="nu">'+(r.defectuosas||'')+'</td>'+
+      '<td class="nu"><span class="hjRes '+(mal?'no':'ok')+'">'+esc(anul?'ANULADA':r.resultado)+'</span></td>'+
+      '<td>'+esc(r.auditor)+'</td>'+
+      '<td>'+(anul?'':'<button class="mini" type="button" data-corr="'+i+'">Corregir</button>')+'</td></tr>';
+  }).join('');
+  Array.prototype.forEach.call($('bqBody').querySelectorAll('[data-corr]'),function(b){
+    b.onclick=function(){ abrirCorreccion(BQ[+b.dataset.corr]); };
+  });
+}
+
+function bqBuscar(){
+  $('bqMsg').className='hint'; $('bqMsg').textContent='Buscando…';
+  jsonp({accion:'buscaraud', tipo:$('bqTipo').value, desde:$('bqDesde').value,
+         hasta:$('bqHasta').value, grupo:U($('bqGrupo').value), estilo:U($('bqEstilo').value),
+         color:U($('bqColor').value), po:U($('bqPo').value), auditor:U($('bqAud').value),
+         resultado:$('bqRes').value, anuladas:$('bqAnul').checked?'1':'0', n:100},
+    function(r){
+      if(!r||!r.ok){ $('bqMsg').className='hint err'; $('bqMsg').textContent='No se pudo buscar.'; return; }
+      BQ=r.filas||[]; bqPintar();
+      $('bqMsg').className='hint'+(BQ.length?'':' err');
+      $('bqMsg').textContent = BQ.length ? (BQ.length+' encontrada(s)') : 'Sin resultados.';
+    }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
+}
+
+var corrId='';
+function abrirCorreccion(r){
+  corrId=r.id;
+  $('corrTit').textContent=r.grupo+' · '+r.estilo+' · '+(r.color||'')+' · '+r.fecha;
+  $('cFecha').value=r.fecha; $('cGrupo').value=r.grupo; $('cEstilo').value=r.estilo;
+  $('cColor').value=r.color; $('cPo').value=r.po; $('cPedido').value=r.pedido||'';
+  $('cLote').value=r.lote||''; $('cMuestra').value=r.muestra||'';
+  $('cAuditor').value=r.auditor; $('cInspector').value=r.inspector;
+  $('cServicio').value=r.servicio; $('cResultado').value=(r.resultado||'APROBADO');
+  $('corrErr').textContent='';
+  $('modalCorr').style.display='flex';
+}
+
+if($('corrGuardar')) $('corrGuardar').onclick=function(){
+  if(N($('cMuestra').value)<=0){ $('corrErr').textContent='La muestra debe ser mayor que cero.'; return; }
+  var cambios={
+    FECHA:$('cFecha').value, GRUPO:U($('cGrupo').value), ESTILO:U($('cEstilo').value),
+    COLOR:U($('cColor').value), PO:U($('cPo').value), PEDIDO:N($('cPedido').value),
+    LOTE:N($('cLote').value), MUESTRA:N($('cMuestra').value),
+    AUDITOR:U($('cAuditor').value), INSPECTOR:U($('cInspector').value),
+    SERVICIO:U($('cServicio').value), RESULTADO:U($('cResultado').value),
+    CLIENTE:U(clienteDeGrupo($('cGrupo').value))
+  };
+  $('modalCorr').style.display='none';
+  $('bqMsg').className='hint'; $('bqMsg').textContent='Guardando corrección…';
+  jsonp({accion:'editar', clave:CLAVE, id:corrId, usuario:U($('digitador').value),
+         cambios:JSON.stringify(cambios),
+         auditores:JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[])},
+    function(r){
+      if(r&&r.ok){ $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.'; bqBuscar(); }
+      else { $('bqMsg').className='hint err'; $('bqMsg').textContent=(r&&r.error)||'No se pudo corregir.'; }
+    }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
+};
+
+/* Para cambiar defectos hace falta el formulario completo: acá solo se corrigen
+   los datos de cabecera, que es lo que se equivoca al digitar. */
+if($('corrForm')) $('corrForm').onclick=function(){
+  $('modalCorr').style.display='none';
+  editar(corrId);
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+if($('bqToggle')) $('bqToggle').onclick=function(){
+  var c=$('bqCuerpo'), ab=c.style.display==='none';
+  c.style.display = ab ? '' : 'none';
+  $('bqToggle').textContent = ab ? 'Cerrar' : 'Abrir';
+  if(ab && !BQ.length) bqBuscar();
+};
+if($('bqBuscar')) $('bqBuscar').onclick=bqBuscar;
+if($('bqLimpiar')) $('bqLimpiar').onclick=function(){
+  ['bqGrupo','bqEstilo','bqColor','bqPo','bqAud','bqDesde','bqHasta'].forEach(function(id){ $(id).value=''; });
+  $('bqTipo').value=''; $('bqRes').value=''; $('bqAnul').checked=false; bqBuscar();
+};
+['bqGrupo','bqEstilo','bqColor','bqPo','bqAud','cGrupo','cEstilo','cColor','cPo',
+ 'cAuditor','cInspector','cServicio'].forEach(function(id){ forzarMayusculas($(id)); });
+Array.prototype.forEach.call(document.querySelectorAll('#bqCuerpo input'),function(e){
+  e.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); bqBuscar(); } });
+});
 
 /* ---------------- arranque ---------------- */
 autocompletar('auditor','dAuditor', function(){

@@ -70,6 +70,8 @@
   .mini{background:#fff;border:1px solid var(--warm);border-radius:6px;padding:4px 11px;
         font-family:inherit;font-size:12px;font-weight:700;color:var(--sage);cursor:pointer;}
   .mini:hover{border-color:var(--sage);}
+  .cod{font-size:10.5px;color:var(--stone);background:var(--wl);border-radius:9px;
+       padding:1px 7px;margin-left:8px;font-weight:700;}
   .mdWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
         align-items:center;justify-content:center;z-index:300;padding:20px;}
   .mdCard{background:#fff;border-radius:12px;max-width:560px;width:100%;overflow:hidden;
@@ -117,6 +119,19 @@
     <h2 id="tTit">Personal</h2>
     <div class="sub" id="tSub"></div>
 
+    <div class="row" id="filaNuevoDef" style="display:none">
+      <div class="f"><label>Nombre del defecto</label>
+        <input type="text" id="dfCat" placeholder="MANCHAS, PUNTADA…"></div>
+      <div class="f"><label>Detalle (opcional)</label>
+        <input type="text" id="dfSub" placeholder="ACEITE, SALTADA…"></div>
+      <div class="f sm"><label>Sección</label>
+        <select id="dfSec">
+          <option value="COSTURA">COSTURA</option><option value="ACABADOS">ACABADOS</option>
+          <option value="EMPAQUE">EMPAQUE</option><option value="DERIVADOS">DERIVADOS</option>
+          <option value="OTROS" selected>OTROS</option></select></div>
+      <div><button class="btn" id="btnNuevoDef" type="button">Agregar defecto</button></div>
+    </div>
+
     <div class="row" id="filaNuevo">
       <div class="f sm"><label id="lbClave">Nombre</label><input type="text" id="nvClave"></div>
       <div class="f" id="wExtra"><label id="lbExtra">Rol</label><input type="text" id="nvExtra"></div>
@@ -147,9 +162,18 @@
   <div class="mdCard">
     <div class="mdHead">Modificar</div>
     <div class="mdBody">
-      <div class="row">
+      <div class="row" id="edNormal">
         <div class="f"><label id="edLbClave">Nombre</label><input type="text" id="edClave"></div>
         <div class="f" id="edWExtra"><label id="edLbExtra">Rol</label><input type="text" id="edExtra"></div>
+      </div>
+      <div class="row" id="edDefecto" style="display:none">
+        <div class="f"><label>Nombre del defecto</label><input type="text" id="edCat"></div>
+        <div class="f"><label>Detalle</label><input type="text" id="edSub"></div>
+        <div class="f sm"><label>Sección</label>
+          <select id="edSec">
+            <option value="COSTURA">COSTURA</option><option value="ACABADOS">ACABADOS</option>
+            <option value="EMPAQUE">EMPAQUE</option><option value="DERIVADOS">DERIVADOS</option>
+            <option value="OTROS">OTROS</option></select></div>
       </div>
       <div class="avisoEd" id="edAviso"></div>
       <div class="hint err" id="edMsg"></div>
@@ -183,6 +207,10 @@ var CATS = [
    clave:'Prefijo (3 letras)', extra:'Cliente',
    sub:'El cliente sale solo del prefijo del grupo: THY-1106 es THEORY. Si el prefijo no está aquí, esa auditoría no se puede guardar.',
    ayudaExtra:'Nombre del cliente'},
+  {id:'DEFECTO', tab:'Defectos', tit:'Catálogo de defectos',
+   clave:'Código', extra:'',
+   sub:'Los 130 defectos que se pueden elegir al digitar. Escribe arriba para filtrar: la lista es larga.',
+   ayudaExtra:''},
   {id:'LINEA', tab:'Líneas', tit:'Líneas de producción',
    clave:'Nombre', extra:'',
    sub:'Líneas 1 a 7. Activa las que estén trabajando; las inactivas no aparecen al digitar.',
@@ -211,6 +239,27 @@ function jsonp(params, ok, fallo){
   qs.push('callback='+cb);
   s.src=API+'?'+qs.join('&');
   document.body.appendChild(s);
+}
+
+/* Mismo criterio que el buscador del formulario: cada palabra escrita debe ser
+   el inicio de alguna palabra del defecto, así «man ace» encuentra MANCHAS ACEITE. */
+function norm(s){
+  return String(s||'').toUpperCase()
+    .replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I')
+    .replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N')
+    .replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function coincide(nombre, q){
+  var n=norm(nombre).split(' '), p=norm(q).split(' ').filter(Boolean);
+  if(!p.length) return true;
+  var usadas={};
+  for(var i=0;i<p.length;i++){
+    var hit=-1;
+    for(var j=0;j<n.length;j++){ if(!usadas[j] && n[j].indexOf(p[i])===0){ hit=j; break; } }
+    if(hit<0) return false;
+    usadas[hit]=true;
+  }
+  return true;
 }
 
 function pintarTabs(){
@@ -242,7 +291,13 @@ function prepararForm(){
   if(hay){ $('lbExtra').textContent=ACT.extra; $('thExtra').textContent=ACT.extra;
            $('nvExtra').placeholder=ACT.ayudaExtra||''; }
   /* En Líneas no se agrega nada: son siempre de la 1 a la 7 y solo se activan. */
-  $('filaNuevo').style.display = (ACT.id==='LINEA') ? 'none' : '';
+  var esDef = ACT.id==='DEFECTO';
+  $('filaNuevo').style.display = (ACT.id==='LINEA'||esDef) ? 'none' : '';
+  $('filaNuevoDef').style.display = esDef ? '' : 'none';
+  $('filtro').placeholder = esDef
+    ? 'Escribe para filtrar entre los 130 defectos: man ace, punt cort…'
+    : 'Buscar en la lista…';
+  if(esDef){ $('thClave').textContent='Defecto'; $('thExtra').style.display=''; $('thExtra').textContent='Sección'; }
   $('nvClave').value=''; $('nvExtra').value=''; $('filtro').value='';
   $('msg').textContent='';
 }
@@ -285,15 +340,19 @@ function pintar(){
   if(!DATOS.length){ return; }        // la carga se encarga del mensaje
   var q=U($('filtro').value);
   var lista=DATOS.filter(function(x){
-    return !q || U(x.clave).indexOf(q)>=0 || U(x.extra).indexOf(q)>=0;
+    if(!q) return true;
+    if(ACT.id==='DEFECTO') return coincide(x.nombre, q) || U(x.clave).indexOf(q)>=0;
+    return U(x.clave).indexOf(q)>=0 || U(x.extra).indexOf(q)>=0;
   });
   $('vacio').style.display = lista.length ? 'none' : 'block';
   $('vacio').textContent='Sin resultados.';
   $('cuerpo').innerHTML = lista.map(function(x,i){
+    var esDef = ACT.id==='DEFECTO';
     return '<tr class="'+(x.activo?'':'off')+'">'+
       '<td>'+(i+1)+'</td>'+
-      '<td><b>'+esc(x.clave)+'</b></td>'+
-      (ACT.extra?('<td>'+esc(x.extra)+'</td>'):'')+
+      '<td><b>'+esc(esDef?x.nombre:x.clave)+'</b>'+
+        (esDef?('<span class="cod">'+esc(x.clave)+'</span>'):'')+'</td>'+
+      (esDef?('<td>'+esc(x.seccion)+'</td>'):(ACT.extra?('<td>'+esc(x.extra)+'</td>'):''))+
       '<td><label class="sw"><input type="checkbox" data-v="'+esc(x.clave)+'"'+
         (x.activo?' checked':'')+'><span class="sl"></span></label>'+
         '<span class="lbl '+(x.activo?'si':'no')+'">'+(x.activo?'Activo':'Inactivo')+'</span></td>'+
@@ -356,16 +415,25 @@ $('btnNuevo').onclick=function(){
 };
 
 /* ---- modificar ---- */
-var edAntes='';
+var edAntes='', edNomAntes='';
 function abrirEditar(valor){
   var x=null;
   for(var i=0;i<DATOS.length;i++) if(U(DATOS[i].clave)===U(valor)) x=DATOS[i];
   if(!x) return;
   edAntes=x.clave;
-  $('edLbClave').textContent=ACT.clave; $('edClave').value=x.clave;
-  var hay=!!ACT.extra;
-  $('edWExtra').style.display = hay?'':'none';
-  if(hay){ $('edLbExtra').textContent=ACT.extra; $('edExtra').value=x.extra; }
+  var esDef = ACT.id==='DEFECTO';
+  $('edNormal').style.display = esDef?'none':'';
+  $('edDefecto').style.display = esDef?'':'none';
+  if(esDef){
+    $('edCat').value=x.categoria; $('edSub').value=x.subtipo;
+    $('edSec').value=(x.seccion||'OTROS');
+    edNomAntes=x.nombre;
+  } else {
+    $('edLbClave').textContent=ACT.clave; $('edClave').value=x.clave;
+    var hay=!!ACT.extra;
+    $('edWExtra').style.display = hay?'':'none';
+    if(hay){ $('edLbExtra').textContent=ACT.extra; $('edExtra').value=x.extra; }
+  }
   $('edAviso').className='avisoEd'; $('edMsg').textContent='';
   $('modalEd').style.display='flex';
   setTimeout(function(){ $('edClave').focus(); },60);
@@ -383,7 +451,36 @@ $('edClave').addEventListener('input', function(){
   }
 });
 
+function avisoDef(){
+  var nom=U(T($('edCat').value)+(T($('edSub').value)?(' '+T($('edSub').value)):''));
+  var a=$('edAviso'), cambia = nom!==U(edNomAntes);
+  a.className='avisoEd'+(cambia?' on':'');
+  if(cambia) a.innerHTML='Vas a renombrar «'+esc(edNomAntes)+'» a «'+esc(nom)+'». '+
+    'Las auditorías ya guardadas con el nombre viejo <b>se actualizarán solas</b>, '+
+    'para que no aparezca como dos defectos distintos en los tableros.';
+}
+['edCat','edSub'].forEach(function(id){ $(id).addEventListener('input', avisoDef); });
+
 $('edGuardar').onclick=function(){
+  if(ACT.id==='DEFECTO'){
+    if(!T($('usuario').value)){ $('edMsg').textContent='Escribe tu nombre arriba.'; return; }
+    if(!T($('edCat').value)){ $('edMsg').textContent='El nombre no puede quedar vacío.'; return; }
+    $('edGuardar').disabled=true;
+    $('edMsg').className='hint'; $('edMsg').textContent='Guardando…';
+    jsonp({accion:'cateditar', clave:CLAVE, que:'DEFECTO', valor:edAntes,
+           categoria:U($('edCat').value), subtipo:U($('edSub').value),
+           seccion:$('edSec').value, usuario:U($('usuario').value)}, function(r){
+      $('edGuardar').disabled=false;
+      if(r&&r.ok){
+        $('modalEd').style.display='none';
+        $('msg').className='hint ok';
+        $('msg').textContent='Modificado.'+(r.actualizadas?(' Se actualizaron '+r.actualizadas+' registro(s).'):'');
+        cargar();
+      } else { $('edMsg').className='hint err'; $('edMsg').textContent=(r&&r.error)||'No se pudo modificar.'; }
+    }, function(){ $('edGuardar').disabled=false;
+      $('edMsg').className='hint err'; $('edMsg').textContent='Sin conexión.'; });
+    return;
+  }
   if(!T($('usuario').value)){
     $('edMsg').textContent='Escribe tu nombre arriba antes de modificar.'; return; }
   var nuevo=U($('edClave').value), extra=U($('edExtra').value);
@@ -407,9 +504,29 @@ $('edGuardar').onclick=function(){
     $('edMsg').className='hint err'; $('edMsg').textContent='Sin conexión.'; });
 };
 
-['edClave','edExtra'].forEach(function(id){
+['edClave','edExtra','edCat','edSub','dfCat','dfSub'].forEach(function(id){
   $(id).addEventListener('keydown',function(e){
     if(e.key==='Enter'){ e.preventDefault(); $('edGuardar').click(); }
+  });
+});
+
+$('btnNuevoDef').onclick=function(){
+  if(!T($('usuario').value)){
+    $('msg').className='hint err'; $('msg').textContent='Escribe tu nombre arriba.'; return; }
+  var cat=U($('dfCat').value), sub=U($('dfSub').value), sec=$('dfSec').value;
+  if(!cat){ $('msg').className='hint err'; $('msg').textContent='Falta el nombre del defecto.'; return; }
+  $('msg').className='hint'; $('msg').textContent='Agregando…';
+  jsonp({accion:'catnuevo', clave:CLAVE, que:'DEFECTO', categoria:cat, subtipo:sub,
+         seccion:sec, usuario:U($('usuario').value)}, function(r){
+    if(r&&r.ok){
+      $('msg').className='hint ok'; $('msg').textContent=(r.nombre||cat)+' agregado.';
+      $('dfCat').value=''; $('dfSub').value=''; $('dfCat').focus(); cargar();
+    } else { $('msg').className='hint err'; $('msg').textContent=(r&&r.error)||'No se pudo agregar.'; }
+  }, function(){ $('msg').className='hint err'; $('msg').textContent='Sin conexión.'; });
+};
+['dfCat','dfSub'].forEach(function(id){
+  $(id).addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ e.preventDefault(); $('btnNuevoDef').click(); }
   });
 });
 

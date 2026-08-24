@@ -458,6 +458,7 @@
     </div>
 
     <div class="drop" id="hjFloat" style="position:fixed;display:none;z-index:120;"></div>
+    <div class="drop" id="hjSug" style="position:fixed;display:none;z-index:121;"></div>
     <div class="hjWrap">
       <table class="hj">
         <thead><tr>
@@ -1524,7 +1525,12 @@ function pintarHoja(){
       }
     };
     inp.onfocus=function(){ activarFila(+inp.dataset.f); };
-    if(inp.dataset.c!=='lote' && inp.dataset.c!=='muestra') forzarMayusculas(inp);
+    if(inp.dataset.c!=='lote' && inp.dataset.c!=='muestra'){
+      forzarMayusculas(inp);
+      /* Sugerencias de lo ya digitado: sin esto hay que reescribir el grupo
+         entero en cada fila aunque se haya usado hace dos renglones. */
+      if(['grupo','estilo','color'].indexOf(inp.dataset.c)>=0) sugerirEnCelda(inp);
+    }
     inp.onkeydown=function(e){
       if(e.key==='Enter'){
         e.preventDefault();
@@ -1613,6 +1619,69 @@ function agregarDefHoja(d){
   if(inp){ inp.focus(); inp.select(); }
   else { var a=$('hjBody').querySelector('input.hjAdd[data-af="'+act+'"]'); if(a) a.focus(); }
   $('hjMsg').className='hint'; $('hjMsg').textContent='';
+}
+
+/* ---- sugerencias en las celdas de grupo, estilo y color ---- */
+var sgOpts=[], sgSel=-1, sgInp=null;
+
+function cerrarSug(){ $('hjSug').style.display='none'; sgOpts=[]; sgSel=-1; sgInp=null; }
+
+function sugerirEnCelda(inp){
+  var campo = inp.dataset.c.toUpperCase();
+  function buscar(){
+    sgInp=inp;
+    var q=U(inp.value);
+    var base=SUG[campo]||[];
+    sgOpts=[];
+    for(var i=0;i<base.length && sgOpts.length<12;i++){
+      if(!q || base[i].indexOf(q)===0) sgOpts.push(base[i]);
+    }
+    /* si nada empieza igual, se acepta lo que lo contenga */
+    if(!sgOpts.length && q){
+      for(var j=0;j<base.length && sgOpts.length<12;j++)
+        if(base[j].indexOf(q)>=0) sgOpts.push(base[j]);
+    }
+    sgOpts=sgOpts.filter(function(x){ return x!==q; });
+    sgSel=sgOpts.length?0:-1;
+    pintarSug();
+  }
+  function pintarSug(){
+    var d=$('hjSug');
+    if(!sgOpts.length){ d.style.display='none'; return; }
+    d.innerHTML=sgOpts.map(function(o,i){
+      return '<div class="opt'+(i===sgSel?' sel':'')+'" data-i="'+i+'">'+
+             '<span class="nm">'+esc(o)+'</span></div>';
+    }).join('');
+    var r=inp.getBoundingClientRect();
+    d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px';
+    d.style.width=Math.max(r.width,150)+'px';
+    d.style.display='block'; d.classList.add('on');
+    Array.prototype.forEach.call(d.querySelectorAll('.opt'),function(el){
+      el.onmousedown=function(e){ e.preventDefault(); elegirSug(sgOpts[+el.dataset.i]); };
+    });
+  }
+  function elegirSug(v){
+    inp.value=v;
+    hoja[+inp.dataset.f][inp.dataset.c]=v;
+    guardarHoja(); cerrarSug();
+    /* pasa a la celda siguiente de la misma fila */
+    var orden=['grupo','color','estilo','lote','muestra'];
+    var k=orden.indexOf(inp.dataset.c);
+    var sig = k>=0 ? $('hjBody').querySelector('tr[data-f="'+inp.dataset.f+'"] input[data-c="'+orden[k+1]+'"]') : null;
+    if(sig){ sig.focus(); sig.select(); }
+  }
+  inp.addEventListener('input', buscar);
+  inp.addEventListener('focus', function(){ if(T(inp.value)) buscar(); });
+  inp.addEventListener('blur', function(){ setTimeout(cerrarSug,150); });
+  inp.addEventListener('keydown', function(e){
+    if(!sgOpts.length) return;
+    if(e.key==='ArrowDown'){ e.preventDefault(); sgSel=(sgSel+1)%sgOpts.length; pintarSug(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); sgSel=(sgSel-1+sgOpts.length)%sgOpts.length; pintarSug(); }
+    else if(e.key==='Tab' || e.key==='Enter'){
+      if(sgSel>=0){ e.preventDefault(); elegirSug(sgOpts[sgSel]); }
+    }
+    else if(e.key==='Escape'){ cerrarSug(); }
+  });
 }
 
 /* ---- buscador dentro de la fila ---- */
@@ -1959,11 +2028,20 @@ autocompletar('color','dColor', function(){ return SUG.COLOR.map(function(v){ re
 
 /* sugerencias de grupo/estilo/color: se piden al servidor y se guardan en memoria */
 var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
-['GRUPO','ESTILO','COLOR','PO'].forEach(function(campo){
-  jsonp({accion:'sugerir', campo:campo, tipo:''}, function(r){
-    if(r && r.ok) SUG[campo]=r.valores||[];
+function cargarSugerencias(){
+  ['GRUPO','ESTILO','COLOR','PO'].forEach(function(campo){
+    jsonp({accion:'sugerir', campo:campo, tipo:''}, function(r){
+      if(!r || !r.ok) return;
+      /* Se juntan con lo que ella ya escribió en esta sesión, sin duplicar. */
+      var v=r.valores||[];
+      var vistos={};
+      SUG[campo]=(SUG[campo]||[]).concat(v).filter(function(x){
+        x=U(x); if(!x || vistos[x]) return false; vistos[x]=true; return true;
+      });
+    });
   });
-});
+}
+cargarSugerencias();
 
 /* buscador de defectos */
 (function(){

@@ -30,9 +30,16 @@
   .f{flex:1;min-width:120px;}
   .f.sm{max-width:120px;}
   label{display:block;font-size:11.5px;font-weight:700;color:var(--slate);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;}
+  /* Todo lo que se digita va en MAYÚSCULAS, en pantalla y al guardar: en el
+     histórico el mismo dato escrito de dos formas salía como dos barras
+     distintas en los tableros. */
+  input[type=text], table.hj input{text-transform:uppercase;}
   input,select{width:100%;font-family:inherit;font-size:14.5px;padding:6px 9px;border:1.5px solid var(--warm);
         border-radius:7px;background:#fff;color:#333;}
   input:focus,select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(15,122,90,.14);}
+  /* Todo lo que se digita va en MAYÚSCULAS, como el resto del sistema: así el
+     mismo dato escrito por dos personas no genera dos valores distintos. */
+  input[type=text], table.hj input:not(.hjCant){ text-transform:uppercase; }
   input:disabled{background:var(--wl);color:var(--stone);}
   input.ro{background:var(--wl);font-weight:700;color:var(--sage);}
   .hint{font-size:11px;color:var(--stone);margin-top:3px;min-height:14px;}
@@ -78,6 +85,14 @@
   .prev{background:#FFFBEB;border:1px solid var(--tan);border-radius:9px;padding:11px 14px;margin-bottom:12px;font-size:13px;display:none;}
   .prev.on{display:block;}
   .prev b{color:#92400E;}
+  .decid{margin-top:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700;color:#92400E;}
+  .decid .mini{background:#fff;border:1.5px solid #F59E0B;color:#92400E;padding:5px 12px;border-radius:7px;
+        font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;}
+  .decid .mini.on{background:#0F7A5A;border-color:#0F7A5A;color:#fff;}
+  .decid #decMsg{font-weight:400;font-size:12px;color:#5F726C;}
+  .ped{background:#fff;border:1px solid #F59E0B;border-radius:7px;padding:7px 11px;
+       margin-top:7px;font-size:12.5px;font-weight:400;color:#5F726C;}
+  .ped b{color:#92400E;}
   .prev table{margin-top:7px;}
   .prev th,.prev td{font-size:12px;padding:4px 6px;}
   .sw{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:var(--slate);cursor:pointer;}
@@ -660,11 +675,12 @@ function leerLocal(k){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v
 
 function cargarCatalogos(){
   var cache=leerLocal('lives_cat_aud');
-  if(cache){ CAT=cache; pintarCatalogos(); $('pillCat').textContent='Catálogos (guardados)'; }
+  if(cache){ CAT=cache; mayusCatalogos(); pintarCatalogos(); $('pillCat').textContent='Catálogos (guardados)'; }
   jsonp({accion:'catalogos'}, function(r){
     if(!r || !r.ok){ $('pillCat').textContent='Error de catálogos'; $('pillCat').className='pill bad'; return; }
     CAT={defectos:r.defectos||[], personal:r.personal||[], clientes:r.clientes||[],
          lineas:r.lineas||[], talleres:r.talleres||[]};
+    mayusCatalogos();
     guardarLocal('lives_cat_aud', CAT);
     pintarCatalogos();
     $('pillCat').textContent=CAT.defectos.length+' defectos · '+CAT.personal.length+' personas';
@@ -672,6 +688,15 @@ function cargarCatalogos(){
     if(r.hoy && !$('fecha').value) $('fecha').value=r.hoy;
   }, function(){
     if(!cache){ $('pillCat').textContent='Sin conexión al servidor'; $('pillCat').className='pill bad'; }
+  });
+}
+
+/* Los catálogos vienen del Sheet tal como estén escritos; se pasan a mayúsculas
+   al cargarlos para que la pantalla y lo guardado coincidan siempre. */
+function mayusCatalogos(){
+  ['defectos','personal','clientes','lineas','talleres','destinos'].forEach(function(k){
+    if(!CAT[k]) return;
+    CAT[k]=CAT[k].map(function(f){ return f.map(function(x){ return U(x); }); });
   });
 }
 
@@ -683,7 +708,7 @@ function pintarCatalogos(){
   pintarChips();
 }
 
-function nombreDefecto(d){ return d[3] ? (d[2]+' '+d[3]) : d[2]; }
+function nombreDefecto(d){ return U(d[3] ? (d[2]+' '+d[3]) : d[2]); }
 
 /* Ordena el catálogo poniendo primero los frecuentes del tipo activo. */
 function catalogoOrdenado(){
@@ -773,10 +798,16 @@ function aplicarCliente(){
 
 
 /* ---------------- búsqueda de lote ---------------- */
+var esReaud = '';   // 'SI' o 'NO' — lo decide quien digita, no el sistema
+
 function buscarLote(){
   var g=U($('grupo').value), e=U($('estilo').value), c=U($('color').value), l=N($('lote').value);
-  if(!g||!e||!l){ $('prev').classList.remove('on'); prevLote=null; return; }
-  jsonp({accion:'buscar', tipo:$('tipo').value, grupo:g, estilo:e, color:c, lote:l}, function(r){
+  var t=$('tipo').value;
+  /* En Empaque y Cliente lo que identifica el despacho es el PO, no el lote. */
+  var listo = (t==='EMPAQUE'||t==='CLIENTE') ? (g&&e&&T($('po').value)) : (g&&e&&l);
+  if(!listo){ $('prev').classList.remove('on'); prevLote=null; esReaud=''; return; }
+  jsonp({accion:'buscar', tipo:$('tipo').value, grupo:g, estilo:e, color:c, lote:l,
+         po:U($('po').value), pedido:N($('pedido').value)}, function(r){
     if(!r||!r.ok) return;
     prevLote=r;
     var p=$('prev');
@@ -785,13 +816,43 @@ function buscarLote(){
       return '<tr><td>'+esc(x.fecha)+'</td><td>'+x.nAuditoria+'.ª</td><td>'+x.muestra+'</td>'+
              '<td>'+x.defectuosas+'</td><td><b>'+esc(x.resultado)+'</b></td><td>'+esc(x.auditor)+'</td></tr>';
     }).join('');
-    p.innerHTML='<b>Este lote ya fue auditado '+r.previas.length+' vez(es).</b> '+
-      'Lo que guardes ahora queda como <b>'+r.siguienteAuditoria+'.ª auditoría</b> y no vuelve a sumar '+
-      'cantidad auditada en los indicadores.'+
+    /* El sistema no puede saber si esto es una re-auditoría o una auditoría
+       nueva del mismo pedido: en dos días distintos puede ser cualquiera de las
+       dos. Ese dato está en el papel, así que lo decide quien digita. */
+    esReaud='';
+    /* Se muestra cuánto del pedido va cubierto: es el dato que decide si esto
+       es el siguiente lote o una revisión del mismo. */
+    var resumen='';
+    if(r.pedido>0){
+      resumen='<div class="ped">Pedido de <b>'+r.pedido.toLocaleString('es-PE')+'</b> prendas · '+
+        'ya recibidas <b>'+r.loteAcumulado.toLocaleString('es-PE')+'</b> · '+
+        (r.falta>0 ? ('faltan <b>'+r.falta.toLocaleString('es-PE')+'</b> por auditar')
+                   : '<b>pedido completo</b>')+
+        ' · revisadas <b>'+r.muestraAcumulada.toLocaleString('es-PE')+'</b> prendas</div>';
+    }
+    p.innerHTML='<b>Ya hay '+r.previas.length+' auditoría(s) de este mismo pedido.</b>'+resumen+
       '<table><thead><tr><th>Fecha</th><th>N.º</th><th>Muestra</th><th>Def.</th><th>Resultado</th><th>Auditora</th></tr></thead>'+
-      '<tbody>'+f+'</tbody></table>';
+      '<tbody>'+f+'</tbody></table>'+
+      '<div class="decid">¿Qué es la que estás digitando?'+
+        '<button type="button" class="mini" id="btnRea">Re-auditoría de este lote</button>'+
+        '<button type="button" class="mini" id="btnNoRea">Auditoría distinta</button>'+
+        '<span id="decMsg"></span></div>';
     p.classList.add('on');
+    $('btnRea').onclick=function(){ fijarReaud('SI', r.siguienteAuditoria); };
+    $('btnNoRea').onclick=function(){ fijarReaud('NO', 1); };
+    /* Se deja marcada la opción más probable, pero sin decidir por ella. */
+    if(r.sugerido==='SI') fijarReaud('SI', r.siguienteAuditoria);
+    else if(r.sugerido==='NO') fijarReaud('NO', 1);
   });
+}
+
+function fijarReaud(v, n){
+  esReaud=v;
+  $('btnRea').classList.toggle('on', v==='SI');
+  $('btnNoRea').classList.toggle('on', v==='NO');
+  $('decMsg').innerHTML = v==='SI'
+    ? '<b>Entra como '+n+'.ª auditoría</b> — no vuelve a sumar cantidad auditada.'
+    : '<b>Entra como auditoría nueva</b> — suma normal en los indicadores.';
 }
 
 /* ---------------- defectos ---------------- */
@@ -902,6 +963,8 @@ function validar(){
     return 'Falta elegir el resultado.';
   if(t==='FINAL' && !T($('servicio').value) && U($('intExt').value)==='EXTERNO')
     return 'Falta el taller.';
+  if(prevLote && prevLote.existe && !esReaud)
+    return 'Ese pedido ya tiene auditorías: indica arriba si esta es re-auditoría o una auditoría distinta.';
   if(totalDef()>N($('muestra').value)) return 'Hay más prendas defectuosas que la muestra.';
   for(var i=0;i<defs.length;i++) if(defs[i].cantidad<=0) return 'Hay un defecto con cantidad en cero.';
   return '';
@@ -944,6 +1007,7 @@ function guardar(){
     nivelAql: $('nivelAql').value,
     resultado: U($('resultado').value),
     licencia: $('licencia').checked ? '1' : '0',
+    esReauditoria: esReaud || 'NO',
     reproceso: $('reproceso').checked ? '1' : '0',
     captura:'DIGITADO',
     digitador:U($('digitador').value)
@@ -1185,7 +1249,7 @@ function limpiarRegistro(exito){
   if(!mantener.grupo) $('cliente').value='';
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
-  defs=[]; prevLote=null;
+  defs=[]; prevLote=null; esReaud='';
   $('prev').classList.remove('on');
   pintarDefs();
   $('hGuardar').className='hint '+(exito?'ok':'');
@@ -1367,6 +1431,7 @@ function pintarHoja(){
       }
     };
     inp.onfocus=function(){ activarFila(+inp.dataset.f); };
+    if(inp.dataset.c!=='lote' && inp.dataset.c!=='muestra') forzarMayusculas(inp);
     inp.onkeydown=function(e){
       if(e.key==='Enter'){
         e.preventDefault();
@@ -1390,6 +1455,7 @@ function pintarHoja(){
     inp.oninput=function(){ buscarDefFila(inp); };
     inp.onkeydown=function(e){ tecleoDefFila(e, inp); };
     inp.onblur=function(){ setTimeout(cerrarDropFila,150); };
+    forzarMayusculas(inp);
   });
   Array.prototype.forEach.call($('hjBody').querySelectorAll('.hjCant'),function(inp){
     inp.onclick=function(ev){ ev.stopPropagation(); };
@@ -1468,9 +1534,10 @@ function buscarDefFila(inp){
   var base=catalogoOrdenado();
   for(var i=0;i<base.length && dfOpts.length<20;i++)
     if(coincide(nombreDefecto(base[i]),q)) dfOpts.push(base[i]);
-  /* Si no existe, se ofrece registrarlo: el catálogo crece con lo real en vez
-     de que el defecto se pierda o caiga en «Otros». */
-  if(!dfOpts.length && norm(q).length>=3) dfOpts.push(['__NUEVO__','Otros',norm(q),'']);
+  /* Igual que en el formulario: se ofrece registrar siempre que no haya una
+     coincidencia exacta, no solo cuando no hay ninguna sugerencia. */
+  if(norm(q).length>=3 && !dfOpts.some(function(o){ return norm(nombreDefecto(o))===norm(q); }))
+    dfOpts.push(['__NUEVO__','Otros',U(norm(q)),'']);
   dfSel=dfOpts.length?0:-1;
   pintarDropFila(q, inp);
 }
@@ -1509,6 +1576,7 @@ function elegirDefFila(o, inp){
 
 /* Guarda el defecto nuevo en el catálogo del Sheet y lo usa al instante. */
 function registrarDefectoNuevo(nombre, luego){
+  nombre=U(nombre);                       // en MAYÚSCULAS, como todo lo demás
   var d=['NUEVO','Otros',nombre,''];
   if(!CAT.defectos.some(function(x){ return U(nombreDefecto(x))===U(nombre); })){
     CAT.defectos.push(d);
@@ -1676,6 +1744,17 @@ function verVista(){
   if(esHoja){ pintarChipsHoja(); pintarHoja(); }
 }
 
+/* Pasa a mayúsculas mientras escribe, sin perder la posición del cursor. */
+function forzarMayusculas(inp){
+  if(!inp || inp.type==='number' || inp.type==='date') return;
+  inp.addEventListener('input', function(){
+    var p1=inp.selectionStart, p2=inp.selectionEnd, v=inp.value.toUpperCase();
+    if(v!==inp.value){ inp.value=v; try{ inp.setSelectionRange(p1,p2); }catch(e){} }
+  });
+}
+['grupo','estilo','color','po','pedido','servicio','destino','auditor','inspector',
+ 'digitador','qdef'].forEach(function(id){ forzarMayusculas($(id)); });
+
 /* ---------------- arranque ---------------- */
 autocompletar('auditor','dAuditor', function(){
   return CAT.personal.filter(function(p){ return (p[1]||'').indexOf('AUDITORA')>=0; })
@@ -1705,9 +1784,12 @@ var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
     opts=[];
     for(var i=0;i<base.length && opts.length<30;i++)
       if(coincide(nombreDefecto(base[i]), q)) opts.push(base[i]);
-    /* Igual que en la hoja: si el defecto no existe se puede registrar en vez de
-       perderlo o meterlo en «Otros». Aplica a Empaque, Cliente y Final. */
-    if(!opts.length && norm(q).length>=3) opts.push(['__NUEVO__','Otros',norm(q),'']);
+    /* La opción de registrar aparece siempre que no haya una coincidencia exacta,
+       no solo cuando la lista queda vacía: si ella escribe «STICKER DESCENTRADO»
+       y el buscador le muestra «STICKER SIN DESGLOSAR», el defecto que quiere
+       igual no existe y tiene que poder darlo de alta. */
+    if(norm(q).length>=3 && !opts.some(function(o){ return norm(nombreDefecto(o))===norm(q); }))
+      opts.push(['__NUEVO__','Otros',U(norm(q)),'']);
     sel=opts.length?0:-1; pintar(q);
   }
   function pintar(q){
@@ -1758,7 +1840,9 @@ function recordar(campo, valor){
 
 $('grupo').addEventListener('input', aplicarCliente);
 $('lote').addEventListener('blur', buscarLote);
-$('color').addEventListener('blur', function(){ if(N($('lote').value)>0) buscarLote(); });
+$('color').addEventListener('blur', function(){ buscarLote(); });
+$('po').addEventListener('blur', buscarLote);
+$('pedido').addEventListener('blur', buscarLote);
 $('muestra').addEventListener('input', veredicto);
 $('tipo').addEventListener('change', function(){
   aplicarTipo();

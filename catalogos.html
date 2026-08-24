@@ -62,6 +62,25 @@
   .lbl{font-size:11.5px;font-weight:700;margin-left:8px;}
   .lbl.si{color:var(--sage);} .lbl.no{color:var(--stone);}
   .vacio{color:var(--stone);font-size:13px;font-style:italic;padding:14px 6px;}
+  td.cargando{text-align:center;color:var(--stone);font-size:13px;padding:26px 6px;}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--warm);
+        border-top-color:var(--sage);border-radius:50%;animation:gira .7s linear infinite;
+        vertical-align:-2px;margin-right:7px;}
+  @keyframes gira{to{transform:rotate(360deg);}}
+  .mini{background:#fff;border:1px solid var(--warm);border-radius:6px;padding:4px 11px;
+        font-family:inherit;font-size:12px;font-weight:700;color:var(--sage);cursor:pointer;}
+  .mini:hover{border-color:var(--sage);}
+  .mdWrap{position:fixed;inset:0;background:rgba(14,59,54,.55);display:none;
+        align-items:center;justify-content:center;z-index:300;padding:20px;}
+  .mdCard{background:#fff;border-radius:12px;max-width:560px;width:100%;overflow:hidden;
+        box-shadow:0 12px 40px rgba(0,0,0,.3);}
+  .mdHead{background:var(--petrol);color:#fff;padding:12px 18px;font-weight:700;font-size:15px;
+        border-bottom:3px solid var(--emer);}
+  .mdBody{padding:16px 18px;}
+  .mdPie{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}
+  .avisoEd{background:#FFFBEB;border:1px solid var(--tan);color:#92400E;border-radius:8px;
+        padding:10px 13px;font-size:12.5px;margin-top:12px;line-height:1.6;display:none;}
+  .avisoEd.on{display:block;}
 </style>
 </head>
 <body>
@@ -114,6 +133,7 @@
         <thead><tr>
           <th style="width:40px">#</th><th id="thClave">Nombre</th>
           <th id="thExtra">Rol</th><th style="width:150px">Activo</th>
+          <th style="width:90px"></th>
         </tr></thead>
         <tbody id="cuerpo"></tbody>
       </table>
@@ -121,6 +141,24 @@
     <div class="vacio" id="vacio" style="display:none">Sin resultados.</div>
   </div>
 
+</div>
+
+<div class="mdWrap" id="modalEd" onclick="if(event.target===this)this.style.display='none'">
+  <div class="mdCard">
+    <div class="mdHead">Modificar</div>
+    <div class="mdBody">
+      <div class="row">
+        <div class="f"><label id="edLbClave">Nombre</label><input type="text" id="edClave"></div>
+        <div class="f" id="edWExtra"><label id="edLbExtra">Rol</label><input type="text" id="edExtra"></div>
+      </div>
+      <div class="avisoEd" id="edAviso"></div>
+      <div class="hint err" id="edMsg"></div>
+      <div class="mdPie">
+        <button type="button" class="btn sec" onclick="document.getElementById('modalEd').style.display='none'">Cancelar</button>
+        <button type="button" class="btn" id="edGuardar">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -151,7 +189,7 @@ var CATS = [
    ayudaExtra:''}
 ];
 
-var ACT = CATS[0], DATOS = [];
+var ACT = CATS[0], DATOS = [], PIDE = 0;
 
 function $(id){ return document.getElementById(id); }
 function T(v){ return String(v==null?'':v).trim(); }
@@ -181,7 +219,15 @@ function pintarTabs(){
     var b=document.createElement('button');
     b.type='button'; b.className='tab'+(x.id===ACT.id?' on':'');
     b.textContent=x.tab;
-    b.onclick=function(){ ACT=x; pintarTabs(); prepararForm(); cargar(); };
+    b.onclick=function(){
+      if(ACT.id===x.id) return;
+      ACT=x;
+      /* Se limpia ANTES de pedir los datos nuevos: si no, la tabla sigue
+         mostrando el catálogo anterior mientras llega la respuesta y parece
+         que Líneas tiene clientes adentro. */
+      DATOS=[]; PIDE++;
+      pintarTabs(); prepararForm(); mostrarCargando(); cargar();
+    };
     c.appendChild(b);
   });
 }
@@ -201,24 +247,48 @@ function prepararForm(){
   $('msg').textContent='';
 }
 
+function mostrarCargando(){
+  var n = ACT.extra ? 5 : 4;
+  $('vacio').style.display='none';
+  $('cuerpo').innerHTML='<tr><td colspan="'+n+'" class="cargando">'+
+    '<span class="spin"></span> Cargando '+ACT.tit.toLowerCase()+'…</td></tr>';
+}
+
 function cargar(){
+  var mi = ++PIDE;                       // marca de esta petición
   $('pill').className='pill'; $('pill').textContent='Cargando…';
+  mostrarCargando();
   jsonp({accion:'cattodos', que:ACT.id}, function(r){
-    if(!r||!r.ok){ $('pill').className='pill bad'; $('pill').textContent='Error'; return; }
+    /* Si mientras tanto se cambió de pestaña, esta respuesta ya no sirve:
+       pintarla mostraría el catálogo equivocado. */
+    if(mi!==PIDE) return;
+    if(!r||!r.ok){
+      $('pill').className='pill bad'; $('pill').textContent='Error';
+      $('cuerpo').innerHTML=''; $('vacio').style.display='block';
+      $('vacio').textContent='No se pudo cargar. Revisa la conexión y vuelve a intentar.';
+      return;
+    }
     DATOS=r.filas||[];
     $('pill').className='pill ok';
     $('pill').textContent=DATOS.filter(function(x){return x.activo;}).length+
       ' activos de '+DATOS.length;
     pintar();
-  }, function(){ $('pill').className='pill bad'; $('pill').textContent='Sin conexión'; });
+  }, function(){
+    if(mi!==PIDE) return;
+    $('pill').className='pill bad'; $('pill').textContent='Sin conexión';
+    $('cuerpo').innerHTML=''; $('vacio').style.display='block';
+    $('vacio').textContent='Sin conexión con el servidor.';
+  });
 }
 
 function pintar(){
+  if(!DATOS.length){ return; }        // la carga se encarga del mensaje
   var q=U($('filtro').value);
   var lista=DATOS.filter(function(x){
     return !q || U(x.clave).indexOf(q)>=0 || U(x.extra).indexOf(q)>=0;
   });
   $('vacio').style.display = lista.length ? 'none' : 'block';
+  $('vacio').textContent='Sin resultados.';
   $('cuerpo').innerHTML = lista.map(function(x,i){
     return '<tr class="'+(x.activo?'':'off')+'">'+
       '<td>'+(i+1)+'</td>'+
@@ -227,10 +297,15 @@ function pintar(){
       '<td><label class="sw"><input type="checkbox" data-v="'+esc(x.clave)+'"'+
         (x.activo?' checked':'')+'><span class="sl"></span></label>'+
         '<span class="lbl '+(x.activo?'si':'no')+'">'+(x.activo?'Activo':'Inactivo')+'</span></td>'+
+      '<td>'+(ACT.id==='LINEA'?'':
+        '<button class="mini" type="button" data-ed="'+esc(x.clave)+'">Modificar</button>')+'</td>'+
     '</tr>';
   }).join('');
   Array.prototype.forEach.call($('cuerpo').querySelectorAll('input[type=checkbox]'),function(ck){
     ck.onchange=function(){ activar(ck.dataset.v, ck.checked, ck); };
+  });
+  Array.prototype.forEach.call($('cuerpo').querySelectorAll('[data-ed]'),function(b){
+    b.onclick=function(){ abrirEditar(b.dataset.ed); };
   });
 }
 
@@ -279,6 +354,64 @@ $('btnNuevo').onclick=function(){
     } else { $('msg').className='hint err'; $('msg').textContent=(r&&r.error)||'No se pudo agregar.'; }
   }, function(){ $('msg').className='hint err'; $('msg').textContent='Sin conexión.'; });
 };
+
+/* ---- modificar ---- */
+var edAntes='';
+function abrirEditar(valor){
+  var x=null;
+  for(var i=0;i<DATOS.length;i++) if(U(DATOS[i].clave)===U(valor)) x=DATOS[i];
+  if(!x) return;
+  edAntes=x.clave;
+  $('edLbClave').textContent=ACT.clave; $('edClave').value=x.clave;
+  var hay=!!ACT.extra;
+  $('edWExtra').style.display = hay?'':'none';
+  if(hay){ $('edLbExtra').textContent=ACT.extra; $('edExtra').value=x.extra; }
+  $('edAviso').className='avisoEd'; $('edMsg').textContent='';
+  $('modalEd').style.display='flex';
+  setTimeout(function(){ $('edClave').focus(); },60);
+}
+
+/* Cambiar el dato principal afecta lo ya guardado: se avisa antes, no después. */
+$('edClave').addEventListener('input', function(){
+  var cambia = U($('edClave').value)!==U(edAntes);
+  var a=$('edAviso');
+  a.className='avisoEd'+(cambia?' on':'');
+  if(cambia){
+    a.innerHTML='Estás cambiando el '+ACT.clave.toLowerCase()+'. Las auditorías ya '+
+      'guardadas con «'+esc(edAntes)+'» <b>se actualizarán solas</b> al nuevo nombre, '+
+      'para que no aparezca dos veces en los tableros. Puede tardar unos segundos.';
+  }
+});
+
+$('edGuardar').onclick=function(){
+  if(!T($('usuario').value)){
+    $('edMsg').textContent='Escribe tu nombre arriba antes de modificar.'; return; }
+  var nuevo=U($('edClave').value), extra=U($('edExtra').value);
+  if(!nuevo){ $('edMsg').textContent='El '+ACT.clave.toLowerCase()+' no puede quedar vacío.'; return; }
+  if(ACT.id==='CLIENTE' && nuevo.length!==3){
+    $('edMsg').textContent='El prefijo son exactamente 3 letras.'; return; }
+  if(ACT.extra && !extra){ $('edMsg').textContent='Falta '+ACT.extra.toLowerCase()+'.'; return; }
+
+  $('edGuardar').disabled=true;
+  $('edMsg').className='hint'; $('edMsg').textContent='Guardando…';
+  jsonp({accion:'cateditar', clave:CLAVE, que:ACT.id, valor:edAntes, nuevo:nuevo,
+         extra:extra, usuario:U($('usuario').value)}, function(r){
+    $('edGuardar').disabled=false;
+    if(r&&r.ok){
+      $('modalEd').style.display='none';
+      $('msg').className='hint ok';
+      $('msg').textContent='Modificado.'+(r.actualizadas? (' Se actualizaron '+r.actualizadas+' auditoría(s).'):'');
+      cargar();
+    } else { $('edMsg').className='hint err'; $('edMsg').textContent=(r&&r.error)||'No se pudo modificar.'; }
+  }, function(){ $('edGuardar').disabled=false;
+    $('edMsg').className='hint err'; $('edMsg').textContent='Sin conexión.'; });
+};
+
+['edClave','edExtra'].forEach(function(id){
+  $(id).addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ e.preventDefault(); $('edGuardar').click(); }
+  });
+});
 
 $('filtro').addEventListener('input', pintar);
 ['nvClave','nvExtra'].forEach(function(id){

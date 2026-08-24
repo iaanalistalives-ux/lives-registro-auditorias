@@ -618,7 +618,10 @@ var NOMBRE_TIPO = { LINEAS:'Líneas de costura', SERVINSP:'Servicio de inspecci�
 var CAMPOS = {
   LINEAS:   ['wAuditor','wInspector','wLinea'],
   SERVINSP: ['wAuditor','wInspector'],
-  EMPAQUE:  ['wAuditor','wServicio','wPo','wDestino','wVia','wCajas','wResultado'],
+  /* Sin taller: el encajado siempre se hace en LIVES. En las 1 261 auditorías
+     de empaque del histórico ese campo tiene un único valor, así que pedirlo
+     era un paso de más. Se manda fijo al guardar. */
+  EMPAQUE:  ['wAuditor','wPo','wDestino','wVia','wCajas','wResultado'],
   CLIENTE:  ['wPo','wPedido','wDestino','wVia','wResultado'],
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
@@ -1068,7 +1071,7 @@ function guardar(){
               nombre:d.nombre, cantidad:d.cantidad};
     })),
     po: U($('po').value),
-    servicio: U($('servicio').value),
+    servicio: (t==='EMPAQUE') ? 'LIVES' : U($('servicio').value),
     destinos: JSON.stringify( T($('destino').value)
         ? [{codigo:U($('destino').value), via:$('via').value}] : [] ),
     cajas: N($('cajas').value),

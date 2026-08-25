@@ -122,7 +122,9 @@
 <script>
 var API   = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
 var CLAVE = 'livessac';
-var TROZO = 40;          // filas por envío: más no cabe en una llamada
+/* 15 filas por envío. Con 40 la dirección llegaba a 14 000 caracteres y el
+   navegador la cortaba: la carga moría a mitad sin motivo aparente. */
+var TROZO = 15;
 
 var FILAS = [];
 
@@ -242,14 +244,21 @@ function subir(){
   $('barra').className='barra on';
   $('msgSube').className='hint'; $('msgSube').textContent='Preparando…';
 
-  jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value)},
+  /* Las descripciones de tela van una sola vez, no en cada fila: 69 distintas
+     para más de mil filas. */
+  var telas={};
+  FILAS.forEach(function(f){ if(f.codTela && !telas[f.codTela]) telas[f.codTela]=f.descTela; });
+
+  jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value),
+         telas:JSON.stringify(telas)},
     function(r){
       if(!r||!r.ok){ falla((r&&r.error)||'no se pudo empezar'); return; }
       mandarTrozo(0);
     }, function(m){ falla(m); });
 }
 
-function mandarTrozo(desde){
+function mandarTrozo(desde, intento){
+  intento = intento || 0;
   if(desde>=FILAS.length){
     jsonp({accion:'opscarga', clave:CLAVE, modo:'fin', usuario:U($('usuario').value)},
       function(r){
@@ -262,7 +271,10 @@ function mandarTrozo(desde){
       }, function(m){ falla(m); });
     return;
   }
-  var parte=FILAS.slice(desde, desde+TROZO);
+  /* Se mandan como arreglos, no como objetos: ocupa un tercio del espacio. */
+  var parte=FILAS.slice(desde, desde+TROZO).map(function(f){
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.destino,f.pedido];
+  });
   jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte)},
     function(r){
       if(!r||!r.ok){ falla((r&&r.error)||'error al enviar'); return; }
@@ -272,7 +284,15 @@ function mandarTrozo(desde){
       $('msgSube').textContent='Enviando '+hecho.toLocaleString('es-PE')+' de '+
         FILAS.length.toLocaleString('es-PE')+'…';
       mandarTrozo(hecho);
-    }, function(m){ falla(m); });
+    }, function(m){
+      /* Un tropiezo de red no debe tirar la carga entera: se reintenta el
+         mismo trozo antes de rendirse. */
+      if(intento<3){
+        $('msgSube').className='hint';
+        $('msgSube').textContent='Reintentando desde la fila '+(desde+1)+'…';
+        setTimeout(function(){ mandarTrozo(desde, intento+1); }, 1500*(intento+1));
+      } else falla(m);
+    });
 }
 
 function falla(m){

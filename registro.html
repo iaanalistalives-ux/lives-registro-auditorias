@@ -974,6 +974,18 @@ function pintarDefs(){
 }
 function totalDef(){ return defs.reduce(function(s,d){ return s+(d.cantidad||0); },0); }
 
+/* El resultado que se muestra tiene que ser EL MISMO que se guarda.
+   En Líneas y Serv. Inspección lo decide la tolerancia cero; en Final, Empaque
+   y Cliente lo elige quien digita. Antes acá se asumía «si hay defectos,
+   rechazado» para todos, y una auditoría marcada APROBADO se veía como
+   RECHAZADO en la lista de pendientes. */
+function resultadoActual(){
+  var t=$('tipo').value;
+  if(TOL0[t]) return totalDef()>0 ? 'RECHAZADO' : 'APROBADO';
+  if(t==='FINAL' && $('licencia').checked && !T($('resultado').value)) return 'APROBADO';
+  return U($('resultado').value);
+}
+
 /* Tabla AQL, la misma que usa el sistema del piloto. */
 var AQL=[[2,8,2,{'1.0':0,'1.5':0,'2.5':0}],[9,15,3,{'1.0':0,'1.5':0,'2.5':0}],
 [16,25,5,{'1.0':0,'1.5':0,'2.5':0}],[26,50,8,{'1.0':0,'1.5':0,'2.5':0}],
@@ -1012,10 +1024,17 @@ function veredicto(){
 
   /* En Final, Empaque y Cliente el resultado viene decidido en el papel: acá
      solo se copia. El sistema no opina para no hacerla dudar. */
-  v.className='ver ok';
-  v.innerHTML='Copia el resultado del papel<span class="exp">'+
-    (mu>0?('Hay '+tot+' defectuosa(s) sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%). '):'')+
-    'Elige abajo APROBADO o RECHAZADO tal como figura en la hoja.</span>';
+  var elegido=U($('resultado').value);
+  if(elegido){
+    v.className='ver '+(elegido==='RECHAZADO'?'no':'ok');
+    v.innerHTML=elegido+'<span class="exp">Es el resultado que marcaste, tal como figura '+
+      'en el papel'+(mu>0?(' · '+tot+' defectuosa(s) sobre '+mu+' revisadas'):'')+'.</span>';
+  } else {
+    v.className='ver ok';
+    v.innerHTML='Copia el resultado del papel<span class="exp">'+
+      (mu>0?('Hay '+tot+' defectuosa(s) sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%). '):'')+
+      'Elige abajo APROBADO o RECHAZADO tal como figura en la hoja.</span>';
+  }
 }
 
 /* ---------------- guardado optimista ---------------- */
@@ -1079,7 +1098,7 @@ function guardar(){
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
     nivelAql: '1.5',          // fijo: el mismo del sistema del piloto
-    resultado: U($('resultado').value),
+    resultado: resultadoActual(),
     licencia: $('licencia').checked ? '1' : '0',
     esReauditoria: esReaud || 'NO',
     reproceso: $('reproceso').checked ? '1' : '0',
@@ -1089,8 +1108,9 @@ function guardar(){
   /* Identificador único del registro. Si la respuesta se pierde por lentitud de
      red y se reintenta, el servidor reconoce que ya lo guardó y no lo duplica. */
   envio.token = 'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
+  var res=resultadoActual();
   var etiqueta=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
-               ' · '+(totalDef()===0?'aprobado':'rechazado ('+totalDef()+')');
+               ' · '+(res||'—').toLowerCase()+(totalDef()?(' ('+totalDef()+')'):'');
   /* Antes cada auditoría salía al servidor al instante. Ahora se acumulan y se
      mandan todas juntas: quitar una es inmediato porque no salió nada, y no hay
      esperas entre registro y registro. */
@@ -1104,7 +1124,7 @@ function guardar(){
 
   pend.push({ id:envio.token, envio:envio, etiqueta:etiqueta,
               tipo:NOMBRE_TIPO[$('tipo').value],
-              resultado: totalDef()>0 ? 'RECHAZADO' : (U($('resultado').value)||'APROBADO'),
+              resultado: res,
               defectuosas: totalDef() });
   guardarPend(); pintarPend();
   limpiarRegistro(true);
@@ -1408,7 +1428,7 @@ function guardarEdicion(){
     LOTE:N($('lote').value), MUESTRA:N($('muestra').value),
     INSPECTOR:U($('inspector').value),
     LINEA: $('tipo').value==='LINEAS' ? $('linea').value : '',
-    RESULTADO: totalDef()>0 ? 'RECHAZADO' : 'APROBADO',
+    RESULTADO: resultadoActual(),
     REPROCESO: $('reproceso').checked ? 1 : 0
   };
   var envio={
@@ -2109,7 +2129,10 @@ $('tipo').addEventListener('change', function(){
   aplicarTipo();
   guardarLocal('lives_fijo_aud', datosFijos());
 });
-['licencia','nivelAql','lote','cajas'].forEach(function(id){
+['resultado'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('change', veredicto);
+});
+['licencia','lote','cajas'].forEach(function(id){
   var e=$(id); if(e) e.addEventListener('input', veredicto);
 });
 $('licencia').addEventListener('change', function(){

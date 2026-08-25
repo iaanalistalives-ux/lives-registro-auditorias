@@ -77,8 +77,8 @@
 
   <div class="card">
     <h2>1 · Elige el archivo</h2>
-    <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · COLOR · OP · PO ·
-      CODIGO TELA · DESCRIPCIÓN TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
+    <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
+      COLOR · OP · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
       por nombre.</div>
 
     <div class="drop" id="zona">
@@ -98,8 +98,8 @@
 
     <div class="tbl">
       <table>
-        <thead><tr><th>OP</th><th>Grupo</th><th>Estilo</th><th>Color</th><th>PO</th>
-          <th>Cód. tela</th><th>Destino</th><th>Pedido</th></tr></thead>
+        <thead><tr><th>OP</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
+          <th>PO</th><th>Cód. tela</th><th>Destino</th><th>Pedido</th></tr></thead>
         <tbody id="prev"></tbody>
       </table>
     </div>
@@ -163,7 +163,8 @@ var COLS = {
   op:['OP'], grupo:['GRUPO'], estilo:['ESTILOPROPIO','ESTILO'],
   color:['COLOR'], po:['PO'], codTela:['CODIGOTELA','CODTELA'],
   descTela:['DESCRIPCIONTELA','DESCTELA','TELA'],
-  destino:['DESTINO'], pedido:['PEDIDO','CANTIDAD']
+  destino:['DESTINO'], pedido:['PEDIDO','CANTIDAD'],
+  eCliente:['ESTILOCLIENTE','ECLIENTE']
 };
 
 function leerArchivo(file){
@@ -188,6 +189,7 @@ function leerArchivo(file){
 
       FILAS = crudo.map(function(r){
         return { op:U(r[mapa.op]), grupo:U(r[mapa.grupo]), estilo:U(r[mapa.estilo]),
+                 eCliente:U(r[mapa.eCliente]),
                  color:U(r[mapa.color]), po:U(r[mapa.po]), codTela:U(r[mapa.codTela]),
                  descTela:T(r[mapa.descTela]), destino:U(r[mapa.destino]),
                  pedido:num(r[mapa.pedido]) };
@@ -224,8 +226,8 @@ function mostrar(nombre){
 
   $('prev').innerHTML=FILAS.slice(0,60).map(function(f){
     return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
-      '<td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td><td>'+esc(f.codTela)+'</td>'+
-      '<td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
+      '<td>'+esc(f.eCliente)+'</td><td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td>'+
+      '<td>'+esc(f.codTela)+'</td><td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
   }).join('');
   $('cardPrev').style.display='';
   $('msgSube').textContent='';
@@ -273,7 +275,7 @@ function mandarTrozo(desde, intento){
   }
   /* Se mandan como arreglos, no como objetos: ocupa un tercio del espacio. */
   var parte=FILAS.slice(desde, desde+TROZO).map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.destino,f.pedido];
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.destino,f.pedido,f.eCliente];
   });
   jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte)},
     function(r){

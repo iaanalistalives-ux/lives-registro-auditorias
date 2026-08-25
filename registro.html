@@ -220,6 +220,12 @@
         padding:10px 14px;margin-bottom:10px;border-left:4px solid var(--sage);}
   .envio.mal{border-left-color:var(--rose);}
   .envTxt{font-size:13.5px;font-weight:700;color:var(--petrol);}
+  .tagsDer{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;min-height:4px;}
+  .tagDer{display:inline-flex;align-items:center;gap:6px;background:#FFFBEB;
+        border:1px solid var(--tan);border-radius:14px;padding:3px 10px;font-size:12.5px;}
+  .tagDer input{width:46px;text-align:center;font-weight:700;color:#92400E;
+        border:1px solid var(--warm);background:#fff;border-radius:4px;padding:1px 3px;font-size:12px;}
+  .tagDer i{font-style:normal;color:var(--rose);cursor:pointer;font-weight:700;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -363,11 +369,7 @@
           <input type="number" id="muestra" min="1" inputmode="numeric">
           <div class="hint" id="hMuestra"></div>
         </div>
-        <div class="f sm" id="wDerivados">
-          <label for="derivados">Derivados</label>
-          <input type="number" id="derivados" min="0" inputmode="numeric" placeholder="0">
-          <div class="hint">Prendas del lote completo</div>
-        </div>
+
         <div class="f" style="display:flex;align-items:flex-end;gap:18px;padding-bottom:4px;flex-wrap:wrap">
           <label class="sw"><input type="checkbox" id="reproceso"> Es reproceso</label>
           <label class="sw" id="wLicencia"><input type="checkbox" id="licencia"> Es licencia (100%)</label>
@@ -411,6 +413,17 @@
             <option value="2.5">2.5</option>
           </select>
         </div>
+      </div>
+
+      <div id="wDerivados" style="display:none;margin-top:10px">
+        <div class="rot">Derivados — defectos del lote completo
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--stone)">
+            · lo hallado fuera de la muestra, al revisar todo el lote. No es obligatorio.</span></div>
+        <div class="ac">
+          <input type="text" id="qder" autocomplete="off" placeholder="Buscar defecto del lote…">
+          <div class="drop" id="dDer"></div>
+        </div>
+        <div id="tagsDer" class="tagsDer"></div>
       </div>
 
       <div class="ver ok" id="ver"></div>
@@ -1037,6 +1050,82 @@ function veredicto(){
   }
 }
 
+/* ---------------- derivados ----------------
+   Son defectos hallados al revisar el LOTE COMPLETO, no la muestra. Se guardan
+   con el mismo formato que los normales («NOMBRE 20-OTRO 13») porque así vienen
+   en el histórico y así los lee el tablero. No son obligatorios. */
+var ders = [];
+
+function pintarDers(){
+  $('tagsDer').innerHTML = ders.map(function(d,i){
+    return '<span class="tagDer">'+esc(d.nombre)+
+      '<input type="number" min="1" value="'+d.cantidad+'" data-di="'+i+'">'+
+      '<i data-dq="'+i+'" title="Quitar">&times;</i></span>';
+  }).join('');
+  Array.prototype.forEach.call($('tagsDer').querySelectorAll('input'),function(inp){
+    inp.onfocus=function(){ inp.select(); };
+    inp.oninput=function(){ ders[+inp.dataset.di].cantidad=Math.max(0,parseInt(inp.value)||0); };
+    inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); $('qder').focus(); } };
+  });
+  Array.prototype.forEach.call($('tagsDer').querySelectorAll('[data-dq]'),function(b){
+    b.onclick=function(){ ders.splice(+b.dataset.dq,1); pintarDers(); $('qder').focus(); };
+  });
+}
+
+function agregarDer(d){
+  var nom=nombreDefecto(d), ya=-1;
+  for(var i=0;i<ders.length;i++) if(ders[i].nombre===nom) ya=i;
+  if(ya<0){ ders.push({cod:d[0],seccion:d[1],nombre:nom,cantidad:1}); ya=ders.length-1; }
+  $('qder').value=''; pintarDers();
+  var inp=$('tagsDer').querySelector('input[data-di="'+ya+'"]');
+  if(inp){ inp.focus(); inp.select(); }
+}
+
+(function(){
+  var inp=$('qder'), dr=$('dDer'), opts=[], sel=-1;
+  if(!inp) return;
+  function buscar(){
+    var q=inp.value; opts=[];
+    if(!T(q)){ dr.classList.remove('on'); return; }
+    /* Primero los de la sección Derivados: son los que corresponden acá.
+       Los demás quedan disponibles porque el histórico muestra que también se
+       usan (MANCHAS ACEITE, SIN ETIQUETA COSTADO…), pero van después. */
+    var base=CAT.defectos.slice().sort(function(a,b){
+      var da=U(a[1])==='DERIVADOS'?0:1, db=U(b[1])==='DERIVADOS'?0:1;
+      return da-db;
+    });
+    for(var i=0;i<base.length && opts.length<25;i++)
+      if(coincide(nombreDefecto(base[i]),q)) opts.push(base[i]);
+    if(norm(q).length>=3 && !opts.some(function(o){ return norm(nombreDefecto(o))===norm(q); }))
+      opts.push(['__NUEVO__','Derivados',U(norm(q)),'']);
+    sel=opts.length?0:-1; pintar(q);
+  }
+  function pintar(q){
+    if(!opts.length){ dr.classList.remove('on'); dr.innerHTML=''; return; }
+    dr.innerHTML=opts.map(function(o,i){
+      var nuevo=o[0]==='__NUEVO__';
+      return '<div class="opt'+(i===sel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
+        '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
+    }).join('');
+    dr.classList.add('on');
+    Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
+      el.onmousedown=function(e){ e.preventDefault(); elegir(opts[+el.dataset.i]); dr.classList.remove('on'); };
+    });
+  }
+  function elegir(o){
+    if(o[0]==='__NUEVO__') registrarDefectoNuevo(o[2], function(d){ agregarDer(d); });
+    else agregarDer(o);
+  }
+  inp.addEventListener('input',buscar);
+  inp.addEventListener('blur',function(){ setTimeout(function(){ dr.classList.remove('on'); },140); });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(opts.length){ sel=(sel+1)%opts.length; pintar(inp.value); } }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); if(opts.length){ sel=(sel-1+opts.length)%opts.length; pintar(inp.value); } }
+    else if(e.key==='Enter'){ e.preventDefault(); if(sel>=0&&opts[sel]) elegir(opts[sel]); }
+    else if(e.key==='Escape'){ dr.classList.remove('on'); inp.value=''; }
+  });
+})();
+
 /* ---------------- guardado optimista ---------------- */
 function validar(){
   if(!T($('fecha').value)) return 'Falta la fecha.';
@@ -1094,7 +1183,9 @@ function guardar(){
     destinos: JSON.stringify( T($('destino').value)
         ? [{codigo:U($('destino').value), via:$('via').value}] : [] ),
     cajas: N($('cajas').value),
-    derivados: T($('derivados').value),
+    derivados: ders.filter(function(d){ return d.cantidad>0; })
+                   .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
+    derivadosDet: JSON.stringify(ders.filter(function(d){ return d.cantidad>0; })),
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
     nivelAql: '1.5',          // fijo: el mismo del sistema del piloto
@@ -1165,14 +1256,16 @@ function cargarEnvioEnForm(e){
   $('grupo').value=e.grupo||''; $('estilo').value=e.estilo||''; $('color').value=e.color||'';
   $('po').value=e.po||''; $('pedido').value=e.pedido||'';
   $('lote').value=e.lote||''; $('muestra').value=e.muestra||'';
-  $('cajas').value=e.cajas||''; $('derivados').value=e.derivados||'';
+  $('cajas').value=e.cajas||'';
+  try{ ders=JSON.parse(e.derivadosDet||'[]')||[]; }catch(err){ ders=[]; }
+  pintarDers();
   $('servicio').value=e.servicio||''; $('intExt').value=e.intExt||'INTERNO';
   $('proceso').value=e.proceso||'COSTURA'; $('nivelAql').value=e.nivelAql||'1.5';
   $('resultado').value=e.resultado||''; $('licencia').checked=e.licencia==='1';
   $('reproceso').checked=e.reproceso==='1';
   try{ $('destino').value=(JSON.parse(e.destinos)[0]||{}).codigo||''; }catch(err){}
   try{ defs=JSON.parse(e.defectos)||[]; }catch(err){ defs=[]; }
-  aplicarCliente(); pintarDefs();
+  aplicarCliente(); pintarDefs(); pintarDers();
 }
 
 /* Devuelve una pendiente al formulario para corregirla y la saca de la lista. */
@@ -1357,7 +1450,7 @@ function limpiarRegistro(exito){
   if(!mantener.grupo) $('cliente').value='';
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
-  defs=[]; prevLote=null; esReaud='';
+  defs=[]; ders=[]; pintarDers(); prevLote=null; esReaud='';
   $('prev').classList.remove('on');
   pintarDefs();
   $('hGuardar').className='hint '+(exito?'ok':'');

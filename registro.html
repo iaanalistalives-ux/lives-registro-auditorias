@@ -349,14 +349,6 @@
           <label for="pedido">Pedido</label>
           <input type="text" id="pedido" autocomplete="off">
         </div>
-        <div class="f sm" id="wVia">
-          <label for="via">Vía</label>
-          <select id="via">
-            <option value="">—</option>
-            <option value="AIR">Aéreo</option>
-            <option value="SEA">Marítimo</option>
-          </select>
-        </div>
       </div>
 
       <div class="row" style="margin-top:10px">
@@ -376,9 +368,9 @@
         </div>
 
         <div class="f" style="display:flex;align-items:flex-end;gap:18px;padding-bottom:4px;flex-wrap:wrap">
-          <label class="sw"><input type="checkbox" id="reproceso"> Es reproceso</label>
+          <label class="sw" id="wReproceso" style="display:none"><input type="checkbox" id="reproceso"> Es reproceso</label>
           <label class="sw" id="wLicencia"><input type="checkbox" id="licencia"> Es licencia (100%)</label>
-          <span class="hint" style="margin:0">No suman lote en los indicadores, pero la auditoría sí cuenta</span>
+          <span class="hint" style="margin:0" id="hMarcas">No suman lote en los indicadores, pero la auditoría sí cuenta</span>
         </div>
       </div>
 
@@ -639,17 +631,17 @@ var CAMPOS = {
   /* Sin taller: el encajado siempre se hace en LIVES. En las 1 261 auditorías
      de empaque del histórico ese campo tiene un único valor, así que pedirlo
      era un paso de más. Se manda fijo al guardar. */
-  EMPAQUE:  ['wAuditor','wPo','wDestino','wVia','wCajas','wResultado'],
-  CLIENTE:  ['wPo','wPedido','wDestino','wVia','wResultado'],
+  EMPAQUE:  ['wAuditor','wPo','wDestino','wCajas','wResultado'],
+  CLIENTE:  ['wPo','wPedido','wDestino','wResultado'],
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
   FINAL:    ['wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
-             'wDestino','wVia','wDerivados','wLicencia','wResultado']
+             'wDestino','wDerivados','wLicencia','wResultado']
 };
 var TODOS_COND = ['wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
-                  'wPo','wPedido','wDestino','wVia','wCajas','wDerivados','wLicencia',
-                  'wResultado','wNivelAql'];
+                  'wPo','wPedido','wDestino','wCajas','wDerivados','wLicencia',
+                  'wResultado','wNivelAql','wReproceso'];
 /* Dónde es obligatorio decir quién auditó. */
 var PIDE_AUDITOR = { LINEAS:true, SERVINSP:true, EMPAQUE:true, FINAL:true, CLIENTE:false };
 
@@ -702,8 +694,11 @@ function aplicarTipo(){
   var t=$('tipo').value;
   TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
   (CAMPOS[t]||[]).forEach(function(id){
-    var e=$(id); if(e) e.style.display = (id==='wLicencia') ? 'inline-flex' : '';
+    var e=$(id); if(e) e.style.display = (id==='wLicencia'||id==='wReproceso') ? 'inline-flex' : '';
   });
+  /* Reproceso solo aparece cuando el pedido ya tiene auditorías: preguntarlo
+     antes no tiene sentido y es un campo más que leer en cada registro. */
+  if($('wReproceso')) $('wReproceso').style.display = 'none';
   var et = ETIQUETAS[t] || ETIQUETAS.DEFECTO;
   $('lblLote').textContent=et.lote; $('lblMuestra').textContent=et.muestra;
   $('hLote').textContent=et.hLote||'';
@@ -942,6 +937,8 @@ function buscarLote(){
         '<button type="button" class="mini" id="btnNoRea">Auditoría distinta</button>'+
         '<span id="decMsg"></span></div>';
     p.classList.add('on');
+    /* Con auditorías previas sí tiene sentido preguntar por el reproceso. */
+    if($('wReproceso')) $('wReproceso').style.display='inline-flex';
     $('btnRea').onclick=function(){ fijarReaud('SI', r.siguienteAuditoria); };
     $('btnNoRea').onclick=function(){ fijarReaud('NO', 1); };
     /* Se deja marcada la opción más probable, pero sin decidir por ella. */
@@ -949,6 +946,29 @@ function buscarLote(){
     else if(r.sugerido==='NO') fijarReaud('NO', 1);
   });
 }
+
+/* Marcado como reproceso, el registro es la misma auditoría revisada de nuevo:
+   los datos de identificación ya están en la anterior. Se ocultan para que solo
+   quede lo que cambia — resultado, defectos y derivados. */
+function modoReproceso(activo){
+  ['wPo','wPedido','wDestino','wServicio','wECliente','wIntExt','wProceso','wCajas','wLinea']
+    .forEach(function(id){
+      var e=$(id); if(!e) return;
+      if(activo) e.style.display='none';
+      else if((CAMPOS[$('tipo').value]||[]).indexOf(id)>=0) e.style.display='';
+    });
+  var h=$('hMarcas');
+  if(h) h.textContent = activo
+    ? 'Reproceso: solo cambia el resultado y los defectos. Lo demás viene de la auditoría anterior.'
+    : 'No suman lote en los indicadores, pero la auditoría sí cuenta';
+}
+$('reproceso').addEventListener('change', function(){
+  modoReproceso($('reproceso').checked);
+  if($('reproceso').checked && prevLote && prevLote.existe){
+    fijarReaud('SI', prevLote.siguienteAuditoria);
+  }
+  veredicto();
+});
 
 function fijarReaud(v, n){
   esReaud=v;
@@ -1186,7 +1206,7 @@ function guardar(){
     po: U($('po').value),
     servicio: (t==='EMPAQUE') ? 'LIVES' : U($('servicio').value),
     destinos: JSON.stringify( T($('destino').value)
-        ? [{codigo:U($('destino').value), via:$('via').value}] : [] ),
+        ? [{codigo:U($('destino').value), via:''}] : [] ),
     cajas: N($('cajas').value),
     derivados: ders.filter(function(d){ return d.cantidad>0; })
                    .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
@@ -1458,6 +1478,8 @@ function limpiarRegistro(exito){
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
   defs=[]; ders=[]; pintarDers(); prevLote=null; esReaud='';
+  modoReproceso(false);
+  if($('wReproceso')) $('wReproceso').style.display='none';
   $('prev').classList.remove('on');
   pintarDefs();
   $('hGuardar').className='hint '+(exito?'ok':'');

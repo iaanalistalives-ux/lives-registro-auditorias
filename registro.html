@@ -465,9 +465,10 @@
 
       <details class="ayuda2">
         <summary>Atajos de teclado</summary>
-        <kbd>Tab</kbd> avanza de campo · <kbd>Enter</kbd> en el buscador agrega el defecto y salta a la
-        cantidad · <kbd>Enter</kbd> en la cantidad vuelve al buscador · <kbd>F2</kbd> agrega a la lista ·
-        <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia.
+        En la hoja: <kbd>Enter</kbd> y <kbd>Tab</kbd> avanzan a la celda de al lado; al terminar la
+        fila pasan a los defectos, y con el buscador vacío bajan a la fila siguiente.
+        <kbd>Enter</kbd> en el buscador agrega el defecto y salta a su cantidad ·
+        <kbd>F2</kbd> agrega a la lista · <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia.
       </details>
     </div>
   </div>
@@ -1809,14 +1810,27 @@ function pintarHoja(){
          entero en cada fila aunque se haya usado hace dos renglones. */
       if(['grupo','estilo','color'].indexOf(inp.dataset.c)>=0) sugerirEnCelda(inp);
     }
+    /* Enter avanza a la celda de al lado, como en Excel. Solo al llegar al
+       final de la fila baja a la siguiente, creándola si hace falta. Antes
+       bajaba de fila desde cualquier celda y obligaba a usar el mouse para
+       terminar de llenar el renglón. */
     inp.onkeydown=function(e){
-      if(e.key==='Enter'){
-        e.preventDefault();
-        var i=+inp.dataset.f;
-        if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
-        var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
-        if(sig) sig.focus();
+      if(e.key!=='Enter') return;
+      e.preventDefault();
+      var orden=['grupo','color','estilo','lote','muestra'];
+      var i=+inp.dataset.f, k=orden.indexOf(inp.dataset.c);
+
+      if(k>=0 && k<orden.length-1){
+        var lado=$('hjBody').querySelector('tr[data-f="'+i+'"] input[data-c="'+orden[k+1]+'"]');
+        if(lado){ lado.focus(); lado.select(); return; }
       }
+      /* Última celda: se pasa a los defectos de esa fila, que es lo que sigue. */
+      var add=$('hjBody').querySelector('input.hjAdd[data-af="'+i+'"]');
+      if(add && k===orden.length-1){ activarFila(i); add.focus(); return; }
+
+      if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
+      var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
+      if(sig) sig.focus();
     };
   });
   Array.prototype.forEach.call($('hjBody').querySelectorAll('[data-qf]'),function(b){
@@ -1942,7 +1956,7 @@ function sugerirEnCelda(inp){
     inp.value=v;
     hoja[+inp.dataset.f][inp.dataset.c]=v;
     guardarHoja(); cerrarSug();
-    /* pasa a la celda siguiente de la misma fila */
+    /* pasa a la celda de al lado, igual que Enter */
     var orden=['grupo','color','estilo','lote','muestra'];
     var k=orden.indexOf(inp.dataset.c);
     var sig = k>=0 ? $('hjBody').querySelector('tr[data-f="'+inp.dataset.f+'"] input[data-c="'+orden[k+1]+'"]') : null;
@@ -2004,6 +2018,14 @@ function tecleoDefFila(e, inp){
   else if(e.key==='ArrowUp'){ e.preventDefault(); if(dfOpts.length){ dfSel=(dfSel-1+dfOpts.length)%dfOpts.length; pintarDropFila(inp.value,inp); } }
   else if(e.key==='Enter'){ e.preventDefault(); if(dfSel>=0&&dfOpts[dfSel]) elegirDefFila(dfOpts[dfSel], inp); }
   else if(e.key==='Escape'){ cerrarDropFila(); inp.value=''; }
+  else if(e.key==='Enter' && !T(inp.value)){
+    /* Enter en el «+ defecto» vacío: la fila está lista, se baja a la siguiente. */
+    e.preventDefault();
+    var i=+inp.dataset.af;
+    if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
+    var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
+    if(sig) sig.focus();
+  }
 }
 
 function elegirDefFila(o, inp){

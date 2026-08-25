@@ -903,10 +903,16 @@ function buscarLote(){
   var g=U($('grupo').value), e=U($('estilo').value), c=U($('color').value), l=N($('lote').value);
   var t=$('tipo').value;
   /* En Empaque y Cliente lo que identifica el despacho es el PO, no el lote. */
-  var listo = (t==='EMPAQUE'||t==='CLIENTE') ? (g&&e&&T($('po').value)) : (g&&e&&l);
+  /* En Empaque, Cliente y Final la llave lleva destino: sin él no se puede
+     distinguir un pedido partido, así que se espera a tenerlo. */
+  var listo;
+  if(t==='EMPAQUE'||t==='CLIENTE') listo = g&&e&&T($('po').value)&&T($('destino').value);
+  else if(t==='FINAL') listo = g&&e&&T($('po').value)&&T($('destino').value);
+  else listo = g&&e&&l;
   if(!listo){ $('prev').classList.remove('on'); prevLote=null; esReaud=''; return; }
   jsonp({accion:'buscar', tipo:$('tipo').value, grupo:g, estilo:e, color:c, lote:l,
-         po:U($('po').value), pedido:N($('pedido').value)}, function(r){
+         po:U($('po').value), pedido:N($('pedido').value),
+         op:U($('op')?$('op').value:''), destino:U($('destino').value)}, function(r){
     if(!r||!r.ok) return;
     prevLote=r;
     var p=$('prev');
@@ -2255,6 +2261,7 @@ $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ buscarLote(); });
 $('po').addEventListener('blur', buscarLote);
 $('pedido').addEventListener('blur', buscarLote);
+$('destino').addEventListener('blur', buscarLote);
 $('muestra').addEventListener('input', veredicto);
 $('tipo').addEventListener('change', function(){
   aplicarTipo();

@@ -211,6 +211,10 @@ var CATS = [
    clave:'Código', extra:'',
    sub:'Los 130 defectos que se pueden elegir al digitar. Escribe arriba para filtrar: la lista es larga.',
    ayudaExtra:''},
+  {id:'DERIVADO', tab:'Derivados', tit:'Catálogo de derivados',
+   clave:'Código', extra:'',
+   sub:'Defectos que se hallan al revisar el lote completo, fuera de la muestra: segundas, contaminado, falla de tela, zurcido…',
+   ayudaExtra:''},
   {id:'LINEA', tab:'Líneas', tit:'Líneas de producción',
    clave:'Nombre', extra:'',
    sub:'Líneas 1 a 7. Activa las que estén trabajando; las inactivas no aparecen al digitar.',
@@ -291,13 +295,20 @@ function prepararForm(){
   if(hay){ $('lbExtra').textContent=ACT.extra; $('thExtra').textContent=ACT.extra;
            $('nvExtra').placeholder=ACT.ayudaExtra||''; }
   /* En Líneas no se agrega nada: son siempre de la 1 a la 7 y solo se activan. */
-  var esDef = ACT.id==='DEFECTO';
+  var esDef = (ACT.id==='DEFECTO'||ACT.id==='DERIVADO');
   $('filaNuevo').style.display = (ACT.id==='LINEA'||esDef) ? 'none' : '';
   $('filaNuevoDef').style.display = esDef ? '' : 'none';
   $('filtro').placeholder = esDef
     ? 'Escribe para filtrar entre los 130 defectos: man ace, punt cort…'
     : 'Buscar en la lista…';
-  if(esDef){ $('thClave').textContent='Defecto'; $('thExtra').style.display=''; $('thExtra').textContent='Sección'; }
+  if(esDef){
+    $('thClave').textContent = (ACT.id==='DERIVADO') ? 'Derivado' : 'Defecto';
+    $('thExtra').style.display=''; $('thExtra').textContent='Sección';
+    /* En derivados la sección es siempre DERIVADOS: no se elige. */
+    var fijo = ACT.id==='DERIVADO';
+    $('dfSec').parentNode.style.display = fijo ? 'none' : '';
+    if(fijo) $('dfSec').value='OTROS';
+  }
   $('nvClave').value=''; $('nvExtra').value=''; $('filtro').value='';
   $('msg').textContent='';
 }
@@ -341,13 +352,13 @@ function pintar(){
   var q=U($('filtro').value);
   var lista=DATOS.filter(function(x){
     if(!q) return true;
-    if(ACT.id==='DEFECTO') return coincide(x.nombre, q) || U(x.clave).indexOf(q)>=0;
+    if(ACT.id==='DEFECTO'||ACT.id==='DERIVADO') return coincide(x.nombre, q) || U(x.clave).indexOf(q)>=0;
     return U(x.clave).indexOf(q)>=0 || U(x.extra).indexOf(q)>=0;
   });
   $('vacio').style.display = lista.length ? 'none' : 'block';
   $('vacio').textContent='Sin resultados.';
   $('cuerpo').innerHTML = lista.map(function(x,i){
-    var esDef = ACT.id==='DEFECTO';
+    var esDef = (ACT.id==='DEFECTO'||ACT.id==='DERIVADO');
     return '<tr class="'+(x.activo?'':'off')+'">'+
       '<td>'+(i+1)+'</td>'+
       '<td><b>'+esc(esDef?x.nombre:x.clave)+'</b>'+
@@ -421,12 +432,13 @@ function abrirEditar(valor){
   for(var i=0;i<DATOS.length;i++) if(U(DATOS[i].clave)===U(valor)) x=DATOS[i];
   if(!x) return;
   edAntes=x.clave;
-  var esDef = ACT.id==='DEFECTO';
+  var esDef = (ACT.id==='DEFECTO'||ACT.id==='DERIVADO');
   $('edNormal').style.display = esDef?'none':'';
   $('edDefecto').style.display = esDef?'':'none';
   if(esDef){
     $('edCat').value=x.categoria; $('edSub').value=x.subtipo;
     $('edSec').value=(x.seccion||'OTROS');
+    $('edSec').parentNode.style.display = (ACT.id==='DERIVADO') ? 'none' : '';
     edNomAntes=x.nombre;
   } else {
     $('edLbClave').textContent=ACT.clave; $('edClave').value=x.clave;
@@ -462,12 +474,12 @@ function avisoDef(){
 ['edCat','edSub'].forEach(function(id){ $(id).addEventListener('input', avisoDef); });
 
 $('edGuardar').onclick=function(){
-  if(ACT.id==='DEFECTO'){
+  if(ACT.id==='DEFECTO'||ACT.id==='DERIVADO'){
     if(!T($('usuario').value)){ $('edMsg').textContent='Escribe tu nombre arriba.'; return; }
     if(!T($('edCat').value)){ $('edMsg').textContent='El nombre no puede quedar vacío.'; return; }
     $('edGuardar').disabled=true;
     $('edMsg').className='hint'; $('edMsg').textContent='Guardando…';
-    jsonp({accion:'cateditar', clave:CLAVE, que:'DEFECTO', valor:edAntes,
+    jsonp({accion:'cateditar', clave:CLAVE, que:ACT.id, valor:edAntes,
            categoria:U($('edCat').value), subtipo:U($('edSub').value),
            seccion:$('edSec').value, usuario:U($('usuario').value)}, function(r){
       $('edGuardar').disabled=false;
@@ -516,7 +528,7 @@ $('btnNuevoDef').onclick=function(){
   var cat=U($('dfCat').value), sub=U($('dfSub').value), sec=$('dfSec').value;
   if(!cat){ $('msg').className='hint err'; $('msg').textContent='Falta el nombre del defecto.'; return; }
   $('msg').className='hint'; $('msg').textContent='Agregando…';
-  jsonp({accion:'catnuevo', clave:CLAVE, que:'DEFECTO', categoria:cat, subtipo:sub,
+  jsonp({accion:'catnuevo', clave:CLAVE, que:ACT.id, categoria:cat, subtipo:sub,
          seccion:sec, usuario:U($('usuario').value)}, function(r){
     if(r&&r.ok){
       $('msg').className='hint ok'; $('msg').textContent=(r.nombre||cat)+' agregado.';

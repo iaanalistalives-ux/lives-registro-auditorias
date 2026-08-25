@@ -226,14 +226,18 @@
   .tagDer input{width:46px;text-align:center;font-weight:700;color:#92400E;
         border:1px solid var(--warm);background:#fff;border-radius:4px;padding:1px 3px;font-size:12px;}
   .tagDer i{font-style:normal;color:var(--rose);cursor:pointer;font-weight:700;}
-  .opcOps{margin-top:8px;display:none;}
-  .opcFila{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;}
-  .opcT{font-size:10.5px;font-weight:700;color:var(--slate);text-transform:uppercase;
-        letter-spacing:.4px;min-width:56px;}
-  .opcB{background:var(--wl);border:1.5px solid var(--warm);border-radius:14px;
-        padding:4px 12px;font-family:inherit;font-size:12.5px;font-weight:700;
-        color:var(--sage);cursor:pointer;}
-  .opcB:hover{border-color:var(--sage);background:#fff;}
+  .opcOps{margin-top:9px;display:none;background:#FFFBEB;border:1px solid var(--tan);
+        border-radius:10px;padding:11px 13px;}
+  .opcTit{font-size:12.5px;font-weight:700;color:#92400E;margin-bottom:8px;}
+  .opcItem{display:flex;align-items:center;gap:7px;width:100%;text-align:left;
+        background:#fff;border:1.5px solid var(--warm);border-radius:8px;
+        padding:9px 13px;margin-bottom:6px;font-family:inherit;font-size:13.5px;
+        color:#333;cursor:pointer;}
+  .opcItem:hover{border-color:var(--sage);box-shadow:0 1px 4px rgba(15,122,90,.15);}
+  .opcItem b{color:var(--petrol);}
+  .opcItem .sep{color:var(--stone);}
+  .opcItem .ped{margin-left:auto;font-weight:700;color:var(--sage);font-size:12.5px;
+        background:var(--wl);border-radius:12px;padding:2px 10px;white-space:nowrap;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -935,8 +939,10 @@ function consultarOps(){
       return;
     }
     OPS_ACT=r;
-    $('hOp').className='hint ok';
-    $('hOp').textContent=r.n+' combinación(es)';
+    $('hOp').className='hint'+(r.n>1?'':' ok');
+    $('hOp').textContent = r.n>1
+      ? 'Esta OP tiene varias opciones — elige abajo.'
+      : 'Datos cargados del sistema.';
     /* Solo se llena lo que es único: nunca se elige por ella. */
     if(r.op && $('op') && !T($('op').value)) $('op').value=r.op;
     if(r.grupo && !T($('grupo').value)){ $('grupo').value=r.grupo; aplicarCliente(); }
@@ -946,7 +952,9 @@ function consultarOps(){
   });
 }
 
-/* Colores, PO y destinos de esa OP como botones: un clic en vez de escribir. */
+/* Las combinaciones de la OP se muestran completas —color, destino, PO y
+   cantidad— y se elige de un clic. Antes eran tres filas de botones separadas
+   y había que elegir tres veces lo que en realidad es una sola decisión. */
 function ofrecerOpciones(r){
   var cont=$('opcOps');
   if(!cont){
@@ -955,29 +963,43 @@ function ofrecerOpciones(r){
     if(ref && ref.parentNode) ref.parentNode.insertBefore(cont, ref.nextSibling);
     else return;
   }
-  function grupoBotones(titulo, lista, campo){
-    if(!lista || lista.length<2) return '';
-    return '<div class="opcFila"><span class="opcT">'+titulo+'</span>'+
-      lista.slice(0,14).map(function(v){
-        return '<button type="button" class="opcB" data-c="'+campo+'" data-v="'+esc(v)+'">'+esc(v)+'</button>';
-      }).join('')+'</div>';
-  }
-  var html = grupoBotones('Color','colores' in r ? r.colores : [], 'color')
-           + grupoBotones('PO', r.pos||[], 'po')
-           + grupoBotones('Destino', r.destinos||[], 'destino');
-  /* Lo que ya quedó en uno solo se pone sin preguntar. */
-  if(r.colores && r.colores.length===1 && !T($('color').value)) $('color').value=r.colores[0];
-  if(r.pos && r.pos.length===1 && !T($('po').value)) $('po').value=r.pos[0];
-  if(r.destinos && r.destinos.length===1 && !T($('destino').value)) $('destino').value=r.destinos[0];
-  if(r.pedido && $('pedido') && !T($('pedido').value)) $('pedido').value=r.pedido;
+  var filas=(r.filas||[]);
 
-  cont.innerHTML=html;
-  cont.style.display = html ? '' : 'none';
-  Array.prototype.forEach.call(cont.querySelectorAll('.opcB'),function(b){
+  /* Una sola combinación: se pone sin preguntar. */
+  if(filas.length===1){
+    var f=filas[0];
+    if(f.color && !T($('color').value)) $('color').value=f.color;
+    if(f.po && !T($('po').value)) $('po').value=f.po;
+    if(f.destino && !T($('destino').value)) $('destino').value=f.destino;
+    if(f.pedido && $('pedido') && !T($('pedido').value)) $('pedido').value=f.pedido;
+    cont.style.display='none'; cont.innerHTML='';
+    buscarLote();
+    return;
+  }
+  if(!filas.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  cont.innerHTML='<div class="opcTit">Esta OP tiene '+filas.length+
+    ' opciones — toca la que corresponde:</div>'+
+    filas.slice(0,30).map(function(f,i){
+      return '<button type="button" class="opcItem" data-i="'+i+'">'+
+        '<b>'+esc(f.color||'—')+'</b>'+
+        (f.destino?('<span class="sep">·</span>Destino '+esc(f.destino)):'')+
+        (f.po?('<span class="sep">·</span>PO '+esc(f.po)):'')+
+        (f.pedido?('<span class="ped">'+f.pedido.toLocaleString('es-PE')+' prendas</span>'):'')+
+      '</button>';
+    }).join('');
+  cont.style.display='';
+
+  Array.prototype.forEach.call(cont.querySelectorAll('.opcItem'),function(b){
     b.onclick=function(){
-      $(b.dataset.c).value=b.dataset.v;
-      if(b.dataset.c==='color'||b.dataset.c==='po'||b.dataset.c==='destino') afinarOps();
-      if(b.dataset.c==='destino'||b.dataset.c==='po') buscarLote();
+      var f=filas[+b.dataset.i];
+      if(f.color) $('color').value=f.color;
+      if(f.po) $('po').value=f.po;
+      if(f.destino) $('destino').value=f.destino;
+      if(f.pedido && $('pedido')) $('pedido').value=f.pedido;
+      if(f.codTela) $('tela').value=f.codTela+(f.descTela?(' · '+f.descTela):'');
+      cont.style.display='none';
+      buscarLote();
     };
   });
 }
@@ -2396,7 +2418,7 @@ $('grupo').addEventListener('input', aplicarCliente);
 $('grupo').addEventListener('blur', consultarOps);
 $('estilo').addEventListener('blur', consultarOps);
 $('op').addEventListener('blur', consultarOps);
-$('color').addEventListener('blur', afinarOps);
+
 autocompletar('op','dOp', function(){ return (SUG.OP||[]).map(function(v){ return {texto:v}; }); }, consultarOps);
 $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ buscarLote(); });

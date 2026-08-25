@@ -226,6 +226,14 @@
   .tagDer input{width:46px;text-align:center;font-weight:700;color:#92400E;
         border:1px solid var(--warm);background:#fff;border-radius:4px;padding:1px 3px;font-size:12px;}
   .tagDer i{font-style:normal;color:var(--rose);cursor:pointer;font-weight:700;}
+  .opcOps{margin-top:8px;display:none;}
+  .opcFila{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;}
+  .opcT{font-size:10.5px;font-weight:700;color:var(--slate);text-transform:uppercase;
+        letter-spacing:.4px;min-width:56px;}
+  .opcB{background:var(--wl);border:1.5px solid var(--warm);border-radius:14px;
+        padding:4px 12px;font-family:inherit;font-size:12.5px;font-weight:700;
+        color:var(--sage);cursor:pointer;}
+  .opcB:hover{border-color:var(--sage);background:#fff;}
   .flash{animation:fl .6s ease;} @keyframes fl{0%{background:#D1FAE5;}100%{background:transparent;}}
 </style>
 </head>
@@ -307,6 +315,12 @@
       <div class="capL">
 
       <div class="row">
+        <div class="f sm ac" id="wOp">
+          <label for="op">OP</label>
+          <input type="text" id="op" autocomplete="off" placeholder="Opcional">
+          <div class="drop" id="dOp"></div>
+          <div class="hint" id="hOp">Llena lo demás sola</div>
+        </div>
         <div class="f ac">
           <label for="grupo">Grupo</label>
           <input type="text" id="grupo" autocomplete="off" placeholder="THY-100">
@@ -316,6 +330,10 @@
         <div class="f">
           <label for="cliente">Cliente</label>
           <input type="text" id="cliente" class="ro" readonly tabindex="-1" placeholder="—">
+        </div>
+        <div class="f" id="wTela">
+          <label for="tela">Tela</label>
+          <input type="text" id="tela" class="ro" readonly tabindex="-1" placeholder="—">
         </div>
         <div class="f ac">
           <label for="estilo">Estilo</label>
@@ -626,20 +644,20 @@ var NOMBRE_TIPO = { LINEAS:'Líneas de costura', SERVINSP:'Servicio de inspecci�
    el cliente, no personal de LIVES. Se verificó en el histórico: esas columnas
    no existen en ese archivo. La inspectora solo va en Líneas y Serv. Inspección. */
 var CAMPOS = {
-  LINEAS:   ['wAuditor','wInspector','wLinea'],
-  SERVINSP: ['wAuditor','wInspector'],
+  LINEAS:   ['wOp','wTela','wAuditor','wInspector','wLinea'],
+  SERVINSP: ['wOp','wTela','wAuditor','wInspector'],
   /* Sin taller: el encajado siempre se hace en LIVES. En las 1 261 auditorías
      de empaque del histórico ese campo tiene un único valor, así que pedirlo
      era un paso de más. Se manda fijo al guardar. */
-  EMPAQUE:  ['wAuditor','wPo','wDestino','wCajas','wResultado'],
-  CLIENTE:  ['wPo','wPedido','wDestino','wResultado'],
+  EMPAQUE:  ['wOp','wTela','wAuditor','wPo','wDestino','wCajas','wResultado'],
+  CLIENTE:  ['wOp','wTela','wPo','wPedido','wDestino','wResultado'],
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
-  FINAL:    ['wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
+  FINAL:    ['wOp','wTela','wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
              'wDestino','wDerivados','wLicencia','wResultado']
 };
-var TODOS_COND = ['wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
+var TODOS_COND = ['wOp','wTela','wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
                   'wPo','wPedido','wDestino','wCajas','wDerivados','wLicencia',
                   'wResultado','wNivelAql','wReproceso'];
 /* Dónde es obligatorio decir quién auditó. */
@@ -895,6 +913,88 @@ function aplicarCliente(){
 }
 
 
+
+/* ============ TABLA DE ÓRDENES DE PRODUCCIÓN ============
+   Es el dato oficial del sistema. Se consulta al escribir la OP, el grupo o el
+   estilo, y llena lo que sea único: si una OP tiene un solo estilo y una sola
+   tela, se ponen solos; si tiene varios colores, se ofrecen para elegir.
+   Nada es obligatorio: si la OP no está en la tabla, se digita como siempre. */
+var OPS_ACT = null;
+
+function limpiarTela(){ $('tela').value=''; }
+
+function consultarOps(){
+  var op=U($('op')?$('op').value:''), gr=U($('grupo').value), es=U($('estilo').value);
+  if(!op && !gr && !es){ OPS_ACT=null; limpiarTela(); $('hOp').className='hint';
+    $('hOp').textContent='Llena lo demás sola'; return; }
+  jsonp({accion:'opsclave', op:op, grupo:gr, estilo:es}, function(r){
+    if(!r || !r.ok || !r.existe){
+      OPS_ACT=null; limpiarTela();
+      if(op){ $('hOp').className='hint err';
+        $('hOp').textContent='Esa OP no está en la tabla. Digita a mano.'; }
+      return;
+    }
+    OPS_ACT=r;
+    $('hOp').className='hint ok';
+    $('hOp').textContent=r.n+' combinación(es)';
+    /* Solo se llena lo que es único: nunca se elige por ella. */
+    if(r.op && $('op') && !T($('op').value)) $('op').value=r.op;
+    if(r.grupo && !T($('grupo').value)){ $('grupo').value=r.grupo; aplicarCliente(); }
+    if(r.estilo && !T($('estilo').value)) $('estilo').value=r.estilo;
+    if(r.codTela) $('tela').value=r.codTela+(r.descTela?(' · '+r.descTela):'');
+    ofrecerOpciones(r);
+  });
+}
+
+/* Colores, PO y destinos de esa OP como botones: un clic en vez de escribir. */
+function ofrecerOpciones(r){
+  var cont=$('opcOps');
+  if(!cont){
+    cont=document.createElement('div'); cont.id='opcOps'; cont.className='opcOps';
+    var ref=$('wPo') || $('prev');
+    if(ref && ref.parentNode) ref.parentNode.insertBefore(cont, ref.nextSibling);
+    else return;
+  }
+  function grupoBotones(titulo, lista, campo){
+    if(!lista || lista.length<2) return '';
+    return '<div class="opcFila"><span class="opcT">'+titulo+'</span>'+
+      lista.slice(0,14).map(function(v){
+        return '<button type="button" class="opcB" data-c="'+campo+'" data-v="'+esc(v)+'">'+esc(v)+'</button>';
+      }).join('')+'</div>';
+  }
+  var html = grupoBotones('Color','colores' in r ? r.colores : [], 'color')
+           + grupoBotones('PO', r.pos||[], 'po')
+           + grupoBotones('Destino', r.destinos||[], 'destino');
+  /* Lo que ya quedó en uno solo se pone sin preguntar. */
+  if(r.colores && r.colores.length===1 && !T($('color').value)) $('color').value=r.colores[0];
+  if(r.pos && r.pos.length===1 && !T($('po').value)) $('po').value=r.pos[0];
+  if(r.destinos && r.destinos.length===1 && !T($('destino').value)) $('destino').value=r.destinos[0];
+  if(r.pedido && $('pedido') && !T($('pedido').value)) $('pedido').value=r.pedido;
+
+  cont.innerHTML=html;
+  cont.style.display = html ? '' : 'none';
+  Array.prototype.forEach.call(cont.querySelectorAll('.opcB'),function(b){
+    b.onclick=function(){
+      $(b.dataset.c).value=b.dataset.v;
+      if(b.dataset.c==='color'||b.dataset.c==='po'||b.dataset.c==='destino') afinarOps();
+      if(b.dataset.c==='destino'||b.dataset.c==='po') buscarLote();
+    };
+  });
+}
+
+/* Al elegir un color o un PO, se vuelve a consultar con eso puesto para que
+   el pedido y el destino salgan exactos. */
+function afinarOps(){
+  jsonp({accion:'opsclave', op:U($('op')?$('op').value:''), grupo:U($('grupo').value),
+         estilo:U($('estilo').value), color:U($('color').value),
+         po:U($('po').value), destino:U($('destino').value)}, function(r){
+    if(!r||!r.ok||!r.existe) return;
+    OPS_ACT=r;
+    if(r.pedido && $('pedido')) $('pedido').value=r.pedido;
+    if(r.codTela) $('tela').value=r.codTela+(r.descTela?(' · '+r.descTela):'');
+    ofrecerOpciones(r);
+  });
+}
 
 /* ---------------- búsqueda de lote ---------------- */
 var esReaud = '';   // 'SI' o 'NO' — lo decide quien digita, no el sistema
@@ -1217,6 +1317,9 @@ function guardar(){
     derivados: ders.filter(function(d){ return d.cantidad>0; })
                    .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
     derivadosDet: JSON.stringify(ders.filter(function(d){ return d.cantidad>0; })),
+    op: U($('op').value),
+    codTela: (OPS_ACT && OPS_ACT.codTela) ? OPS_ACT.codTela : '',
+    descTela: (OPS_ACT && OPS_ACT.descTela) ? OPS_ACT.descTela : '',
     eCliente: U($('eCliente').value),
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
@@ -1483,7 +1586,8 @@ function limpiarRegistro(exito){
   if(!mantener.grupo) $('cliente').value='';
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
-  defs=[]; ders=[]; pintarDers(); prevLote=null; esReaud='';
+  defs=[]; ders=[]; pintarDers(); prevLote=null; esReaud=''; OPS_ACT=null;
+  if($('opcOps')) $('opcOps').style.display='none';
   modoReproceso(false);
   if($('wReproceso')) $('wReproceso').style.display='none';
   $('prev').classList.remove('on');
@@ -2171,13 +2275,45 @@ autocompletar('inspector','dInspector', function(){
   return CAT.personal.filter(function(p){ return (p[1]||'').indexOf('INSPECTORA')>=0; })
     .map(function(p){ return {texto:p[0], tag:p[1]}; });
 });
-autocompletar('grupo','dGrupo', function(){ return SUG.GRUPO.map(function(v){ return {texto:v}; }); }, aplicarCliente);
-autocompletar('estilo','dEstilo', function(){ return SUG.ESTILO.map(function(v){ return {texto:v}; }); });
+autocompletar('grupo','dGrupo', function(){
+  var q=U($('grupo').value), of=(OFIC.GRUPO||[]);
+  var lista=of.map(function(v){ return {texto:v, tag:'del sistema'}; });
+  SUG.GRUPO.forEach(function(v){ if(of.indexOf(v)<0) lista.push({texto:v}); });
+  return lista;
+}, function(){ aplicarCliente(); consultarOps(); });
+
+/* Cache de lo que devuelve la tabla oficial mientras escribe. */
+var OFIC={GRUPO:[],ESTILO:[],OP:[]};
+['grupo','estilo','op'].forEach(function(id){
+  var e=$(id); if(!e) return;
+  var t=null;
+  e.addEventListener('input', function(){
+    clearTimeout(t);
+    t=setTimeout(function(){
+      sugerirOficial(id.toUpperCase(), U(e.value), function(v){ OFIC[id.toUpperCase()]=v; });
+    }, 220);
+  });
+});
+autocompletar('estilo','dEstilo', function(){
+  var of=(OFIC.ESTILO||[]);
+  var lista=of.map(function(v){ return {texto:v, tag:'del sistema'}; });
+  SUG.ESTILO.forEach(function(v){ if(of.indexOf(v)<0) lista.push({texto:v}); });
+  return lista;
+}, consultarOps);
 autocompletar('eCliente','dECliente', function(){ return (SUG.ECLIENTE||[]).map(function(v){ return {texto:v}; }); });
 autocompletar('color','dColor', function(){ return SUG.COLOR.map(function(v){ return {texto:v}; }); });
 
 /* sugerencias de grupo/estilo/color: se piden al servidor y se guardan en memoria */
-var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[],ECLIENTE:[]};
+var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[],ECLIENTE:[],OP:[]};
+/* Las sugerencias salen primero de la tabla de OP —el dato oficial— y solo
+   después del historial, que arrastra dos años de escrituras buenas y malas.
+   Se consulta la tabla al escribir; si el grupo no está ahí, queda el historial. */
+function sugerirOficial(campo, q, luego){
+  if(!q || q.length<2) { luego([]); return; }
+  jsonp({accion:'opssugerir', campo:campo, q:q}, function(r){
+    luego((r && r.ok && r.valores) ? r.valores : []);
+  }, function(){ luego([]); });
+}
 function cargarSugerencias(){
   ['GRUPO','ESTILO','COLOR','PO'].forEach(function(campo){
     jsonp({accion:'sugerir', campo:campo, tipo:''}, function(r){
@@ -2257,6 +2393,11 @@ function recordar(campo, valor){
 $('eCliente').addEventListener('change', function(){ recordar('ECLIENTE', $('eCliente').value); });
 
 $('grupo').addEventListener('input', aplicarCliente);
+$('grupo').addEventListener('blur', consultarOps);
+$('estilo').addEventListener('blur', consultarOps);
+$('op').addEventListener('blur', consultarOps);
+$('color').addEventListener('blur', afinarOps);
+autocompletar('op','dOp', function(){ return (SUG.OP||[]).map(function(v){ return {texto:v}; }); }, consultarOps);
 $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ buscarLote(); });
 $('po').addEventListener('blur', buscarLote);

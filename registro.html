@@ -322,6 +322,11 @@
           <input type="text" id="estilo" autocomplete="off">
           <div class="drop" id="dEstilo"></div>
         </div>
+        <div class="f ac" id="wECliente">
+          <label for="eCliente">Estilo cliente</label>
+          <input type="text" id="eCliente" autocomplete="off">
+          <div class="drop" id="dECliente"></div>
+        </div>
         <div class="f ac">
           <label for="color">Color</label>
           <input type="text" id="color" autocomplete="off">
@@ -639,10 +644,10 @@ var CAMPOS = {
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
-  FINAL:    ['wAuditor','wIntExt','wProceso','wServicio','wPo','wPedido','wDestino',
-             'wVia','wDerivados','wLicencia','wResultado']
+  FINAL:    ['wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
+             'wDestino','wVia','wDerivados','wLicencia','wResultado']
 };
-var TODOS_COND = ['wAuditor','wInspector','wLinea','wIntExt','wProceso','wServicio',
+var TODOS_COND = ['wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
                   'wPo','wPedido','wDestino','wVia','wCajas','wDerivados','wLicencia',
                   'wResultado','wNivelAql'];
 /* Dónde es obligatorio decir quién auditó. */
@@ -1186,6 +1191,7 @@ function guardar(){
     derivados: ders.filter(function(d){ return d.cantidad>0; })
                    .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
     derivadosDet: JSON.stringify(ders.filter(function(d){ return d.cantidad>0; })),
+    eCliente: U($('eCliente').value),
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
     nivelAql: '1.5',          // fijo: el mismo del sistema del piloto
@@ -1254,6 +1260,7 @@ function cargarEnvioEnForm(e){
   if(e.auditores){ try{ $('auditor').value=(JSON.parse(e.auditores)[0])||''; }catch(err){} }
   $('inspector').value=e.inspector||''; $('linea').value=e.linea||'';
   $('grupo').value=e.grupo||''; $('estilo').value=e.estilo||''; $('color').value=e.color||'';
+  $('eCliente').value=e.eCliente||'';
   $('po').value=e.po||''; $('pedido').value=e.pedido||'';
   $('lote').value=e.lote||''; $('muestra').value=e.muestra||'';
   $('cajas').value=e.cajas||'';
@@ -1478,12 +1485,17 @@ function editar(idAud){
     $('inspector').value=T(g.INSPECTOR);
     $('linea').value=T(g.LINEA);
     $('grupo').value=T(g.GRUPO); $('estilo').value=T(g.ESTILO); $('color').value=T(g.COLOR);
+    $('eCliente').value=T(g.E_CLIENTE);
     $('lote').value=N(g.LOTE); $('muestra').value=N(g.MUESTRA);
     $('reproceso').checked = N(g.REPROCESO)===1;
     aplicarCliente();
 
     /* Los defectos se recargan de verdad. Si no se recargaran y ella guardara,
        se borrarían en silencio: ese es el error más caro de un formulario así. */
+    ders=(r.derivados||[]).map(function(d){
+      return {cod:T(d.COD), seccion:T(d.SECCION), nombre:U(d.CATEGORIA), cantidad:N(d.CANTIDAD)};
+    });
+    pintarDers();
     defs=(r.defectos||[]).map(function(d){
       var nom = T(d.SUBTIPO) ? (T(d.CATEGORIA)+' '+T(d.SUBTIPO)) : T(d.CATEGORIA);
       return {cod:T(d.COD), seccion:T(d.SECCION), categoria:T(d.CATEGORIA),
@@ -1521,6 +1533,7 @@ function guardarEdicion(){
     LOTE:N($('lote').value), MUESTRA:N($('muestra').value),
     INSPECTOR:U($('inspector').value),
     LINEA: $('tipo').value==='LINEAS' ? $('linea').value : '',
+    E_CLIENTE: U($('eCliente').value),
     RESULTADO: resultadoActual(),
     REPROCESO: $('reproceso').checked ? 1 : 0
   };
@@ -1533,7 +1546,8 @@ function guardarEdicion(){
     defectos:JSON.stringify(defs.map(function(d){
       return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,
               nombre:d.nombre, cantidad:d.cantidad};
-    }))
+    })),
+    derivadosDet:JSON.stringify(ders.filter(function(d){ return d.cantidad>0; }))
   };
   var etq=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
           ' · '+(totalDef()===0?'aprobado':'rechazado ('+totalDef()+')');
@@ -2022,7 +2036,7 @@ function forzarMayusculas(inp){
   });
 }
 ['grupo','estilo','color','po','pedido','servicio','destino','auditor','inspector',
- 'digitador','qdef'].forEach(function(id){ forzarMayusculas($(id)); });
+ 'digitador','qdef','qder','eCliente'].forEach(function(id){ forzarMayusculas($(id)); });
 
 /* ============ BUSCAR Y CORREGIR ============
    Busca sobre la hoja viva, no sobre el histórico migrado: ese es data cerrada
@@ -2131,10 +2145,11 @@ autocompletar('inspector','dInspector', function(){
 });
 autocompletar('grupo','dGrupo', function(){ return SUG.GRUPO.map(function(v){ return {texto:v}; }); }, aplicarCliente);
 autocompletar('estilo','dEstilo', function(){ return SUG.ESTILO.map(function(v){ return {texto:v}; }); });
+autocompletar('eCliente','dECliente', function(){ return (SUG.ECLIENTE||[]).map(function(v){ return {texto:v}; }); });
 autocompletar('color','dColor', function(){ return SUG.COLOR.map(function(v){ return {texto:v}; }); });
 
 /* sugerencias de grupo/estilo/color: se piden al servidor y se guardan en memoria */
-var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[]};
+var SUG={GRUPO:[],ESTILO:[],COLOR:[],PO:[],ECLIENTE:[]};
 function cargarSugerencias(){
   ['GRUPO','ESTILO','COLOR','PO'].forEach(function(campo){
     jsonp({accion:'sugerir', campo:campo, tipo:''}, function(r){
@@ -2211,6 +2226,7 @@ function recordar(campo, valor){
   var e=$(id); if(!e) return;
   e.addEventListener('change', function(){ recordar(id.toUpperCase(), e.value); });
 });
+$('eCliente').addEventListener('change', function(){ recordar('ECLIENTE', $('eCliente').value); });
 
 $('grupo').addEventListener('input', aplicarCliente);
 $('lote').addEventListener('blur', buscarLote);
@@ -2237,6 +2253,17 @@ autocompletar('servicio','dServicio', function(){
 });
 autocompletar('destino','dDestino', function(){
   return (CAT.destinos||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });
+}, function(o){
+  /* Si escribió un destino que no está, se registra para que la próxima vez
+     salga como sugerencia y nadie lo vuelva a escribir de otra forma. */
+  if(!o || !o.nuevo) return;
+  var cod=U(o.texto);
+  if(!CAT.destinos.some(function(x){ return U(x[0])===cod; })){
+    CAT.destinos.push([cod,'POR IDENTIFICAR']);
+    guardarLocal('lives_cat_aud', CAT);
+  }
+  jsonp({accion:'agregarcat', clave:CLAVE, que:'DESTINO', valor:cod,
+         detalle:'POR IDENTIFICAR', usuario:U($('digitador').value)}, function(){});
 });
 autocompletar('po','dPo', function(){ return (SUG.PO||[]).map(function(v){ return {texto:v}; }); });
 $('btnGuardar').onclick=guardar;

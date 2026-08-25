@@ -947,6 +947,8 @@ function consultarOps(){
     if(r.op && $('op') && !T($('op').value)) $('op').value=r.op;
     if(r.grupo && !T($('grupo').value)){ $('grupo').value=r.grupo; aplicarCliente(); }
     if(r.estilo && !T($('estilo').value)) $('estilo').value=r.estilo;
+    /* El estilo cliente es único por OP: se llena solo, no se elige. */
+    if(r.eCliente && $('eCliente') && !T($('eCliente').value)) $('eCliente').value=r.eCliente;
     if(r.codTela) $('tela').value=r.codTela+(r.descTela?(' · '+r.descTela):'');
     ofrecerOpciones(r);
   });
@@ -998,6 +1000,7 @@ function ofrecerOpciones(r){
       if(f.destino) $('destino').value=f.destino;
       if(f.pedido && $('pedido')) $('pedido').value=f.pedido;
       if(f.codTela) $('tela').value=f.codTela+(f.descTela?(' · '+f.descTela):'');
+      if(f.eCliente && $('eCliente')) $('eCliente').value=f.eCliente;
       cont.style.display='none';
       buscarLote();
     };

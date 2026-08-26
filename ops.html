@@ -173,19 +173,29 @@ function leerArchivo(file){
   fr.onload=function(e){
     try{
       var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      var hoja=wb.Sheets[wb.SheetNames[0]];
-      var crudo=XLSX.utils.sheet_to_json(hoja,{defval:''});
-      if(!crudo.length) throw new Error('la hoja está vacía');
 
-      var cab={}, primeras=Object.keys(crudo[0]);
-      primeras.forEach(function(c){ cab[norm(c)]=c; });
-      var mapa={}, faltan=[];
-      for(var k in COLS){
-        var hallado=null;
-        for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]){ hallado=cab[COLS[k][i]]; break; }
-        if(hallado) mapa[k]=hallado; else faltan.push(COLS[k][0]);
+      /* Se buscan las columnas en TODAS las hojas, no solo en la primera: el
+         archivo del sistema viene con varias (V1, V2, V3…) y las buenas suelen
+         estar en la última. Antes solo se miraba la primera y el archivo se
+         rechazaba diciendo que faltaban todas las columnas. */
+      var crudo=null, mapa=null, hojaUsada='', mejorFaltan=null;
+      for(var hi=wb.SheetNames.length-1; hi>=0; hi--){
+        var nombreHoja=wb.SheetNames[hi];
+        var datos=XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja],{defval:''});
+        if(!datos.length) continue;
+        var cab={};
+        Object.keys(datos[0]).forEach(function(c){ cab[norm(c)]=c; });
+        var m={}, faltan=[];
+        for(var k in COLS){
+          var hallado=null;
+          for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]){ hallado=cab[COLS[k][i]]; break; }
+          if(hallado) m[k]=hallado; else faltan.push(COLS[k][0]);
+        }
+        if(!faltan.length){ crudo=datos; mapa=m; hojaUsada=nombreHoja; break; }
+        if(!mejorFaltan || faltan.length<mejorFaltan.length){ mejorFaltan=faltan; }
       }
-      if(faltan.length) throw new Error('faltan columnas: '+faltan.join(', '));
+      if(!crudo) throw new Error('ninguna hoja tiene las columnas necesarias. '+
+        'A la más parecida le faltan: '+(mejorFaltan||[]).join(', '));
 
       FILAS = crudo.map(function(r){
         return { op:U(r[mapa.op]), grupo:U(r[mapa.grupo]), estilo:U(r[mapa.estilo]),
@@ -196,7 +206,7 @@ function leerArchivo(file){
       }).filter(function(f){ return f.op; });
 
       if(!FILAS.length) throw new Error('ninguna fila tiene OP');
-      mostrar(file.name);
+      mostrar(file.name, hojaUsada);
     }catch(err){
       $('msgLee').textContent='No pude leer el archivo: '+err.message;
       $('cardPrev').style.display='none';
@@ -205,15 +215,16 @@ function leerArchivo(file){
   fr.readAsArrayBuffer(file);
 }
 
-function mostrar(nombre){
+function mostrar(nombre, hojaUsada){
   var ops={}, gr={}, sinTela=0, sinPedido=0;
   FILAS.forEach(function(f){
     ops[f.op]=1; if(f.grupo) gr[f.grupo]=1;
     if(!f.codTela) sinTela++;
     if(!f.pedido) sinPedido++;
   });
-  $('subPrev').innerHTML='Archivo <b>'+esc(nombre)+'</b>. Así se va a guardar. '+
-    'Revisa que los datos se vean bien antes de reemplazar.';
+  $('subPrev').innerHTML='Archivo <b>'+esc(nombre)+'</b>'+
+    (hojaUsada?(' · hoja <b>'+esc(hojaUsada)+'</b>'):'')+
+    '. Así se va a guardar. Revisa que los datos se vean bien antes de reemplazar.';
   $('kpis').innerHTML=
     '<div class="kpi"><div class="v">'+FILAS.length.toLocaleString('es-PE')+'</div>'+
       '<div class="l">Filas</div></div>'+
@@ -262,11 +273,18 @@ function subir(){
 function mandarTrozo(desde, intento){
   intento = intento || 0;
   if(desde>=FILAS.length){
-    jsonp({accion:'opscarga', clave:CLAVE, modo:'fin', usuario:U($('usuario').value)},
+    jsonp({accion:'opscarga', clave:CLAVE, modo:'fin', usuario:U($('usuario').value),
+           total:FILAS.length},
       function(r){
         $('barraI').style.width='100%';
         $('msgSube').className='hint ok';
-        $('msgSube').textContent='Listo. La tabla quedó con '+((r&&r.total)||FILAS.length)+' filas.';
+        var t=(r&&r.total)||FILAS.length;
+        $('msgSube').className = (t===FILAS.length) ? 'hint ok' : 'hint err';
+        $('msgSube').textContent = (t===FILAS.length)
+          ? ('Listo. La tabla quedó con '+t.toLocaleString('es-PE')+' filas.')
+          : ('Atención: se leyeron '+FILAS.length.toLocaleString('es-PE')+
+             ' filas pero la tabla quedó con '+t.toLocaleString('es-PE')+
+             '. Vuelve a subir el archivo.');
         $('pill').className='pill ok';
         $('pill').textContent=((r&&r.total)||FILAS.length)+' filas cargadas';
         $('btnSubir').disabled=false;
@@ -277,7 +295,8 @@ function mandarTrozo(desde, intento){
   var parte=FILAS.slice(desde, desde+TROZO).map(function(f){
     return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.destino,f.pedido,f.eCliente];
   });
-  jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte)},
+  jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte),
+         idx:Math.floor(desde/TROZO), tam:TROZO},
     function(r){
       if(!r||!r.ok){ falla((r&&r.error)||'error al enviar'); return; }
       var hecho=Math.min(desde+TROZO, FILAS.length);

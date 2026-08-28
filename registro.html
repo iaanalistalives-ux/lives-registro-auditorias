@@ -220,6 +220,11 @@
         padding:10px 14px;margin-bottom:10px;border-left:4px solid var(--sage);}
   .envio.mal{border-left-color:var(--rose);}
   .envTxt{font-size:13.5px;font-weight:700;color:var(--petrol);}
+  .tagsAud{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+  .tagAud{display:inline-flex;align-items:center;gap:6px;background:var(--wl);
+        border:1px solid var(--warm);border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:700;
+        color:var(--petrol);}
+  .tagAud i{font-style:normal;color:var(--rose);cursor:pointer;}
   .tagsDer{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;min-height:4px;}
   .tagDer{display:inline-flex;align-items:center;gap:6px;background:#FFFBEB;
         border:1px solid var(--tan);border-radius:14px;padding:3px 10px;font-size:12.5px;}
@@ -278,6 +283,8 @@
           <label for="auditor">Auditora</label>
           <input type="text" id="auditor" autocomplete="off" placeholder="Escribe…">
           <div class="drop" id="dAuditor"></div>
+          <div id="tagsAud" class="tagsAud"></div>
+          <div class="hint" id="hAud"></div>
         </div>
         <div class="f ac" id="wInspector">
           <label for="inspector">Inspectora</label>
@@ -432,6 +439,20 @@
             <option value="2.5">2.5</option>
           </select>
         </div>
+      </div>
+
+      <div id="wLineas" style="display:none;margin-top:10px">
+        <div class="rot">Colores auditados
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--stone)">
+            · la auditora revisa varios juntos; el lote y la muestra son del conjunto,
+            aquí solo se anota qué había dentro</span></div>
+        <div class="row" style="align-items:flex-end">
+          <div class="f"><label for="lnColor">Color</label><input type="text" id="lnColor" autocomplete="off"></div>
+          <div class="f"><label for="lnEcli">Estilo cliente</label><input type="text" id="lnEcli" autocomplete="off"></div>
+          <div class="f sm"><label for="lnPo">PO</label><input type="text" id="lnPo" autocomplete="off"></div>
+          <div><button type="button" class="btn sec" id="btnLinea">Agregar</button></div>
+        </div>
+        <div id="tagsLineas" class="tagsDer"></div>
       </div>
 
       <div id="wDerivados" style="display:none;margin-top:10px">
@@ -655,14 +676,14 @@ var CAMPOS = {
      de empaque del histórico ese campo tiene un único valor, así que pedirlo
      era un paso de más. Se manda fijo al guardar. */
   EMPAQUE:  ['wOp','wTela','wAuditor','wPo','wDestino','wCajas','wResultado'],
-  CLIENTE:  ['wOp','wTela','wPo','wPedido','wDestino','wResultado'],
+  CLIENTE:  ['wOp','wTela','wPedido','wDestino','wLineas','wResultado'],
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
   FINAL:    ['wOp','wTela','wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
              'wDestino','wDerivados','wLicencia','wResultado']
 };
-var TODOS_COND = ['wOp','wTela','wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
+var TODOS_COND = ['wOp','wTela','wLineas','wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
                   'wPo','wPedido','wDestino','wCajas','wDerivados','wLicencia',
                   'wResultado','wNivelAql','wReproceso'];
 /* Dónde es obligatorio decir quién auditó. */
@@ -712,6 +733,11 @@ function pintarTipos(){
 
 function aplicarTipo(){
   pintarTipos();
+  /* En Cliente los colores van en su propio bloque, no en el campo suelto. */
+  var esCli = $('tipo').value==='CLIENTE';
+  pintarAuds();
+  var wc = $('color') ? $('color').closest('.f') : null;
+  if(wc) wc.style.display = esCli ? 'none' : '';
   if(typeof verVista==='function' && $('cardHoja')) verVista();
   if($('cardHoja') && $('cardHoja').style.display!=='none'){ pintarChipsHoja(); pintarHoja(); }
   var t=$('tipo').value;
@@ -1207,6 +1233,77 @@ function veredicto(){
   }
 }
 
+/* ---------------- varias auditoras ----------------
+   En Empaque suelen entrar varias personas al mismo lote y no se sabe cuánto
+   revisó cada una: la auditoría es del lote entero. Por eso se anotan sin
+   cantidades. En el ranking cada una aparece con ese lote y ese resultado,
+   así que la suma por auditora puede pasar del total de la empresa: es
+   correcto, y el tablero lo advierte. */
+var auds = [];
+
+function pintarAuds(){
+  var t=$('tipo').value;
+  var multi = (t==='EMPAQUE');
+  $('tagsAud').style.display = multi ? '' : 'none';
+  $('hAud').textContent = multi
+    ? (auds.length ? (auds.length+' auditora(s) en este lote') : 'Escribe y pulsa Enter para agregar varias')
+    : '';
+  if(!multi){ $('tagsAud').innerHTML=''; return; }
+  $('tagsAud').innerHTML = auds.map(function(a,i){
+    return '<span class="tagAud">'+esc(a)+'<i data-aq="'+i+'" title="Quitar">&times;</i></span>';
+  }).join('');
+  Array.prototype.forEach.call($('tagsAud').querySelectorAll('[data-aq]'),function(b){
+    b.onclick=function(){ auds.splice(+b.dataset.aq,1); pintarAuds(); };
+  });
+}
+
+function agregarAud(){
+  var v=U($('auditor').value);
+  if(!v) return;
+  if(auds.indexOf(v)<0) auds.push(v);
+  $('auditor').value=''; pintarAuds(); $('auditor').focus();
+}
+$('auditor').addEventListener('keydown', function(e){
+  if($('tipo').value!=='EMPAQUE') return;
+  if(e.key==='Enter'){ e.preventDefault(); agregarAud(); }
+});
+
+/* ---------------- colores de la auditoría ----------------
+   En Auditoría de Cliente la auditora revisa varios colores en una sola pasada.
+   Cada uno tiene su estilo cliente y su PO, pero el lote y la muestra son del
+   conjunto: no se puede repartir. Por eso aquí no hay cantidades. */
+var lineas = [];
+
+function pintarLineas(){
+  $('tagsLineas').innerHTML = lineas.map(function(l,i){
+    return '<span class="tagDer" style="background:var(--wl);border-color:var(--warm)">'+
+      '<b style="color:var(--petrol)">'+esc(l.color||'—')+'</b>'+
+      (l.eCliente?('<span style="color:var(--stone)">· '+esc(l.eCliente)+'</span>'):'')+
+      (l.po?('<span style="color:var(--stone)">· PO '+esc(l.po)+'</span>'):'')+
+      '<i data-lq="'+i+'" title="Quitar">&times;</i></span>';
+  }).join('');
+  Array.prototype.forEach.call($('tagsLineas').querySelectorAll('[data-lq]'),function(b){
+    b.onclick=function(){ lineas.splice(+b.dataset.lq,1); pintarLineas(); };
+  });
+}
+
+function agregarLinea(){
+  var c=U($('lnColor').value), e=U($('lnEcli').value), po=U($('lnPo').value);
+  if(!c && !e && !po){ $('lnColor').focus(); return; }
+  var rep=lineas.some(function(l){ return l.color===c && l.eCliente===e && l.po===po; });
+  if(rep){ $('lnColor').focus(); $('lnColor').select(); return; }
+  lineas.push({color:c, eCliente:e, po:po});
+  ['lnColor','lnEcli','lnPo'].forEach(function(id){ $(id).value=''; });
+  pintarLineas(); $('lnColor').focus();
+}
+$('btnLinea').onclick=agregarLinea;
+['lnColor','lnEcli','lnPo'].forEach(function(id){
+  $(id).addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ e.preventDefault(); agregarLinea(); }
+  });
+  forzarMayusculas($(id));
+});
+
 /* ---------------- derivados ----------------
    Son defectos hallados al revisar el LOTE COMPLETO, no la muestra. Se guardan
    con el mismo formato que los normales («NOMBRE 20-OTRO 13») porque así vienen
@@ -1286,11 +1383,16 @@ function agregarDer(d){
 /* ---------------- guardado optimista ---------------- */
 function validar(){
   if(!T($('fecha').value)) return 'Falta la fecha.';
-  if(PIDE_AUDITOR[$('tipo').value] && !T($('auditor').value)) return 'Falta la auditora.';
+  var tv=$('tipo').value;
+  if(PIDE_AUDITOR[tv] && !T($('auditor').value) && !(tv==='EMPAQUE' && auds.length))
+    return 'Falta la auditora.';
   if(!T($('grupo').value)) return 'Falta el grupo.';
   if(!T($('cliente').value)) return 'El prefijo del grupo no está en el catálogo.';
   if(!T($('estilo').value)) return 'Falta el estilo.';
-  if(!T($('color').value)) return 'Falta el color.';
+  if($('tipo').value==='CLIENTE'){
+    if(!lineas.length && !T($('color').value)) return 'Agrega al menos un color auditado.';
+  }
+  else if(!T($('color').value)) return 'Falta el color.';
   if(N($('lote').value)<=0) return 'Falta el lote.';
   if(N($('muestra').value)<=0) return 'Falta la muestra.';
   var t=$('tipo').value;
@@ -1325,12 +1427,19 @@ function guardar(){
     fecha:$('fecha').value,
     grupo:U($('grupo').value), estilo:U($('estilo').value), color:U($('color').value),
     lote:N($('lote').value), muestra:N($('muestra').value),
-    auditores:JSON.stringify(
-      PIDE_AUDITOR[t] && T($('auditor').value) ? [U($('auditor').value)] : []),
+    auditores: JSON.stringify(
+      !PIDE_AUDITOR[t] ? []
+      : (t==='EMPAQUE'
+          ? auds.concat(T($('auditor').value)?[U($('auditor').value)]:[])
+              .filter(function(x,i,a){ return x && a.indexOf(x)===i; })
+          : (T($('auditor').value) ? [U($('auditor').value)] : []))),
     pedido: U($('pedido').value),
     inspector:U($('inspector').value),
     linea: t==='LINEAS' ? $('linea').value : '',
-    colores:JSON.stringify([{color:U($('color').value), po:U($('po').value)}]),
+    colores: JSON.stringify(
+      lineas.length ? lineas
+                    : [{color:U($('color').value), po:U($('po').value),
+                        eCliente:U($('eCliente').value)}] ),
     defectos:JSON.stringify(defs.map(function(d){
       return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,
               nombre:d.nombre, cantidad:d.cantidad};
@@ -1612,7 +1721,9 @@ function limpiarRegistro(exito){
   if(!mantener.grupo) $('cliente').value='';
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
-  defs=[]; ders=[]; pintarDers(); prevLote=null; esReaud=''; OPS_ACT=null;
+  defs=[]; ders=[]; pintarDers(); lineas=[]; pintarLineas();
+  ['lnColor','lnEcli','lnPo'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
+  prevLote=null; esReaud=''; OPS_ACT=null;
   if($('opcOps')) $('opcOps').style.display='none';
   modoReproceso(false);
   if($('wReproceso')) $('wReproceso').style.display='none';
@@ -1698,8 +1809,12 @@ function guardarEdicion(){
   var envio={
     accion:'editar', clave:CLAVE, id:id, usuario:U($('digitador').value),
     cambios:JSON.stringify(cambios),
-    auditores:JSON.stringify(
-      PIDE_AUDITOR[t] && T($('auditor').value) ? [U($('auditor').value)] : []),
+    auditores: JSON.stringify(
+      !PIDE_AUDITOR[t] ? []
+      : (t==='EMPAQUE'
+          ? auds.concat(T($('auditor').value)?[U($('auditor').value)]:[])
+              .filter(function(x,i,a){ return x && a.indexOf(x)===i; })
+          : (T($('auditor').value) ? [U($('auditor').value)] : []))),
     pedido: U($('pedido').value),
     defectos:JSON.stringify(defs.map(function(d){
       return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo,

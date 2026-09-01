@@ -731,6 +731,17 @@ function pintarTipos(){
   });
 }
 
+/* Única responsable de qué campos se ven. Cualquier otra parte que necesite
+   restaurarlos la llama a ella en vez de decidir por su cuenta. */
+function aplicarCamposDelTipo(){
+  var t=$('tipo').value;
+  TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
+  (CAMPOS[t]||[]).forEach(function(id){
+    var e=$(id); if(e) e.style.display = (id==='wLicencia'||id==='wReproceso') ? 'inline-flex' : '';
+  });
+  if($('wReproceso')) $('wReproceso').style.display='none';
+}
+
 function aplicarTipo(){
   pintarTipos();
   /* En Cliente los colores van en su propio bloque, no en el campo suelto. */
@@ -740,14 +751,7 @@ function aplicarTipo(){
   if(wc) wc.style.display = esCli ? 'none' : '';
   if(typeof verVista==='function' && $('cardHoja')) verVista();
   if($('cardHoja') && $('cardHoja').style.display!=='none'){ pintarChipsHoja(); pintarHoja(); }
-  var t=$('tipo').value;
-  TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
-  (CAMPOS[t]||[]).forEach(function(id){
-    var e=$(id); if(e) e.style.display = (id==='wLicencia'||id==='wReproceso') ? 'inline-flex' : '';
-  });
-  /* Reproceso solo aparece cuando el pedido ya tiene auditorías: preguntarlo
-     antes no tiene sentido y es un campo más que leer en cada registro. */
-  if($('wReproceso')) $('wReproceso').style.display = 'none';
+  aplicarCamposDelTipo();
   var et = ETIQUETAS[t] || ETIQUETAS.DEFECTO;
   $('lblLote').textContent=et.lote; $('lblMuestra').textContent=et.muestra;
   $('hLote').textContent=et.hLote||'';
@@ -1108,13 +1112,19 @@ function buscarLote(){
 /* Marcado como reproceso, el registro es la misma auditoría revisada de nuevo:
    los datos de identificación ya están en la anterior. Se ocultan para que solo
    quede lo que cambia — resultado, defectos y derivados. */
+/* Solo apaga campos mientras el reproceso está marcado. Quién decide qué va en
+   cada tipo es aplicarCamposDelTipo(): antes esta función restauraba por su
+   cuenta y, al correr después de un cambio de tipo, dejaba apagados el pedido
+   y el destino de Cliente aunque nadie hubiera marcado reproceso. */
+var CAMPOS_REPROCESO = ['wPo','wPedido','wDestino','wServicio','wECliente',
+                        'wIntExt','wProceso','wCajas','wLinea','wLineas'];
+
 function modoReproceso(activo){
-  ['wPo','wPedido','wDestino','wServicio','wECliente','wIntExt','wProceso','wCajas','wLinea']
-    .forEach(function(id){
-      var e=$(id); if(!e) return;
-      if(activo) e.style.display='none';
-      else if((CAMPOS[$('tipo').value]||[]).indexOf(id)>=0) e.style.display='';
-    });
+  if(activo){
+    CAMPOS_REPROCESO.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
+  } else {
+    aplicarCamposDelTipo();
+  }
   var h=$('hMarcas');
   if(h) h.textContent = activo
     ? 'Reproceso: solo cambia el resultado y los defectos. Lo demás viene de la auditoría anterior.'

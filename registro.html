@@ -1879,12 +1879,16 @@ function guardarEdicion(){
     RESULTADO: resultadoActual(),
     REPROCESO: $('reproceso').checked ? 1 : 0
   };
+  /* Faltaba declarar el tipo: al no existir «t» aquí, el navegador cortaba la
+     ejecución al leer el archivo y nunca llegaba a cargar los catálogos. Por eso
+     los campos de auditora y cliente quedaban vacíos sin ningún aviso. */
+  var tEd = $('tipo').value;
   var envio={
     accion:'editar', clave:CLAVE, id:id, usuario:U($('digitador').value),
     cambios:JSON.stringify(cambios),
     auditores: JSON.stringify(
-      !PIDE_AUDITOR[t] ? []
-      : (t==='EMPAQUE'
+      !PIDE_AUDITOR[tEd] ? []
+      : (tEd==='EMPAQUE'
           ? auds.concat(T($('auditor').value)?[U($('auditor').value)]:[])
               .filter(function(x,i,a){ return x && a.indexOf(x)===i; })
           : (T($('auditor').value) ? [U($('auditor').value)] : []))),

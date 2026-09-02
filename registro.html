@@ -790,7 +790,7 @@ var editando = null;      // id de la auditoría que se está corrigiendo
 
 function $(id){ return document.getElementById(id); }
 function T(v){ return String(v==null?'':v).trim(); }
-function U(v){ return T(v).toUpperCase(); }
+function U(v){ return String(T(v)||'').toUpperCase(); }
 function N(v){ var x=parseFloat(String(v==null?'':v).replace(/,/g,'')); return isFinite(x)?x:0; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function norm(s){
@@ -1991,7 +1991,12 @@ function pintarHoja(){
   Array.prototype.forEach.call($('hjBody').querySelectorAll('input'),function(inp){
     inp.oninput=function(){ hoja[+inp.dataset.f][inp.dataset.c]=inp.value; guardarHoja(); refrescarTotales(); };
     inp.onchange=function(){
-      recordar(inp.dataset.c.toUpperCase(), inp.value);
+      /* Solo las celdas de datos tienen «data-c». El campo «+ defecto» de la
+         fila no lo tiene, y al pasar por él esto reventaba y cortaba la página
+         a media digitación. */
+      var campo = inp.dataset.c;
+      if(!campo) return;
+      recordar(campo.toUpperCase(), inp.value);
       if(inp.dataset.c==='grupo' && U(inp.value).length>=3 && !clienteDeGrupo(inp.value)){
         $('hjMsg').className='hint err';
         $('hjMsg').textContent='«'+U(inp.value).substring(0,3)+'» no está en la base de clientes. '+
@@ -2114,6 +2119,7 @@ var sgOpts=[], sgSel=-1, sgInp=null;
 function cerrarSug(){ $('hjSug').style.display='none'; sgOpts=[]; sgSel=-1; sgInp=null; }
 
 function sugerirEnCelda(inp){
+  if(!inp || !inp.dataset || !inp.dataset.c) return;
   var campo = inp.dataset.c.toUpperCase();
   function buscar(){
     sgInp=inp;
@@ -2405,7 +2411,7 @@ function verVista(){
 function forzarMayusculas(inp){
   if(!inp || inp.type==='number' || inp.type==='date') return;
   inp.addEventListener('input', function(){
-    var p1=inp.selectionStart, p2=inp.selectionEnd, v=inp.value.toUpperCase();
+    var p1=inp.selectionStart, p2=inp.selectionEnd, v=String(inp.value||'').toUpperCase();
     if(v!==inp.value){ inp.value=v; try{ inp.setSelectionRange(p1,p2); }catch(e){} }
   });
 }
@@ -2540,7 +2546,8 @@ var OFIC={GRUPO:[],ESTILO:[],OP:[]};
   e.addEventListener('input', function(){
     clearTimeout(t);
     t=setTimeout(function(){
-      sugerirOficial(id.toUpperCase(), U(e.value), function(v){ OFIC[id.toUpperCase()]=v; });
+      sugerirOficial(String(id||'').toUpperCase(), U(e.value),
+        function(v){ OFIC[String(id||'').toUpperCase()]=v; });
     }, 220);
   });
 });
@@ -2638,7 +2645,7 @@ function recordar(campo, valor){
 }
 ['grupo','estilo','color','po'].forEach(function(id){
   var e=$(id); if(!e) return;
-  e.addEventListener('change', function(){ recordar(id.toUpperCase(), e.value); });
+  e.addEventListener('change', function(){ recordar(String(id||'').toUpperCase(), e.value); });
 });
 $('eCliente').addEventListener('change', function(){ recordar('ECLIENTE', $('eCliente').value); });
 

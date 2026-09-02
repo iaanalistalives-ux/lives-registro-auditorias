@@ -836,7 +836,11 @@ function cargarCatalogos(){
     guardarLocal('lives_cat_aud', CAT);
     pintarCatalogos();
     $('pillCat').textContent=CAT.defectos.length+' defectos · '+CAT.personal.length+' personas';
-    $('pillCat').className='pill';
+    $('pillCat').className='pill'+((CAT.personal.length && CAT.defectos.length)?'':' bad');
+    if(!CAT.personal.length){
+      $('hAud').className='hint err';
+      $('hAud').textContent='No se cargó la lista de auditoras. Recarga la página.';
+    }
     if(r.hoy && !$('fecha').value) $('fecha').value=r.hoy;
   }, function(){
     if(!cache){ $('pillCat').textContent='Sin conexión al servidor'; $('pillCat').className='pill bad'; }
@@ -893,7 +897,19 @@ function autocompletar(inputId, dropId, fuente, alElegir){
     var q=inp.value, base=fuente();
     opts=[];
     for(var i=0;i<base.length && opts.length<30;i++) if(coincide(base[i].texto,q)) opts.push(base[i]);
-    if(!opts.length && norm(q).length>=2) opts.push({texto:norm(q), tag:'nuevo', nuevo:true});
+    /* Si nada empieza igual, se acepta lo que contenga el texto: «ASTU» debe
+       encontrar a MARLENE ASTUDILLO aunque no empiece por ahí. */
+    if(!opts.length && T(q)){
+      var qq=norm(q);
+      for(var j=0;j<base.length && opts.length<30;j++)
+        if(norm(base[j].texto).indexOf(qq)>=0) opts.push(base[j]);
+    }
+    /* Ofrecer «usar este valor nuevo» solo si el catálogo sí cargó. Si llegó
+       vacío, lo que corresponde es avisar, no invitar a inventar un nombre. */
+    if(!opts.length && norm(q).length>=2){
+      if(base.length) opts.push({texto:norm(q), tag:'nuevo', nuevo:true});
+      else opts.push({texto:'No se cargó la lista — revisa la conexión', tag:'', vacio:true});
+    }
     sel=opts.length?0:-1; pintar(q);
   }
   function pintar(q){
@@ -905,12 +921,19 @@ function autocompletar(inputId, dropId, fuente, alElegir){
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
-      el.onmousedown=function(e){ e.preventDefault(); elegir(opts[+el.dataset.i]); };
+      el.onmousedown=function(e){
+        e.preventDefault();
+        var o=opts[+el.dataset.i];
+        if(o && o.vacio) return;          // no es una opción, es un aviso
+        elegir(o);
+      };
     });
   }
   function cerrar(){ dr.classList.remove('on'); opts=[]; sel=-1; }
   function elegir(o){ if(!o) return; inp.value=o.texto; cerrar(); alElegir && alElegir(o); }
   inp.addEventListener('input', buscar);
+  /* Al entrar al campo se muestran las opciones aunque no haya escrito nada:
+     así puede elegir de la lista en vez de tener que adivinar cómo se escribe. */
   inp.addEventListener('focus', buscar);
   inp.addEventListener('blur', function(){ setTimeout(cerrar,140); });
   inp.addEventListener('keydown', function(e){

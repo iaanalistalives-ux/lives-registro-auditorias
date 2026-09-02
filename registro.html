@@ -770,6 +770,9 @@ function aplicarTipo(){
   if(typeof verVista==='function' && $('cardHoja')) verVista();
   if($('cardHoja') && $('cardHoja').style.display!=='none'){ pintarChipsHoja(); pintarHoja(); }
   aplicarCamposDelTipo();
+  /* Se volvió a declarar: al mover el bloque de campos a su propia función se
+     fue con él la declaración, y el resto seguía usándola. */
+  var t = $('tipo').value;
   var et = ETIQUETAS[t] || ETIQUETAS.DEFECTO;
   $('lblLote').textContent=et.lote; $('lblMuestra').textContent=et.muestra;
   $('hLote').textContent=et.hLote||'';

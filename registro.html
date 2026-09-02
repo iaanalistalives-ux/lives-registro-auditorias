@@ -828,7 +828,12 @@ function leerLocal(k){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v
 
 function cargarCatalogos(){
   var cache=leerLocal('lives_cat_aud');
-  if(cache){ CAT=cache; mayusCatalogos(); pintarCatalogos(); $('pillCat').textContent='Catálogos (guardados)'; }
+  /* Una copia guardada a medias hace más daño que no tener nada: si no trae
+     personas, se descarta y se espera la respuesta del servidor. */
+  if(cache && cache.personal && cache.personal.length){
+    CAT=cache; mayusCatalogos(); pintarCatalogos();
+    $('pillCat').textContent='Catálogos (guardados)';
+  }
   jsonp({accion:'catalogos'}, function(r){
     if(!r || !r.ok){ $('pillCat').textContent='Error de catálogos'; $('pillCat').className='pill bad'; return; }
     CAT={defectos:r.defectos||[], personal:r.personal||[], clientes:r.clientes||[],
@@ -838,9 +843,13 @@ function cargarCatalogos(){
     pintarCatalogos();
     $('pillCat').textContent=CAT.defectos.length+' defectos · '+CAT.personal.length+' personas';
     $('pillCat').className='pill'+((CAT.personal.length && CAT.defectos.length)?'':' bad');
+    $('pillCat').title='defectos '+CAT.defectos.length+' · personas '+CAT.personal.length+
+      ' · talleres '+(CAT.talleres||[]).length+' · líneas '+(CAT.lineas||[]).length+
+      ' · destinos '+(CAT.destinos||[]).length+' · clientes '+(CAT.clientes||[]).length;
     if(!CAT.personal.length){
       $('hAud').className='hint err';
-      $('hAud').textContent='No se cargó la lista de auditoras. Recarga la página.';
+      $('hAud').textContent='La lista de personas llegó vacía del servidor. '+
+        'Revisa la pestaña CAT_PERSONAL del Sheet y vuelve a cargar la página.';
     }
     if(r.hoy && !$('fecha').value) $('fecha').value=r.hoy;
   }, function(){
@@ -2460,14 +2469,22 @@ Array.prototype.forEach.call(document.querySelectorAll('#bqCuerpo input'),functi
 });
 
 /* ---------------- arranque ---------------- */
-autocompletar('auditor','dAuditor', function(){
-  return CAT.personal.filter(function(p){ return (p[1]||'').indexOf('AUDITORA')>=0; })
-    .map(function(p){ return {texto:p[0], tag:p[1]}; });
-});
-autocompletar('inspector','dInspector', function(){
-  return CAT.personal.filter(function(p){ return (p[1]||'').indexOf('INSPECTORA')>=0; })
-    .map(function(p){ return {texto:p[0], tag:p[1]}; });
-});
+/* El rol solo ordena la lista, no la recorta. Antes se filtraba por rol y si
+   alguna fila lo tenía vacío o escrito distinto, esa persona desaparecía; y si
+   fallaba en todas, el campo quedaba sin nadie y ofrecía crear un nombre nuevo.
+   Ahora los del rol que corresponde salen primero y el resto queda disponible. */
+function personalPara(rol){
+  var todos = CAT.personal || [];
+  if(!todos.length) return [];
+  var coincide=[], resto=[];
+  todos.forEach(function(p){
+    var r=U(p[1]||'');
+    (r.indexOf(rol)>=0 ? coincide : resto).push({texto:p[0], tag:p[1]||''});
+  });
+  return coincide.concat(resto);
+}
+autocompletar('auditor','dAuditor', function(){ return personalPara('AUDITORA'); });
+autocompletar('inspector','dInspector', function(){ return personalPara('INSPECTORA'); });
 autocompletar('grupo','dGrupo', function(){
   var q=U($('grupo').value), of=(OFIC.GRUPO||[]);
   var lista=of.map(function(v){ return {texto:v, tag:'del sistema'}; });

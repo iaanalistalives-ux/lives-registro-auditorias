@@ -291,9 +291,10 @@
           <input type="text" id="inspector" autocomplete="off" placeholder="Escribe…">
           <div class="drop" id="dInspector"></div>
         </div>
-        <div class="f sm" id="wLinea">
+        <div class="f sm ac" id="wLinea">
           <label for="linea">Línea</label>
-          <select id="linea"></select>
+          <input type="text" id="linea" autocomplete="off" placeholder="Elegir…">
+          <div class="drop" id="dLinea"></div>
         </div>
         <div class="f sm" id="wIntExt">
           <label for="intExt">Origen</label>
@@ -856,13 +857,10 @@ function mayusCatalogos(){
   });
 }
 
-function pintarCatalogos(){
-  var sel=$('linea'); sel.innerHTML='<option value="">—</option>';
-  (CAT.lineas||[]).forEach(function(l){
-    var o=document.createElement('option'); o.value=l[0]; o.textContent=l[0]; sel.appendChild(o);
-  });
-  pintarChips();
-}
+/* La línea usa el mismo buscador que el resto de los campos. Antes era un
+   desplegable nativo del navegador y en algunos equipos se pintaba oscuro,
+   dejando las opciones invisibles. */
+function pintarCatalogos(){ pintarChips(); }
 
 function nombreDefecto(d){ return U(d[3] ? (d[2]+' '+d[3]) : d[2]); }
 
@@ -2363,7 +2361,7 @@ function forzarMayusculas(inp){
   });
 }
 ['grupo','estilo','color','po','pedido','servicio','destino','auditor','inspector',
- 'digitador','qdef','qder','eCliente'].forEach(function(id){ forzarMayusculas($(id)); });
+ 'digitador','qdef','qder','eCliente','linea','op'].forEach(function(id){ forzarMayusculas($(id)); });
 
 /* ============ BUSCAR Y CORREGIR ============
    Busca sobre la hoja viva, no sobre el histórico migrado: ese es data cerrada
@@ -2613,6 +2611,9 @@ $('licencia').addEventListener('change', function(){
   if($('licencia').checked) $('muestra').value=$('lote').value;
   veredicto();
 });
+autocompletar('linea','dLinea', function(){
+  return (CAT.lineas||[]).map(function(l){ return {texto:l[0]}; });
+});
 autocompletar('servicio','dServicio', function(){
   return (CAT.talleres||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });
 });
@@ -2701,7 +2702,7 @@ function cargarRecientes(){
   setTimeout(verVista, 1100);
   var vg=leerLocal('lives_vista_aud');
   setTimeout(function(){ verVista(vg==='hoja'?'hoja':'form'); }, 1000);
-  setTimeout(function(){ if(f && f.linea) $('linea').value=f.linea; }, 1200);
+  if(f && f.linea) $('linea').value=f.linea;
   pintarDefs();
   $('grupo').focus();
 })();

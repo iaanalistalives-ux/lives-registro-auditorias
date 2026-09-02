@@ -836,11 +836,16 @@ function cargarCatalogos(){
   }
   jsonp({accion:'catalogos'}, function(r){
     if(!r || !r.ok){ $('pillCat').textContent='Error de catálogos'; $('pillCat').className='pill bad'; return; }
+    /* destinos y vias faltaban acá. mayusCatalogos() los recorre, se encontraba
+       con undefined y lanzaba error: todo lo que venía después —pintar las
+       listas y la etiqueta— no llegaba a ejecutarse, y por eso los campos de
+       auditora e inspectora quedaban vacíos sin ningún aviso. */
     CAT={defectos:r.defectos||[], personal:r.personal||[], clientes:r.clientes||[],
-         lineas:r.lineas||[], talleres:r.talleres||[]};
-    mayusCatalogos();
+         lineas:r.lineas||[], talleres:r.talleres||[], destinos:r.destinos||[],
+         vias:r.vias||[]};
+    try{ mayusCatalogos(); }catch(e){ console.warn('mayusCatalogos',e); }
     guardarLocal('lives_cat_aud', CAT);
-    pintarCatalogos();
+    try{ pintarCatalogos(); }catch(e){ console.warn('pintarCatalogos',e); }
     $('pillCat').textContent=CAT.defectos.length+' defectos · '+CAT.personal.length+' personas';
     $('pillCat').className='pill'+((CAT.personal.length && CAT.defectos.length)?'':' bad');
     $('pillCat').title='defectos '+CAT.defectos.length+' · personas '+CAT.personal.length+
@@ -861,8 +866,12 @@ function cargarCatalogos(){
    al cargarlos para que la pantalla y lo guardado coincidan siempre. */
 function mayusCatalogos(){
   ['defectos','personal','clientes','lineas','talleres','destinos'].forEach(function(k){
-    if(!CAT[k]) return;
-    CAT[k]=CAT[k].map(function(f){ return f.map(function(x){ return U(x); }); });
+    try{
+      if(!Array.isArray(CAT[k])) { CAT[k]=CAT[k]||[]; return; }
+      CAT[k]=CAT[k].map(function(f){
+        return Array.isArray(f) ? f.map(function(x){ return U(x); }) : f;
+      });
+    }catch(e){ console.warn('catálogo',k,e); }
   });
 }
 

@@ -261,6 +261,8 @@
   </div>
 </div>
 
+<div id="errBar" style="display:none;background:#FEF2F2;border-bottom:2px solid #DC2626;
+     color:#991B1B;padding:9px 22px;font-size:12.5px;font-family:Consolas,monospace;"></div>
 <div class="wrap">
 <div class="uno">
   <div>
@@ -656,6 +658,21 @@
 var API   = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
 var CLAVE = 'livessac';
 
+/* Cualquier error se muestra en pantalla. Antes un fallo temprano cortaba la
+   carga de catálogos en silencio y los campos quedaban vacíos sin decir por qué. */
+function mostrarError(donde, e){
+  try{
+    var b=document.getElementById('errBar');
+    if(!b) return;
+    b.style.display='block';
+    b.textContent='Error en '+donde+': '+((e && e.message) ? e.message : e)+
+      '  ·  manda este texto a Christian';
+  }catch(_){}
+}
+window.addEventListener('error', function(ev){
+  mostrarError('la página', (ev && (ev.error || ev.message)) || 'desconocido');
+});
+
 /* Defectos más frecuentes por tipo, en orden, según el histórico 2025-2026.
    Solo definen qué sale como botón: el catálogo completo viene del Sheet. */
 var FRECUENTES = {"LINEAS": ["CO02", "CO01-2", "CO34", "AC23", "CO02-3", "CO01", "CO17", "DE03-3", "DE02", "AC32", "CO14", "AC27", "AC33", "CO13"], "SERVINSP": ["CO02", "CO02-3", "DE02", "AC32", "CO01-2", "DE03-3", "CO17", "AC23", "CO14", "CO01", "AC25", "AC16", "CO13", "CO28"], "EMPAQUE": ["AC08", "EM01", "EM02", "CO02-3", "CO15-2", "CO17", "CO21", "EM05", "DE02", "EM03-2", "EM07", "EM06", "EM03-3", "CO06"], "CLIENTE": ["CO01-2", "CO21", "CO23", "CO35", "CO02-3", "CO02", "AC40", "AC23", "CO09-2", "DE02", "CO09", "AC18", "EM03-3", "CO17"], "FINAL": ["AC17", "CO02", "AC31", "CO01-2", "CO02-3", "CO17-2", "AC18", "CO01", "AC01", "CO17", "AC20", "AC25", "AC19", "AC23"]};
@@ -835,7 +852,13 @@ function cargarCatalogos(){
     $('pillCat').textContent='Catálogos (guardados)';
   }
   jsonp({accion:'catalogos'}, function(r){
-    if(!r || !r.ok){ $('pillCat').textContent='Error de catálogos'; $('pillCat').className='pill bad'; return; }
+   try{
+    if(!r || !r.ok){
+      $('pillCat').textContent='Error de catálogos';
+      $('pillCat').className='pill bad';
+      mostrarError('los catálogos', (r && r.error) || 'respuesta vacía');
+      return;
+    }
     /* destinos y vias faltaban acá. mayusCatalogos() los recorre, se encontraba
        con undefined y lanzaba error: todo lo que venía después —pintar las
        listas y la etiqueta— no llegaba a ejecutarse, y por eso los campos de
@@ -857,6 +880,7 @@ function cargarCatalogos(){
         'Revisa la pestaña CAT_PERSONAL del Sheet y vuelve a cargar la página.';
     }
     if(r.hoy && !$('fecha').value) $('fecha').value=r.hoy;
+   }catch(e){ mostrarError('procesar los catálogos', e); }
   }, function(){
     if(!cache){ $('pillCat').textContent='Sin conexión al servidor'; $('pillCat').className='pill bad'; }
   });
@@ -2712,6 +2736,7 @@ function cargarRecientes(){
 }
 
 (function inicio(){
+ try{
   var f=leerLocal('lives_fijo_aud');
   if(f){ $('tipo').value=f.tipo||'LINEAS'; $('auditor').value=f.auditor||'';
          $('inspector').value=f.inspector||''; $('digitador').value=f.digitador||'';
@@ -2731,6 +2756,7 @@ function cargarRecientes(){
   if(f && f.linea) $('linea').value=f.linea;
   pintarDefs();
   $('grupo').focus();
+ }catch(e){ mostrarError('el arranque', e); }
 })();
 </script>
 </body>

@@ -366,8 +366,8 @@
         </div>
       </div>
 
-      <div class="row" id="wPo" style="margin-top:10px">
-        <div class="f ac">
+      <div class="row" id="rowPo" style="margin-top:10px">
+        <div class="f ac" id="wPo">
           <label for="po">PO</label>
           <input type="text" id="po" autocomplete="off">
           <div class="drop" id="dPo"></div>
@@ -1058,7 +1058,7 @@ function ofrecerOpciones(r){
   var cont=$('opcOps');
   if(!cont){
     cont=document.createElement('div'); cont.id='opcOps'; cont.className='opcOps';
-    var ref=$('wPo') || $('prev');
+    var ref=$('rowPo') || $('prev');
     if(ref && ref.parentNode) ref.parentNode.insertBefore(cont, ref.nextSibling);
     else return;
   }

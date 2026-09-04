@@ -1363,6 +1363,20 @@ function pintarLineas(){
   });
 }
 
+/* Mientras escribe, se avisa que hay una línea sin agregar: así no llega al
+   final del registro y se encuentra con un mensaje que parece contradecirla. */
+function avisarLineaSuelta(){
+  var h=$('hGuardar');
+  if($('tipo').value!=='CLIENTE' || !h) return;
+  if(T($('lnColor').value) && !lineas.length){
+    h.className='hint';
+    h.textContent='Pulsa Agregar para sumar ese color, o guarda: se agrega solo.';
+  }
+}
+['lnColor','lnEcli','lnPo'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('input', avisarLineaSuelta);
+});
+
 function agregarLinea(){
   var c=U($('lnColor').value), e=U($('lnEcli').value), po=U($('lnPo').value);
   if(!c && !e && !po){ $('lnColor').focus(); return; }
@@ -1466,7 +1480,10 @@ function validar(){
   if(!T($('cliente').value)) return 'El prefijo del grupo no está en el catálogo.';
   if(!T($('estilo').value)) return 'Falta el estilo.';
   if($('tipo').value==='CLIENTE'){
-    if(!lineas.length && !T($('color').value)) return 'Agrega al menos un color auditado.';
+    /* Si dejó los campos llenos sin pulsar Agregar, se toma igual: el dato está
+       escrito y negarse a guardar diciendo que falta es desconcertante. */
+    if(!lineas.length && T($('lnColor').value)) agregarLinea();
+    if(!lineas.length) return 'Escribe al menos un color auditado.';
   }
   else if(!T($('color').value)) return 'Falta el color.';
   if(N($('lote').value)<=0) return 'Falta el lote.';
@@ -1545,6 +1562,9 @@ function guardar(){
   /* Identificador único del registro. Si la respuesta se pierde por lentitud de
      red y se reintenta, el servidor reconoce que ya lo guardó y no lo duplica. */
   envio.token = 'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
+  /* Lo que quedó escrito en la fila de colores sin pulsar Agregar entra igual. */
+  if($('tipo').value==='CLIENTE' && T($('lnColor').value)) agregarLinea();
+
   var res=resultadoActual();
   var etiqueta=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value)+
                ' · '+(res||'—').toLowerCase()+(totalDef()?(' ('+totalDef()+')'):'');

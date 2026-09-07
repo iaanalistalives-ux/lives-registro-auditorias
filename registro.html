@@ -90,7 +90,11 @@
   .decid .mini{background:#fff;border:1.5px solid #F59E0B;color:#92400E;padding:5px 12px;border-radius:7px;
         font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;}
   .decid .mini.on{background:#0F7A5A;border-color:#0F7A5A;color:#fff;}
-  .decid #decMsg{font-weight:400;font-size:12px;color:#5F726C;}
+  .decid #decMsg{font-weight:400;font-size:12px;color:#5F726C;width:100%;}
+  .decid{flex-direction:column;align-items:flex-start;}
+  .pendTit{font-size:12.5px;font-weight:700;color:#92400E;width:100%;}
+  .decid .mini.rep{background:#FEF2F2;border-color:#DC2626;color:#991B1B;}
+  .decid .mini.rep:hover{background:#fff;}
   .ped{background:#fff;border:1px solid #F59E0B;border-radius:7px;padding:7px 11px;
        margin-top:7px;font-size:12.5px;font-weight:400;color:#5F726C;}
   .ped b{color:#92400E;}
@@ -312,6 +316,11 @@
             <option value="ACABADOS">Acabados</option>
           </select>
         </div>
+        <div class="f ac" id="wAudTaller">
+          <label for="audTaller">Auditora del taller</label>
+          <input type="text" id="audTaller" autocomplete="off" placeholder="Quien auditó en el taller">
+          <div class="drop" id="dAudTaller"></div>
+        </div>
         <div class="f ac" id="wServicio">
           <label for="servicio">Taller</label>
           <input type="text" id="servicio" autocomplete="off" placeholder="Escribe…">
@@ -400,7 +409,7 @@
         </div>
 
         <div class="f" style="display:flex;align-items:flex-end;gap:18px;padding-bottom:4px;flex-wrap:wrap">
-          <label class="sw" id="wReproceso" style="display:none"><input type="checkbox" id="reproceso"> Es reproceso</label>
+          <input type="checkbox" id="reproceso" style="display:none">
           <label class="sw" id="wLicencia"><input type="checkbox" id="licencia"> Es licencia (100%)</label>
           <span class="hint" style="margin:0" id="hMarcas">No suman lote en los indicadores, pero la auditoría sí cuenta</span>
         </div>
@@ -698,10 +707,12 @@ var CAMPOS = {
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
-  FINAL:    ['wOp','wTela','wAuditor','wECliente','wIntExt','wProceso','wServicio','wPo','wPedido',
-             'wDestino','wDerivados','wLicencia','wResultado']
+  FINAL:    ['wOp','wTela','wAuditor','wECliente','wIntExt','wProceso','wServicio',
+             'wAudTaller','wPo','wPedido','wDestino','wDerivados',
+             'wLicencia','wResultado']
 };
-var TODOS_COND = ['wOp','wTela','wLineas','wAuditor','wInspector','wLinea','wECliente','wIntExt','wProceso','wServicio',
+var TODOS_COND = ['wOp','wTela','wLineas','wAuditor','wInspector','wLinea','wECliente',
+                  'wIntExt','wProceso','wServicio','wAudTaller',
                   'wPo','wPedido','wDestino','wCajas','wDerivados','wLicencia',
                   'wResultado','wNivelAql','wReproceso'];
 /* Dónde es obligatorio decir quién auditó. */
@@ -1143,35 +1154,44 @@ function buscarLote(){
       return '<tr><td>'+esc(x.fecha)+'</td><td>'+x.nAuditoria+'.ª</td><td>'+x.muestra+'</td>'+
              '<td>'+x.defectuosas+'</td><td><b>'+esc(x.resultado)+'</b></td><td>'+esc(x.auditor)+'</td></tr>';
     }).join('');
-    /* El sistema no puede saber si esto es una re-auditoría o una auditoría
-       nueva del mismo pedido: en dos días distintos puede ser cualquiera de las
-       dos. Ese dato está en el papel, así que lo decide quien digita. */
-    esReaud='';
-    /* Se muestra cuánto del pedido va cubierto: es el dato que decide si esto
-       es el siguiente lote o una revisión del mismo. */
+    /* Una sola pregunta con salidas claras, en vez de tres controles que podían
+       contradecirse. Si hay rechazos sin corregir, se ofrece reprocesar ESE
+       rechazo concreto —guardando el vínculo— o seguir como tanda nueva. */
+    esReaud=''; reprocesaDe=''; motivoRep='';
+    var pend = r.rechazosPendientes || [];
     var resumen='';
     if(r.pedido>0){
       resumen='<div class="ped">Pedido de <b>'+r.pedido.toLocaleString('es-PE')+'</b> prendas · '+
         'ya recibidas <b>'+r.loteAcumulado.toLocaleString('es-PE')+'</b> · '+
         (r.falta>0 ? ('faltan <b>'+r.falta.toLocaleString('es-PE')+'</b> por auditar')
-                   : '<b>pedido completo</b>')+
-        ' · revisadas <b>'+r.muestraAcumulada.toLocaleString('es-PE')+'</b> prendas</div>';
+                   : '<b>pedido liquidado</b> — auditado completo, listo para despachar')+
+        '</div>';
     }
     p.innerHTML='<b>Ya hay '+r.previas.length+' auditoría(s) de este mismo pedido.</b>'+resumen+
       '<table><thead><tr><th>Fecha</th><th>N.º</th><th>Muestra</th><th>Def.</th><th>Resultado</th><th>Auditora</th></tr></thead>'+
       '<tbody>'+f+'</tbody></table>'+
-      '<div class="decid">¿Qué es la que estás digitando?'+
-        '<button type="button" class="mini" id="btnRea">Re-auditoría de este lote</button>'+
-        '<button type="button" class="mini" id="btnNoRea">Auditoría distinta</button>'+
+      '<div class="decid">'+
+        (pend.length
+          ? ('<div class="pendTit">Hay '+pend.length+' rechazo(s) sin corregir. '+
+             '¿Esta auditoría corrige alguno?</div>'+
+             pend.map(function(x,i){
+               return '<button type="button" class="mini rep" data-rep="'+i+'">Corrige la del '+
+                 esc(x.fecha)+(x.auditor?(' · '+esc(x.auditor)):'')+
+                 (x.defectuosas?(' · '+x.defectuosas+' def.'):'')+'</button>';
+             }).join('')+
+             '<button type="button" class="mini" id="btnNoRea">No, es otra tanda del pedido</button>')
+          : ('<span class="pendTit">Ninguna quedó sin corregir. '+
+             'Esta sería la <b>'+(r.siguienteParcial||1)+'.ª tanda</b> del pedido.</span>'+
+             '<button type="button" class="mini" id="btnNoRea">Continuar</button>'))+
+        '<button type="button" class="mini" id="btnRepSuelto">Es reproceso, pero el rechazo no está en el sistema</button>'+
         '<span id="decMsg"></span></div>';
     p.classList.add('on');
-    /* Con auditorías previas sí tiene sentido preguntar por el reproceso. */
-    if($('wReproceso')) $('wReproceso').style.display='inline-flex';
-    $('btnRea').onclick=function(){ fijarReaud('SI', r.siguienteAuditoria); };
-    $('btnNoRea').onclick=function(){ fijarReaud('NO', 1); };
-    /* Se deja marcada la opción más probable, pero sin decidir por ella. */
-    if(r.sugerido==='SI') fijarReaud('SI', r.siguienteAuditoria);
-    else if(r.sugerido==='NO') fijarReaud('NO', 1);
+    PEND_ACT = pend;
+    Array.prototype.forEach.call(p.querySelectorAll('[data-rep]'),function(b){
+      b.onclick=function(){ elegirReproceso(PEND_ACT[+b.dataset.rep]); };
+    });
+    if($('btnNoRea')) $('btnNoRea').onclick=function(){ marcarTandaNueva(r.siguienteParcial||1); };
+    if($('btnRepSuelto')) $('btnRepSuelto').onclick=reprocesoSinOrigen;
   });
 }
 
@@ -1203,6 +1223,41 @@ $('reproceso').addEventListener('change', function(){
   }
   veredicto();
 });
+
+var PEND_ACT=[], reprocesaDe='', motivoRep='';
+
+/* Reprocesar un rechazo concreto: queda el vínculo, no una casilla suelta. */
+function elegirReproceso(x){
+  if(!x) return;
+  var m=prompt('¿Por qué se reprocesó?\n\nCorrige la auditoría del '+x.fecha+
+               (x.auditor?(' ('+x.auditor+')'):'')+'.');
+  if(m===null) return;
+  if(!T(m)){ $('decMsg').innerHTML='<b style="color:#DC2626">Falta el motivo.</b>'; return; }
+  reprocesaDe=x.id; motivoRep=T(m); esReaud='SI';
+  $('reproceso').checked=true; modoReproceso(true);
+  $('decMsg').innerHTML='<b>Reproceso de la auditoría del '+esc(x.fecha)+'.</b> '+
+    'No suma lote: son las mismas prendas.';
+  veredicto();
+}
+
+/* Papel viejo: el rechazo original nunca se digitó. Sin esta salida, esas hojas
+   no se podrían registrar y el formulario trabaría el trabajo del día. */
+function reprocesoSinOrigen(){
+  var m=prompt('Reproceso sin rechazo registrado.\n\n¿Por qué se reprocesó?');
+  if(m===null) return;
+  if(!T(m)){ $('decMsg').innerHTML='<b style="color:#DC2626">Falta el motivo.</b>'; return; }
+  reprocesaDe=''; motivoRep=T(m); esReaud='SI';
+  $('reproceso').checked=true; modoReproceso(true);
+  $('decMsg').innerHTML='<b>Reproceso sin origen registrado.</b> No suma lote.';
+  veredicto();
+}
+
+function marcarTandaNueva(n){
+  reprocesaDe=''; motivoRep=''; esReaud='NO';
+  $('reproceso').checked=false; modoReproceso(false);
+  $('decMsg').innerHTML='<b>Tanda '+n+' del pedido.</b> Son prendas distintas: suma lote.';
+  veredicto();
+}
 
 function fijarReaud(v, n){
   esReaud=v;
@@ -1555,6 +1610,9 @@ function guardar(){
     resultado: resultadoActual(),
     licencia: $('licencia').checked ? '1' : '0',
     esReauditoria: esReaud || 'NO',
+    reprocesaDe: reprocesaDe,
+    motivoReproceso: motivoRep,
+    audTaller: U($('audTaller').value),
     reproceso: $('reproceso').checked ? '1' : '0',
     captura:'DIGITADO',
     digitador:U($('digitador').value)
@@ -1818,6 +1876,8 @@ function limpiarRegistro(exito){
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
   defs=[]; ders=[]; pintarDers(); lineas=[]; pintarLineas();
+  reprocesaDe=''; motivoRep=''; PEND_ACT=[];
+  if($('audTaller')) $('audTaller').value='';
   ['lnColor','lnEcli','lnPo'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
   prevLote=null; esReaud=''; OPS_ACT=null;
   if($('opcOps')) $('opcOps').style.display='none';
@@ -2436,7 +2496,8 @@ function forzarMayusculas(inp){
   });
 }
 ['grupo','estilo','color','po','pedido','servicio','destino','auditor','inspector',
- 'digitador','qdef','qder','eCliente','linea','op'].forEach(function(id){ forzarMayusculas($(id)); });
+ 'digitador','qdef','qder','eCliente','linea','op','audTaller'].forEach(function(id){ forzarMayusculas($(id)); });
+autocompletar('audTaller','dAudTaller', function(){ return personalPara('AUDITORA'); });
 
 /* ============ BUSCAR Y CORREGIR ============
    Busca sobre la hoja viva, no sobre el histórico migrado: ese es data cerrada

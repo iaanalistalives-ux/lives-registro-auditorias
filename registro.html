@@ -762,6 +762,37 @@ function pintarTipos(){
 
 /* Única responsable de qué campos se ven. Cualquier otra parte que necesite
    restaurarlos la llama a ella en vez de decidir por su cuenta. */
+/* Dos campos de Final que no dependen del tipo sino de qué auditoría es:
+ *
+ * LIQUIDADO — el lote quedó cerrado y sale del taller. Solo tiene sentido en
+ *   talleres externos, Costura o Acabados. En la auditoría final interna de
+ *   LIVES no se marca nunca.
+ *
+ * AUD. TALLER — NO es quien hizo esta auditoría: es la auditora del taller que
+ *   revisó el lote antes, anotada en la re-auditoría que LIVES hace de Acabados.
+ *   Alimenta el comparativo taller contra LIVES. Pedirla en cualquier otra fila
+ *   haría que ese panel compare cosas que no son comparables.
+ */
+function afinarCamposFinal(){
+  if($('tipo').value!=='FINAL'){
+    ['wAudTaller','wLiquidado'].forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
+    return;
+  }
+  var externo = U($('intExt').value)==='EXTERNO';
+  var acabados = U($('proceso').value)==='ACABADOS';
+
+  var wl=$('wLiquidado');
+  if(wl) wl.style.display = externo ? 'flex' : 'none';
+  if(!externo && $('liquidado')) $('liquidado').checked=false;
+
+  var wa=$('wAudTaller');
+  if(wa) wa.style.display = (!externo && acabados) ? '' : 'none';
+  if(externo || !acabados){ if($('audTaller')) $('audTaller').value=''; }
+}
+['intExt','proceso'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('change', afinarCamposFinal);
+});
+
 function aplicarCamposDelTipo(){
   var t=$('tipo').value;
   TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
@@ -769,6 +800,7 @@ function aplicarCamposDelTipo(){
     var e=$(id); if(e) e.style.display = (id==='wLicencia'||id==='wReproceso') ? 'inline-flex' : '';
   });
   if($('wReproceso')) $('wReproceso').style.display='none';
+  afinarCamposFinal();
 }
 
 function aplicarTipo(){

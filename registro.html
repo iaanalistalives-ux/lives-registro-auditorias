@@ -808,6 +808,12 @@ function aplicarTipo(){
   /* En Cliente los colores van en su propio bloque, no en el campo suelto. */
   var esCli = $('tipo').value==='CLIENTE';
   pintarAuds();
+  /* Se avisa antes de llegar al guardado. */
+  var hOp=$('hOp'), fx=T($('fecha').value), hh=new Date();
+  var mm=hh.getFullYear()+'-'+('0'+(hh.getMonth()+1)).slice(-2);
+  if(hOp && fx.slice(0,7)===mm && !T($('op').value)){
+    hOp.className='hint'; hOp.textContent='Obligatoria este mes';
+  }
   var wc = $('color') ? $('color').closest('.f') : null;
   if(wc) wc.style.display = esCli ? 'none' : '';
   if(typeof verVista==='function' && $('cardHoja')) verVista();
@@ -1584,6 +1590,15 @@ function validar(){
     return 'Falta elegir el resultado.';
   if(t==='FINAL' && !T($('servicio').value) && U($('intExt').value)==='EXTERNO')
     return 'Falta el taller.';
+  /* La OP es obligatoria solo si el papel es del mes corriente: esas OP están en
+     la tabla. Las de meses anteriores ya se despacharon y no están, así que
+     exigirlas impediría digitar los papeles atrasados. Así la regla deja de
+     depender de que alguien se acuerde. */
+  var fp=T($('fecha').value), hoy=new Date();
+  var mesActual = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2);
+  if(fp.slice(0,7)===mesActual && !T($('op').value))
+    return 'Falta la OP. Es obligatoria en los papeles del mes en curso.';
+
   if(prevLote && prevLote.existe && !esReaud)
     return 'Ese pedido ya tiene auditorías: indica arriba si esta es re-auditoría o una auditoría distinta.';
   if(totalDef()>N($('muestra').value)) return 'Hay más prendas defectuosas que la muestra.';
@@ -2766,6 +2781,7 @@ $('grupo').addEventListener('input', aplicarCliente);
 $('grupo').addEventListener('blur', consultarOps);
 $('estilo').addEventListener('blur', consultarOps);
 $('op').addEventListener('blur', consultarOps);
+$('fecha').addEventListener('change', aplicarTipo);
 
 autocompletar('op','dOp', function(){ return (SUG.OP||[]).map(function(v){ return {texto:v}; }); }, consultarOps);
 $('lote').addEventListener('blur', buscarLote);

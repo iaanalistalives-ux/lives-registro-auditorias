@@ -762,11 +762,11 @@ function pintarTipos(){
 
 /* Única responsable de qué campos se ven. Cualquier otra parte que necesite
    restaurarlos la llama a ella en vez de decidir por su cuenta. */
-/* Dos campos de Final que no dependen del tipo sino de qué auditoría es:
+/* Dos campos de Final:
  *
- * LIQUIDADO — el lote quedó cerrado y sale del taller. Solo tiene sentido en
- *   talleres externos, Costura o Acabados. En la auditoría final interna de
- *   LIVES no se marca nunca.
+ * LIQUIDADO — la última auditoría de esa OP en ese proceso: no se vuelve a
+ *   auditar. Aplica a los tres procesos —costura taller, acabados taller y
+ *   acabados interna—. Es informativo y no entra en ningún cálculo.
  *
  * AUD. TALLER — NO es quien hizo esta auditoría: es la auditora del taller que
  *   revisó el lote antes, anotada en la re-auditoría que LIVES hace de Acabados.
@@ -781,9 +781,11 @@ function afinarCamposFinal(){
   var externo = U($('intExt').value)==='EXTERNO';
   var acabados = U($('proceso').value)==='ACABADOS';
 
+  /* LIQUIDADO va en los tres procesos de Auditoría Final —costura taller,
+     acabados taller y acabados interna—: marca que esa OP ya no se vuelve a
+     auditar en ese proceso. Es informativo, no cambia ningún cálculo. */
   var wl=$('wLiquidado');
-  if(wl) wl.style.display = externo ? 'flex' : 'none';
-  if(!externo && $('liquidado')) $('liquidado').checked=false;
+  if(wl) wl.style.display='flex';
 
   var wa=$('wAudTaller');
   if(wa) wa.style.display = (!externo && acabados) ? '' : 'none';

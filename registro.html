@@ -302,6 +302,19 @@
           <input type="text" id="linea" autocomplete="off" placeholder="Elegir…">
           <div class="drop" id="dLinea"></div>
         </div>
+        <!-- Un solo selector con los tres procesos reales de Auditoría Final, los
+             mismos que ve la auditora en el formulario del piloto. Por debajo sigue
+             llenando Origen y Proceso, que es lo que viaja al Sheet: así el papel se
+             digita igual que se captura en vivo y desaparece la cuarta combinación
+             que no existe en planta (interno + costura). -->
+        <div class="f sm" id="wProcFinal">
+          <label for="procFinal">Proceso</label>
+          <select id="procFinal">
+            <option value="COSTURA_TALLER">Costura (taller)</option>
+            <option value="ACABADOS_TALLER">Acabados (taller)</option>
+            <option value="ACABADOS_INTERNO">Acabados Final (interno)</option>
+          </select>
+        </div>
         <div class="f sm" id="wIntExt">
           <label for="intExt">Origen</label>
           <select id="intExt">
@@ -707,12 +720,12 @@ var CAMPOS = {
   /* Sin el nivel AQL: Athina transcribe un papel donde el resultado ya está
      decidido, y que el sistema le discuta el veredicto solo la hace dudar de lo
      que tiene delante. El AQL se sigue calculando en silencio para Calidad. */
-  FINAL:    ['wOp','wTela','wAuditor','wECliente','wIntExt','wProceso','wServicio',
+  FINAL:    ['wOp','wTela','wAuditor','wECliente','wProcFinal','wServicio',
              'wAudTaller','wPo','wPedido','wDestino','wDerivados',
              'wLicencia','wResultado']
 };
 var TODOS_COND = ['wOp','wTela','wLineas','wAuditor','wInspector','wLinea','wECliente',
-                  'wIntExt','wProceso','wServicio','wAudTaller',
+                  'wProcFinal','wIntExt','wProceso','wServicio','wAudTaller',
                   'wPo','wPedido','wDestino','wCajas','wDerivados','wLicencia',
                   'wResultado','wNivelAql','wReproceso'];
 /* Dónde es obligatorio decir quién auditó. */
@@ -773,13 +786,42 @@ function pintarTipos(){
  *   Alimenta el comparativo taller contra LIVES. Pedirla en cualquier otra fila
  *   haría que ese panel compare cosas que no son comparables.
  */
+/* El selector unificado escribe en los dos campos que viajan al Sheet.
+   Se hace aquí y no al guardar para que todo lo que depende de ellos —el filtro
+   de talleres, la auditora de taller, el aviso de reprocesos— siga funcionando
+   sin tocar una línea más. */
+function sincronizarProcesoFinal(){
+  var s=$('procFinal'); if(!s) return;
+  var v=s.value;
+  if($('intExt'))  $('intExt').value  = (v==='ACABADOS_INTERNO') ? 'INTERNO' : 'EXTERNO';
+  if($('proceso')) $('proceso').value = (v==='COSTURA_TALLER')   ? 'COSTURA' : 'ACABADOS';
+}
+
+/* Al abrir una auditoría para corregirla, los campos llegan por separado:
+   hay que reconstruir cuál de las tres opciones es. */
+function reflejarProcesoFinal(){
+  var s=$('procFinal'); if(!s) return;
+  var interno = U($('intExt') ? $('intExt').value : '')==='INTERNO';
+  var costura = U($('proceso') ? $('proceso').value : '')==='COSTURA';
+  s.value = interno ? 'ACABADOS_INTERNO' : (costura ? 'COSTURA_TALLER' : 'ACABADOS_TALLER');
+}
+
 function afinarCamposFinal(){
   if($('tipo').value!=='FINAL'){
     ['wAudTaller','wLiquidado'].forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
     return;
   }
+  sincronizarProcesoFinal();
   var externo = U($('intExt').value)==='EXTERNO';
   var acabados = U($('proceso').value)==='ACABADOS';
+
+  /* En la auditoría interna no hay taller que elegir: el taller es LIVES. Dejar
+     el campo visible invita a escribir algo ahí, y ese algo termina en el Sheet
+     —hoy hay filas con 'ACABADOS FINAL' y con un nombre de persona en la columna
+     del taller, escritas así. */
+  var ws=$('wServicio');
+  if(ws) ws.style.display = externo ? '' : 'none';
+  if(!externo && $('servicio')) $('servicio').value='';
 
   /* LIQUIDADO va en los tres procesos de Auditoría Final —costura taller,
      acabados taller y acabados interna—: marca que esa OP ya no se vuelve a
@@ -791,7 +833,7 @@ function afinarCamposFinal(){
   if(wa) wa.style.display = (!externo && acabados) ? '' : 'none';
   if(externo || !acabados){ if($('audTaller')) $('audTaller').value=''; }
 }
-['intExt','proceso'].forEach(function(id){
+['intExt','proceso','procFinal'].forEach(function(id){
   var e=$(id); if(e) e.addEventListener('change', afinarCamposFinal);
 });
 
@@ -1243,7 +1285,7 @@ function buscarLote(){
    cuenta y, al correr después de un cambio de tipo, dejaba apagados el pedido
    y el destino de Cliente aunque nadie hubiera marcado reproceso. */
 var CAMPOS_REPROCESO = ['wPo','wPedido','wDestino','wServicio','wECliente',
-                        'wIntExt','wProceso','wCajas','wLinea','wLineas'];
+                        'wProcFinal','wIntExt','wProceso','wCajas','wLinea','wLineas'];
 
 function modoReproceso(activo){
   if(activo){
@@ -1735,6 +1777,7 @@ function cargarEnvioEnForm(e){
   pintarDers();
   $('servicio').value=e.servicio||''; $('intExt').value=e.intExt||'INTERNO';
   $('proceso').value=e.proceso||'COSTURA'; $('nivelAql').value=e.nivelAql||'1.5';
+  reflejarProcesoFinal();
   $('resultado').value=e.resultado||''; $('licencia').checked=e.licencia==='1';
   $('reproceso').checked=e.reproceso==='1';
   try{ $('destino').value=(JSON.parse(e.destinos)[0]||{}).codigo||''; }catch(err){}
@@ -2810,7 +2853,22 @@ autocompletar('linea','dLinea', function(){
   return (CAT.lineas||[]).map(function(l){ return {texto:l[0]}; });
 });
 autocompletar('servicio','dServicio', function(){
-  return (CAT.talleres||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });
+  /* Solo los talleres del proceso elegido. El catálogo trae 35 y mezclarlos es
+     la vía más fácil para escribir un taller de costura en una auditoría de
+     acabados: en el Sheet no da error y nadie lo nota. Cada entrada viene como
+     [NOMBRE, PROCESO]. */
+  var lista = (CAT.talleres||[]);
+  var t = $('tipo') ? $('tipo').value : '';
+  if(t==='FINAL'){
+    var quiere = U($('proceso') ? $('proceso').value : '');   /* COSTURA | ACABADOS */
+    if(quiere){
+      var filtrada = lista.filter(function(x){ return U(x[1]).indexOf(quiere)>=0; });
+      /* Si el catálogo no marca proceso en ninguno, se muestran todos antes que
+         dejar la lista vacía y bloquear a quien digita. */
+      if(filtrada.length) lista = filtrada;
+    }
+  }
+  return lista.map(function(x){ return {texto:x[0], tag:x[1]}; });
 });
 autocompletar('destino','dDestino', function(){
   return (CAT.destinos||[]).map(function(x){ return {texto:x[0], tag:x[1]}; });

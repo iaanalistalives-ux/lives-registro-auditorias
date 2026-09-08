@@ -3,9 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Actualizar órdenes de producción · LIVES</title>
+<title>Actualizar órdenes de producción · Base de Datos · LIVES</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embebido');</script>
 <style>
+  html.embebido .header{display:none!important;}
+  html.embebido body{background:transparent;}
+  html.embebido .wrap{padding-top:0;}
   :root{--petrol:#0E3B36;--emer:#10B981;--sage:#0F7A5A;--sage2:#0B815E;--slate:#4E6B78;
         --rose:#DC2626;--tan:#F59E0B;--warm:#DCE5E2;--wl:#F1F6F4;--stone:#5F726C;}
   *{box-sizing:border-box;}
@@ -72,14 +76,18 @@
   <div class="aviso">
     <b>Esta tabla se reemplaza entera cada vez.</b> No se acumula: lo que subas pasa a ser
     la única lista de órdenes de producción. Es una foto del sistema, no un histórico.
-    Las auditorías ya guardadas no se tocan.
+    Las auditorías ya guardadas no se tocan. Destino: Sheet <b>Base de Datos</b>, pestaña
+    <b>OPS</b>. Si la carga se corta a la mitad, OPS queda como estaba: el reemplazo ocurre
+    recién al final, cuando el conteo cuadra.
   </div>
 
   <div class="card">
     <h2>1 · Elige el archivo</h2>
     <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
       COLOR · OP · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
-      por nombre.</div>
+      por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
+      (<i>Cod_GrupoPro, Est_Prop, des_present, cod_tela, desc_tela, cod_destino,
+      Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.</div>
 
     <div class="drop" id="zona">
       <div class="ic">📄</div>
@@ -120,10 +128,13 @@
 </div>
 
 <script>
-var API   = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
+/* Apps Script del Sheet "Base de Datos" (pestaña OPS). Si algún día se publica
+   una versión nueva del script, esta dirección cambia y hay que actualizarla. */
+var API   = 'https://script.google.com/macros/s/AKfycbyuw2qdB-8HVy60G04LxDfD3WSy7OkjNYIvxti2kFm7JMz0sOYVuobClHLWu49gRU9bcg/exec';
 var CLAVE = 'livessac';
 /* 15 filas por envío. Con 40 la dirección llegaba a 14 000 caracteres y el
-   navegador la cortaba: la carga moría a mitad sin motivo aparente. */
+   navegador la cortaba: la carga moría a mitad sin motivo aparente.
+   Con 15, incluyendo ya la descripción de tela, el peor trozo mide ~5 000. */
 var TROZO = 15;
 
 var FILAS = [];
@@ -159,12 +170,21 @@ function norm(s){
     .replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N')
     .replace(/[^A-Z0-9]/g,'');
 }
+/* Alias reales del export del sistema (hoja V5: Cod_GrupoPro, Est_Prop,
+   des_present, cod_tela, desc_tela, cod_destino, Estilo_Cliente, Requeridas).
+   Así el archivo se sube tal como sale del sistema, sin renombrar cabeceras
+   a mano. El primer nombre de cada lista es el que se muestra si falta. */
 var COLS = {
-  op:['OP'], grupo:['GRUPO'], estilo:['ESTILOPROPIO','ESTILO'],
-  color:['COLOR'], po:['PO'], codTela:['CODIGOTELA','CODTELA'],
-  descTela:['DESCRIPCIONTELA','DESCTELA','TELA'],
-  destino:['DESTINO'], pedido:['PEDIDO','CANTIDAD'],
-  eCliente:['ESTILOCLIENTE','ECLIENTE']
+  op:['OP','NUMOP','NROOP','CODOP','ORDENDEPRODUCCION','ORDENPRODUCCION'],
+  grupo:['GRUPO','CODGRUPOPRO','CODGRUPOPROD','CODGRUPO','GRUPOPRO','GRUPOPROD'],
+  estilo:['ESTILOPROPIO','ESTPROP','ESTILOPROP','ESTPROPIO','ESTILO'],
+  color:['COLOR','DESPRESENT','DESPRESENTACION','PRESENTACION','DESCOLOR','COLORES'],
+  po:['PO','NUMPO','NROPO','CODPO'],
+  codTela:['CODIGOTELA','CODTELA','CODIGODETELA','CODMATERIAL'],
+  descTela:['DESCRIPCIONTELA','DESCTELA','DESCRIPCIONDETELA','DESTELA','TELA'],
+  destino:['DESTINO','CODDESTINO','CODIGODESTINO','DESTINOFINAL'],
+  pedido:['PEDIDO','REQUERIDAS','REQUERIDA','CANTREQUERIDA','CANTIDADREQUERIDA','CANTIDAD','CANT'],
+  eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI']
 };
 
 function leerArchivo(file){
@@ -257,13 +277,9 @@ function subir(){
   $('barra').className='barra on';
   $('msgSube').className='hint'; $('msgSube').textContent='Preparando…';
 
-  /* Las descripciones de tela van una sola vez, no en cada fila: 69 distintas
-     para más de mil filas. */
-  var telas={};
-  FILAS.forEach(function(f){ if(f.codTela && !telas[f.codTela]) telas[f.codTela]=f.descTela; });
-
-  jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value),
-         telas:JSON.stringify(telas)},
+  /* La descripción de tela ahora viaja en cada fila porque la pestaña OPS tiene
+     su propia columna DESC_TELA. Se dejó de mandar el diccionario aparte. */
+  jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value)},
     function(r){
       if(!r||!r.ok){ falla((r&&r.error)||'no se pudo empezar'); return; }
       mandarTrozo(0);
@@ -291,9 +307,10 @@ function mandarTrozo(desde, intento){
       }, function(m){ falla(m); });
     return;
   }
-  /* Se mandan como arreglos, no como objetos: ocupa un tercio del espacio. */
+  /* Se mandan como arreglos, no como objetos: ocupa un tercio del espacio.
+     ESTE ORDEN debe coincidir con ORDEN_ENVIO del Apps Script. */
   var parte=FILAS.slice(desde, desde+TROZO).map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.destino,f.pedido,f.eCliente];
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente];
   });
   jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte),
          idx:Math.floor(desde/TROZO), tam:TROZO},

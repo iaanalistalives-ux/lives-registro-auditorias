@@ -456,6 +456,16 @@
             <option value="RECHAZADO">RECHAZADO</option>
           </select>
         </div>
+        <!-- Autorización para pasar por aprobado un lote que el AQL rechaza. Es el
+             mismo mecanismo que tiene la auditora en planta: no se puede cambiar el
+             veredicto en silencio, queda quién lo autorizó y por qué. -->
+        <div class="f" id="wOverride" style="display:none;flex-basis:100%">
+          <label for="ovWho">Autorizado por</label>
+          <input type="text" id="ovWho" autocomplete="off" placeholder="Quién autorizó pasarlo">
+          <label for="ovWhy" style="margin-top:6px">Motivo</label>
+          <input type="text" id="ovWhy" autocomplete="off" placeholder="Por qué se aprueba pese al AQL">
+          <div class="hint err" id="hOverride">El AQL rechaza este lote. Para dejarlo aprobado hace falta quién lo autorizó y el motivo.</div>
+        </div>
         <div class="f sm" id="wNivelAql" style="display:none">
           <label for="nivelAql">Nivel AQL</label>
           <select id="nivelAql">
@@ -833,6 +843,12 @@ function afinarCamposFinal(){
   if(wa) wa.style.display = (!externo && acabados) ? '' : 'none';
   if(externo || !acabados){ if($('audTaller')) $('audTaller').value=''; }
 }
+['lote','licencia','nivelAql'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('change', sugerirMuestra);
+});
+['muestra','resultado'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('change', veredicto);
+});
 ['intExt','proceso','procFinal'].forEach(function(id){
   var e=$(id); if(e) e.addEventListener('change', afinarCamposFinal);
 });
@@ -1408,6 +1424,58 @@ function aqlFor(lote,niv){
   return null;
 }
 
+/* Sugiere la muestra a partir del lote, con la misma tabla AQL que usa la auditora
+   en planta. Así el papel y lo capturado en vivo se miden igual.
+
+   Solo sugiere cuando el campo está VACÍO: si el papel trae otra cantidad, manda el
+   papel y no se pisa lo que ella escribió. */
+function sugerirMuestra(){
+  if($('tipo').value!=='FINAL') return;
+  var lote=N($('lote').value);
+  if(lote<=0) return;
+  var h=$('hMuestra');
+  if($('licencia') && $('licencia').checked){
+    if(!N($('muestra').value)) $('muestra').value=lote;
+    veredicto(); return;
+  }
+  var a=aqlFor(lote, nivelAqlActual());
+  if(!a) return;
+  if(!N($('muestra').value)){
+    $('muestra').value=a.muestra;
+    if(h){ h.className='hint'; h.textContent='Muestra sugerida por AQL para un lote de '+lote+'. Si el papel dice otra, cámbiala.'; }
+  }
+  veredicto();
+}
+
+function nivelAqlActual(){
+  var s=$('nivelAql');
+  var n=s && s.value ? String(s.value) : '1.5';
+  if(n==='1') n='1.0';
+  return n;
+}
+
+/* Lo que dictaría el AQL con la muestra y los defectos que hay ahora. */
+function veredictoAql(){
+  var lote=N($('lote').value), mu=N($('muestra').value), tot=totalDef();
+  if(mu<=0) return null;
+  var a=aqlFor(lote>0?lote:mu, nivelAqlActual());
+  if(!a || a.acepta===undefined) return null;
+  return { res: (tot<=a.acepta ? 'APROBADO' : 'RECHAZADO'), acepta:a.acepta, muestra:a.muestra };
+}
+
+/* Muestra el bloque de autorización solo cuando hace falta: el AQL rechaza y ella
+   marcó APROBADO. En cualquier otro caso se oculta y se limpia, para que no quede
+   una autorización colgada de una auditoría que no la necesita. */
+function afinarOverride(){
+  var w=$('wOverride'); if(!w) return;
+  var t=$('tipo').value;
+  var elegido=U($('resultado').value);
+  var aql=veredictoAql();
+  var hace = (t==='FINAL' && !$('licencia').checked && aql && aql.res==='RECHAZADO' && elegido==='APROBADO');
+  w.style.display = hace ? '' : 'none';
+  if(!hace){ if($('ovWho')) $('ovWho').value=''; if($('ovWhy')) $('ovWhy').value=''; }
+}
+
 function veredicto(){
   var t=$('tipo').value, tot=totalDef(), mu=N($('muestra').value), v=$('ver');
   var h=$('hMuestra');
@@ -1434,16 +1502,30 @@ function veredicto(){
   /* En Final, Empaque y Cliente el resultado viene decidido en el papel: acá
      solo se copia. El sistema no opina para no hacerla dudar. */
   var elegido=U($('resultado').value);
+  /* Qué diría el AQL con estos números. Se muestra como REFERENCIA: el que manda
+     sigue siendo el resultado del papel. Cuando los dos no coinciden se avisa, y si
+     el papel aprueba lo que el AQL rechaza hace falta autorización. */
+  var aql = (t==='FINAL' && !$('licencia').checked) ? veredictoAql() : null;
+  var refAql = aql ? ('AQL: ' + aql.res + ' · acepta hasta ' + aql.acepta +
+                      ' defectuosa(s) en una muestra de ' + aql.muestra + '. ') : '';
+
   if(elegido){
+    var choca = aql && aql.res!==elegido;
     v.className='ver '+(elegido==='RECHAZADO'?'no':'ok');
-    v.innerHTML=elegido+'<span class="exp">Es el resultado que marcaste, tal como figura '+
-      'en el papel'+(mu>0?(' · '+tot+' defectuosa(s) sobre '+mu+' revisadas'):'')+'.</span>';
+    v.innerHTML=elegido+'<span class="exp">'+
+      (choca ? ('⚠ No coincide con el AQL. ' + refAql +
+                (elegido==='APROBADO' ? 'Para dejarlo aprobado, completa quién lo autorizó y el motivo.'
+                                      : 'Se guarda el resultado del papel.') + ' ')
+             : refAql)+
+      'Es el resultado que marcaste, tal como figura en el papel'+
+      (mu>0?(' · '+tot+' defectuosa(s) sobre '+mu+' revisadas'):'')+'.</span>';
   } else {
     v.className='ver ok';
-    v.innerHTML='Copia el resultado del papel<span class="exp">'+
+    v.innerHTML='Copia el resultado del papel<span class="exp">'+refAql+
       (mu>0?('Hay '+tot+' defectuosa(s) sobre '+mu+' revisadas ('+(tot/mu*100).toFixed(1)+'%). '):'')+
       'Elige abajo APROBADO o RECHAZADO tal como figura en la hoja.</span>';
   }
+  afinarOverride();
 }
 
 /* ---------------- varias auditoras ----------------
@@ -1634,6 +1716,13 @@ function validar(){
     return 'Falta elegir el resultado.';
   if(t==='FINAL' && !T($('servicio').value) && U($('intExt').value)==='EXTERNO')
     return 'Falta el taller.';
+  /* Si el papel aprueba un lote que el AQL rechaza, tiene que decir quién lo
+     autorizó: esos documentos llegan firmados. Sin esto, un lote que debía salir
+     rechazado queda aprobado y no hay forma de saber quién lo decidió. */
+  if($('wOverride') && $('wOverride').style.display!=='none'){
+    if(!T($('ovWho').value)) return 'El AQL rechaza este lote: falta quién autorizó aprobarlo.';
+    if(!T($('ovWhy').value)) return 'El AQL rechaza este lote: falta el motivo de la autorización.';
+  }
   /* La OP es obligatoria solo si el papel es del mes corriente: esas OP están en
      la tabla. Las de meses anteriores ya se despacharon y no están, así que
      exigirlas impediría digitar los papeles atrasados. Así la regla deja de
@@ -1697,7 +1786,12 @@ function guardar(){
     eCliente: U($('eCliente').value),
     intExt: U($('intExt').value),
     proceso: U($('proceso').value),
-    nivelAql: '1.5',          // fijo: el mismo del sistema del piloto
+    nivelAql: nivelAqlActual(),   /* el que esté elegido; 1.5 por defecto */
+    /* Autorización para aprobar lo que el AQL rechaza. Igual que en planta:
+       queda registrado quién lo autorizó y por qué. */
+    override:          $('wOverride') && $('wOverride').style.display!=='none' ? 'SÍ' : 'NO',
+    overrideAutoriza:  $('ovWho') ? $('ovWho').value.trim() : '',
+    overrideMotivo:    $('ovWhy') ? $('ovWhy').value.trim() : '',
     resultado: resultadoActual(),
     licencia: $('licencia').checked ? '1' : '0',
     esReauditoria: esReaud || 'NO',

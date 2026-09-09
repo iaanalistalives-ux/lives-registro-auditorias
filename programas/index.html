@@ -206,7 +206,7 @@ var ORDEN = {col:null, asc:true};
 
 /* ---------- utilidades ---------- */
 function isoADMY(v){
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ''));
   return m ? (m[3] + '/' + m[2] + '/' + m[1]) : String(v == null ? '' : v);
 }
 function hoyISO(){
@@ -214,11 +214,11 @@ function hoyISO(){
   return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
 }
 function diasEntre(a, b){
-  var x = /^(\d{4})-(\d{2})-(\d{2})$/.exec(a), y = /^(\d{4})-(\d{2})-(\d{2})$/.exec(b);
+  var x = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(a || '')), y = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(b || ''));
   if(!x || !y) return null;
   return Math.round((Date.UTC(+y[1],+y[2]-1,+y[3]) - Date.UTC(+x[1],+x[2]-1,+x[3])) / 86400000);
 }
-function esFechaISO(v){ return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')); }
+function esFechaISO(v){ return /^\d{4}-\d{2}-\d{2}/.test(String(v || '')); }
 function nfmt(n){
   var x = Number(n);
   return isFinite(x) ? x.toLocaleString('es-PE') : String(n == null ? '' : n);
@@ -345,7 +345,8 @@ function render(){
   } else {
     var d = diasEntre(e.fechaPrograma, hoyISO());
     var anti = (d === null) ? '' : (d === 0 ? 'Es el de hoy.' : (d === 1 ? 'Es el de ayer.' : 'Tiene ' + d + ' días.'));
-    v.classList.add(d === null ? '' : (d > DIAS_ALERTA * 2 ? 'malo' : (d > DIAS_ALERTA ? 'viejo' : 'ok')));
+    var cls = (d === null) ? '' : (d > DIAS_ALERTA * 2 ? 'malo' : (d > DIAS_ALERTA ? 'viejo' : 'ok'));
+    if(cls) v.classList.add(cls);
     var alerta = (d !== null && d > DIAS_ALERTA) ? ' Conviene confirmar con PCP antes de usar estas fechas.' : '';
     document.getElementById('vt').textContent = 'Programa de ' + def.etq + ' del ' + isoADMY(e.fechaPrograma) + '. ' + anti;
     document.getElementById('vd').textContent = 'Subido por ' + (e.usuario || '—') + ' el ' + (e.fechaHora || '—') +

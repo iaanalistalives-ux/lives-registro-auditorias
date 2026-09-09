@@ -81,8 +81,11 @@ padding:12px 16px;margin-top:18px;font-size:13px;}
 details.help summary{cursor:pointer;font-weight:700;color:var(--sage-dark);}
 details.help p{color:var(--stone);margin:8px 0 0;}
 
-.cards{display:none;padding:4px 0 0;}
-.ctarj{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:10px;
+.cards{display:none;padding:2px 0 0;}
+.cards.on{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+gap:12px;align-items:start;}
+.cards .vermas,.cards .vacio{grid-column:1/-1;}
+.ctarj{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:0;
 overflow:hidden;border-left:5px solid var(--sage);}
 .ctarj.aca{border-left-color:var(--taupe);}
 .ct-head{display:flex;align-items:flex-start;gap:10px;padding:12px 14px 8px;}
@@ -119,8 +122,8 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
   border-top:1px solid var(--warm-light);margin-top:2px;padding-top:10px;}
   .fpanel.open{display:flex;}
   .fpanel select,.fpanel input[type=date],.fpanel .btn{width:100%;max-width:100%;}
-  .tblwrap{display:none;}
-  .cards{display:block;}
+  .cards.on{grid-template-columns:1fr;}
+  .segvista{display:none;}
   .card{background:none;box-shadow:none;border-radius:0;}
   .card .tira{display:none;}
   .chip{font-size:11.5px;padding:5px 11px;}
@@ -175,6 +178,10 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
       <button data-q="semana">Esta semana</button>
       <button data-q="prox">Próximos 7 días</button>
     </div>
+    <div class="seg segvista">
+      <button id="vTarj" class="active">Tarjetas</button>
+      <button id="vTabla">Tabla</button>
+    </div>
     <button class="btn fbtn" id="fbtn">Filtros</button>
     <div class="fpanel" id="fpanel">
       <select id="fTaller"><option value="">Todos los talleres</option></select>
@@ -190,7 +197,7 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
 
   <div class="chips" id="chips"></div>
 
-  <div class="card">
+  <div class="card" id="cardTabla">
     <div class="tira" id="tira"></div>
     <div class="tblwrap" id="tblwrap"><div class="vacio">Cargando…</div></div>
   </div>
@@ -288,8 +295,10 @@ var DATA = {COSTURA:null, ACABADO:null};
 var ESTADO = {COSTURA:null, ACABADO:null};
 var TIPO = 'COSTURA';
 var ORDEN = {col:null, asc:true};
-var VISIBLES = PAGINA;
+var VISTA = 'cards';
+var VISIBLES = 30;
 var QUICK = '';
+function porPagina(){ return esMovil() ? 30 : 48; }
 
 /* ---------- utilidades ---------- */
 function isoADMY(v){
@@ -470,7 +479,7 @@ function aplicarQuick(cual){
   QUICK = cual;
   document.getElementById('fDesde').value = d1;
   document.getElementById('fHasta').value = d2;
-  VISIBLES = PAGINA;
+  VISIBLES = porPagina();
   render();
 }
 
@@ -524,7 +533,10 @@ function render(){
     '<span class="chip">' + (TIPO === 'COSTURA' ? 'Talleres' : 'Proveedores') + ' <b>' + nfmt(Object.keys(tall).length) + '</b></span>' +
     '<span class="chip">Unidades <b>' + nfmt(und) + '</b></span>';
 
-  if(esMovil()) pintarCards(filas); else pintarTabla(filas);
+  var comoCards = esMovil() || VISTA === 'cards';
+  document.getElementById('cardTabla').style.display = comoCards ? 'none' : '';
+  document.getElementById('cards').classList.toggle('on', comoCards);
+  if(comoCards) pintarCards(filas); else pintarTabla(filas);
 }
 
 function pintarTabla(filas){
@@ -615,11 +627,12 @@ function pintarCards(filas){
     h += '</div></details></div>';
   });
   if(filas.length > VISIBLES){
-    h += '<button class="btn vermas" id="btnMas">Ver 30 más (' + nfmt(filas.length - VISIBLES) + ' restantes)</button>';
+    h += '<button class="btn vermas" id="btnMas">Ver ' + porPagina() + ' más (' +
+         nfmt(filas.length - VISIBLES) + ' restantes)</button>';
   }
   cont.innerHTML = h;
   var bm = document.getElementById('btnMas');
-  if(bm) bm.addEventListener('click', function(){ VISIBLES += PAGINA; render(); });
+  if(bm) bm.addEventListener('click', function(){ VISIBLES += porPagina(); render(); });
 }
 
 /* ---------- descarga ---------- */
@@ -646,7 +659,7 @@ function cambiarTipo(t){
   if(TIPO === t) return;
   TIPO = t;
   ORDEN = {col:null, asc:true};
-  VISIBLES = PAGINA;
+  VISIBLES = porPagina();
   document.getElementById('tabCOSTURA').classList.toggle('active', t === 'COSTURA');
   document.getElementById('tabACABADO').classList.toggle('active', t === 'ACABADO');
   document.getElementById('fTaller').value = '';
@@ -660,7 +673,7 @@ document.getElementById('tabACABADO').addEventListener('click', function(){ camb
   var el = document.getElementById(id);
   function h(){
     if(id === 'fDesde' || id === 'fHasta') QUICK = '';
-    VISIBLES = PAGINA;
+    VISIBLES = porPagina();
     render();
   }
   el.addEventListener('input', h);
@@ -669,13 +682,23 @@ document.getElementById('tabACABADO').addEventListener('click', function(){ camb
 Array.prototype.forEach.call(document.querySelectorAll('.quick button'), function(b){
   b.addEventListener('click', function(){ aplicarQuick(b.getAttribute('data-q')); });
 });
+function cambiarVista(v){
+  if(VISTA === v) return;
+  VISTA = v;
+  VISIBLES = porPagina();
+  document.getElementById('vTarj').classList.toggle('active', v === 'cards');
+  document.getElementById('vTabla').classList.toggle('active', v === 'tabla');
+  if(DATA[TIPO]) render();
+}
+document.getElementById('vTarj').addEventListener('click', function(){ cambiarVista('cards'); });
+document.getElementById('vTabla').addEventListener('click', function(){ cambiarVista('tabla'); });
 document.getElementById('fbtn').addEventListener('click', function(){
   document.getElementById('fpanel').classList.toggle('open');
 });
 document.getElementById('btnLimpiar').addEventListener('click', function(){
   ['q','fTaller','fCliente','fDesde','fHasta'].forEach(function(id){ document.getElementById(id).value = ''; });
   ORDEN = {col:null, asc:true};
-  QUICK = ''; VISIBLES = PAGINA;
+  QUICK = ''; VISIBLES = porPagina();
   render();
 });
 document.getElementById('btnExcel').addEventListener('click', descargar);
@@ -684,7 +707,7 @@ document.getElementById('btnRefresh').addEventListener('click', arrancar);
 var anchoPrev = esMovil();
 window.addEventListener('resize', function(){
   var ahora = esMovil();
-  if(ahora !== anchoPrev){ anchoPrev = ahora; VISIBLES = PAGINA; if(DATA[TIPO]) render(); }
+  if(ahora !== anchoPrev){ anchoPrev = ahora; VISIBLES = porPagina(); if(DATA[TIPO]) render(); }
 });
 
 arrancar();

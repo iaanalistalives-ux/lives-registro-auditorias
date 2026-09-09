@@ -2202,11 +2202,20 @@ function confirmarAnular(motivo){
   m.style.display='none';
   jsonp({accion:'anular', clave:CLAVE, id:idAud, motivo:motivo, usuario:U($('digitador').value)},
     function(r){
-      if(r&&r.ok){ if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; } guardados=Math.max(0,guardados-1); }
+      if(r&&r.ok){
+        if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; guardados=Math.max(0,guardados-1); }
+        /* Si venía de la búsqueda por OP, marcarla ahí también: sin esto la fila
+           sigue viéndose normal y da la impresión de que la anulación no funcionó. */
+        if(ANUL_BQ){ ANUL_BQ.estado='ANULADO'; ANUL_BQ=null; bqPintar(); }
+      }
       else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo anular'; }
+      else if(ANUL_BQ){ $('bqMsg').className='hint err';
+                        $('bqMsg').textContent=(r&&r.error)||'No se pudo anular.'; ANUL_BQ=null; }
       pintarLog();
     }, function(){
       if(it){ it.estado='err'; it.msg='sin conexión al anular'; }
+      else if(ANUL_BQ){ $('bqMsg').className='hint err';
+                        $('bqMsg').textContent='Sin conexión al anular. Vuelve a intentarlo.'; ANUL_BQ=null; }
       pintarLog();
     });
 }
@@ -2701,12 +2710,41 @@ function bqPintar(){
       '<td class="nu">'+(r.muestra||'')+'</td><td class="nu">'+(r.defectuosas||'')+'</td>'+
       '<td class="nu"><span class="hjRes '+(mal?'no':'ok')+'">'+esc(anul?'ANULADA':r.resultado)+'</span></td>'+
       '<td>'+esc(r.auditor)+'</td>'+
-      '<td>'+(anul?'':'<button class="mini" type="button" data-corr="'+i+'">Corregir</button>')+'</td></tr>';
+      /* Además de corregir, se puede ANULAR desde aquí. La lista de la sesión ya lo
+         permitía, pero esta —la de buscar por OP— es la que se usa para revisar lo
+         digitado antes, que es justo donde aparece una auditoría de más: repetida,
+         de otra OP, o cargada por error. Sin esta opción había que corregirla para
+         que dejara de estorbar, y una auditoría corregida sigue contando. */
+      '<td>'+(anul?'':(
+        '<button class="mini" type="button" data-corr="'+i+'">Corregir</button> '+
+        '<button class="mini danger" type="button" data-anu="'+i+'">Anular</button>'
+      ))+'</td></tr>';
   }).join('');
   Array.prototype.forEach.call($('bqBody').querySelectorAll('[data-corr]'),function(b){
     b.onclick=function(){ abrirCorreccion(BQ[+b.dataset.corr]); };
   });
+  Array.prototype.forEach.call($('bqBody').querySelectorAll('[data-anu]'),function(b){
+    b.onclick=function(){ anularDesdeBusqueda(BQ[+b.dataset.anu]); };
+  });
 }
+
+/* Anular una auditoría encontrada por OP.
+
+   No se borra la fila: se marca ANULADA con quién y por qué, y deja de contar en
+   los indicadores. Borrarla dejaría un hueco sin explicación y perdería el rastro
+   de que existió. */
+function anularDesdeBusqueda(r){
+  if(!r || !r.id) return;
+  ANUL_BQ = r;                       /* para refrescar la lista al terminar */
+  var m=$('modalAnular');
+  m.dataset.id=r.id;
+  $('anulLote').textContent=[r.grupo,r.estilo,r.color,r.po,r.fecha].filter(Boolean).join(' · ');
+  $('anulOtro').value='';
+  $('anulErr').textContent='';
+  m.style.display='flex';
+  var b=m.querySelector('.mtBtn'); if(b) b.focus();
+}
+var ANUL_BQ=null;
 
 function bqBuscar(){
   $('bqMsg').className='hint'; $('bqMsg').textContent='Buscando…';

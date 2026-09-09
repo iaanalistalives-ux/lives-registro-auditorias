@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LIVES · Subir programas de Costura y Acabados</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --petrol:#0E3B36; --petrol-2:#12463F; --emer:#10B981; --sage:#0F7A5A; --sage-dark:#0B815E;
+  --slate:#4E6B78; --taupe:#B45309; --rose:#DC2626; --tan:#F59E0B;
+  --warm:#DCE5E2; --warm-light:#F1F6F4; --stone:#5F726C; --card:#fff;
+  --sh:0 1px 3px rgba(14,59,54,.06),0 1px 2px rgba(14,59,54,.04);
+  --sh-h:0 4px 12px rgba(14,59,54,.10); --r:12px;
+}
+body{margin:0;background:var(--warm-light);color:#333;
+font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.45;
+font-variant-numeric:tabular-nums;}
+*{box-sizing:border-box;}
+
+.header{background:var(--petrol);border-bottom:3px solid var(--emer);min-height:70px;
+display:flex;align-items:center;gap:16px;padding:0 22px;flex-wrap:wrap;}
+.header img{height:38px;display:block;}
+.divider{width:1px;height:34px;background:rgba(255,255,255,.3);}
+.htitle{color:#fff;font-size:17px;font-weight:700;letter-spacing:.2px;}
+.hsub{color:#B9CFC9;font-size:11.5px;}
+.hstate{margin-left:auto;color:#B9CFC9;font-size:11.5px;text-align:right;}
+
+.wrap{max-width:100%;margin:0;padding:16px 22px 32px;}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:0;overflow:hidden;margin-bottom:14px;}
+.tira{height:4px;background:var(--warm);}
+.tira.cos{background:var(--sage);} .tira.aca{background:var(--taupe);} .tira.est{background:var(--slate);}
+.cbody{padding:14px 18px 18px;}
+.ct{font-size:14.5px;font-weight:700;color:#333;margin:0 0 2px;}
+.ph{font-size:11.5px;color:var(--stone);margin:0 0 12px;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+.estado{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.ebox{background:var(--warm-light);border-radius:10px;padding:12px 14px;border-left:5px solid var(--warm);}
+.ebox.ok{border-left-color:var(--sage);} .ebox.viejo{border-left-color:var(--tan);}
+.ebox.malo{border-left-color:var(--rose);} 
+.ebox .et{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--stone);font-weight:700;}
+.ebox .ev{font-size:20px;font-weight:700;color:var(--sage);margin:2px 0;}
+.ebox .ed{font-size:12px;color:var(--stone);}
+
+.drop{border:2px dashed var(--warm);border-radius:var(--r);background:var(--card);
+padding:28px 20px;text-align:center;cursor:pointer;transition:.15s;}
+.drop:hover,.drop.over{border-color:var(--sage);background:var(--warm-light);}
+.drop .big{font-size:15.5px;font-weight:700;color:#333;margin-bottom:4px;}
+.drop .sm{font-size:12.5px;color:var(--stone);}
+.drop.listo{border-style:solid;border-color:var(--sage);background:#F3FAF7;}
+
+.fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+label.lab{font-size:12px;font-weight:700;color:var(--stone);}
+input[type=date],input[type=text]{font-family:inherit;font-size:13.5px;font-weight:700;color:var(--sage);
+border:1px solid var(--warm);border-radius:8px;padding:0 12px;height:44px;background:#fff;}
+.btn{font-family:inherit;font-size:13px;font-weight:700;border-radius:8px;padding:0 16px;height:44px;
+cursor:pointer;border:1px solid var(--warm);background:#fff;color:var(--sage);}
+.btn:hover{border-color:var(--sage);}
+.btn.primary{background:var(--sage);color:#fff;border-color:var(--sage);}
+.btn.primary:hover{background:var(--sage-dark);}
+.btn[disabled]{opacity:.45;cursor:not-allowed;}
+.spacer{margin-left:auto;}
+
+.res{margin-top:14px;display:none;}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.chip{background:var(--warm-light);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--stone);}
+.chip b{color:#333;font-size:13px;}
+.avisos{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.av{border-radius:8px;padding:10px 12px;font-size:12.5px;border-left:4px solid var(--slate);background:var(--warm-light);}
+.av.warn{border-left-color:var(--tan);background:#FEF6E7;}
+.av.bad{border-left-color:var(--rose);background:#FBE9E9;color:#8A1C1C;}
+.av.good{border-left-color:var(--sage);background:#EDF7F3;}
+.av b{display:block;margin-bottom:2px;}
+.conf{display:flex;align-items:flex-start;gap:8px;background:#FBE9E9;border-radius:8px;padding:10px 12px;
+font-size:12.5px;margin-bottom:10px;display:none;}
+.conf input{margin-top:2px;width:18px;height:18px;}
+
+.tbl{max-height:260px;overflow:auto;border:1px solid var(--warm);border-radius:8px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);
+border-bottom:1px solid var(--warm);padding:7px 6px;background:var(--card);position:sticky;top:0;white-space:nowrap;}
+td{padding:6px;border-bottom:1px solid var(--warm-light);white-space:nowrap;}
+tr:hover td{background:var(--warm-light);}
+
+details.help{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);
+padding:12px 16px;margin-top:18px;font-size:13px;}
+details.help summary{cursor:pointer;font-weight:700;color:var(--sage-dark);}
+details.help p{color:var(--stone);margin:8px 0 0;}
+.note{border-left:4px solid var(--tan);background:#FEF6E7;border-radius:8px;padding:10px 14px;
+font-size:12.5px;margin-bottom:14px;}
+.hide{display:none;}
+@media(max-width:900px){.grid2,.estado{grid-template-columns:1fr;}.wrap{padding:12px;}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="data:image/png;base64,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" alt="LIVES">
+  <div class="divider"></div>
+  <div>
+    <div class="htitle">SUBIR PROGRAMAS DE COSTURA Y ACABADOS</div>
+    <div class="hsub">Lo que se publique aquí es lo que ven las auditoras de calidad</div>
+  </div>
+  <div class="hstate" id="hstate">—</div>
+</div>
+
+<div class="wrap">
+
+  <div class="note hide" id="notaPrueba">
+    <b>Modo prueba.</b> No hay dirección del servidor configurada (<code>APP_URL</code> vacío):
+    el archivo se lee y se valida, pero <b>no se guarda nada</b>. Se avisa en pantalla en cada paso.
+  </div>
+
+  <!-- ESTADO ACTUAL -->
+  <div class="card">
+    <div class="tira est"></div>
+    <div class="cbody">
+      <p class="ct">Lo que las auditoras están viendo ahora</p>
+      <p class="ph">Cada carga reemplaza el programa vigente y guarda el anterior. Se registra quién lo subió y cuándo.</p>
+      <div class="estado" id="estado">
+        <div class="ebox"><div class="et">Costura</div><div class="ev">—</div><div class="ed">Cargando…</div></div>
+        <div class="ebox"><div class="et">Acabados</div><div class="ev">—</div><div class="ed">Cargando…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIEN SUBE -->
+  <div class="card">
+    <div class="tira"></div>
+    <div class="cbody">
+      <p class="ct">¿Quién está subiendo?</p>
+      <p class="ph">Este nombre queda firmado en cada carga y lo ven las auditoras.</p>
+      <div class="fila">
+        <label class="lab" for="usuario">Nombre</label>
+        <input type="text" id="usuario" placeholder="Nombre y apellido" style="min-width:280px">
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+
+    <!-- COSTURA -->
+    <div class="card">
+      <div class="tira cos"></div>
+      <div class="cbody">
+        <p class="ct">Programa de Costura</p>
+        <p class="ph">Archivo <b>PROGRAMA DE COSTURA … .xlsm</b> — se lee solo la pestaña <b>DESTINO</b>.</p>
+        <div class="drop" id="dropCOSTURA">
+          <div class="big">Arrastra el archivo aquí</div>
+          <div class="sm">o haz clic para buscarlo · .xlsm o .xlsx</div>
+        </div>
+        <input type="file" id="fileCOSTURA" accept=".xlsm,.xlsx,.xls" class="hide">
+        <div class="fila">
+          <label class="lab" for="fpCOSTURA">Fecha del programa</label>
+          <input type="date" id="fpCOSTURA">
+        </div>
+        <div class="res" id="resCOSTURA"></div>
+      </div>
+    </div>
+
+    <!-- ACABADOS -->
+    <div class="card">
+      <div class="tira aca"></div>
+      <div class="cbody">
+        <p class="ct">Programa de Acabados</p>
+        <p class="ph">Archivo <b>PROGRAMA DE ACABADO … .xlsx</b> — se lee solo la pestaña <b>SERVICIOS</b>.</p>
+        <div class="drop" id="dropACABADO">
+          <div class="big">Arrastra el archivo aquí</div>
+          <div class="sm">o haz clic para buscarlo · .xlsx o .xlsm</div>
+        </div>
+        <input type="file" id="fileACABADO" accept=".xlsm,.xlsx,.xls" class="hide">
+        <div class="fila">
+          <label class="lab" for="fpACABADO">Fecha del programa</label>
+          <input type="date" id="fpACABADO">
+        </div>
+        <div class="res" id="resACABADO"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <details class="help">
+    <summary>¿Qué hace exactamente esta pantalla?</summary>
+    <p><b>Lee solo una pestaña de cada archivo.</b> De Costura toma <b>DESTINO</b>; de Acabados toma
+    <b>SERVICIOS</b>. El resto de pestañas del Excel se ignora por completo.</p>
+    <p><b>Convierte el nombre del taller en columna.</b> En el Excel el taller aparece como título de
+    bloque (por ejemplo "ANABELLE TELLO (AMBELL)") y la razón social va en la fila
+    ("4437 AMBELL EXPORT E.I.R.L"). Aquí se guardan las dos: <b>TALLER</b> es la razón social de la fila
+    y <b>RESPONSABLE</b> es el título del bloque. Así las auditoras pueden filtrar por cualquiera de las dos.</p>
+    <p><b>Deriva el cliente</b> del prefijo del grupo (THY → THEORY, EFI → EILEEN FISHER, PAK → PAKA,
+    VIN → VINCE). Si el prefijo no está en esa lista se guarda el prefijo tal cual, sin inventar nombre.</p>
+    <p><b>Las fechas se guardan como AAAA-MM-DD.</b> Las celdas que traen texto en vez de fecha
+    (por ejemplo "ok" en la columna INICIO) se guardan como ese texto. Las celdas con error de fórmula
+    (#VALUE!, #REF!) se guardan vacías y se avisa cuántas eran.</p>
+    <p><b>Reemplaza, no acumula.</b> Un programa es una foto de la semana: al publicar, el programa
+    vigente pasa a la hoja _ANT y el nuevo ocupa su lugar. Nunca se pierde la versión anterior.</p>
+    <p><b>Avisa antes de publicar</b> si el archivo trae menos filas que el programa vigente, si la fecha
+    del programa es anterior a la publicada, o si hay OP que no existen en la base de OPs. En esos casos
+    hay que marcar la casilla de confirmación para poder continuar.</p>
+    <p><b>Lo que no hace:</b> no corrige fechas, no completa datos faltantes y no toca el Excel original.
+    Si el programa está mal en el Excel, se publica mal: la fuente de verdad sigue siendo el archivo de PCP.</p>
+  </details>
+
+</div>
+
+<script>
+/* ================= CONFIGURACION ================= */
+var APP_URL = 'https://script.google.com/macros/s/AKfycbysmAxeZUtMCf13Jv7VZVU7AC-9Ut28yABhLcKbRizSKPO4i2JRsdcAmZLKvlzBE1dJ/exec'; /* URL /exec del Apps Script. Vacio = modo prueba */
+var DIAS_ALERTA = 3;   /* a partir de cuantos dias el programa se marca como viejo */
+
+/* ================= MAPEO DE COLUMNAS ================= */
+var DEF = {
+  COSTURA: {
+    hoja: 'DESTINO',
+    campos: [
+      ['TALLER','DESTINO',1,'txt'],
+      ['GRUPO','GRUPO',1,'txt'],
+      ['ESTILO','ESTILO',1,'txt'],
+      ['OP','OP',1,'txt'],
+      ['COLOR','COLOR',1,'txt'],
+      ['REQ','REQ',1,'num'],
+      ['INICIO_CORTE','INICIO',1,'fec'],
+      ['FIN_CORTE','FIN',1,'fec'],
+      ['CUOT_DIA','CUOT/DIA',1,'num'],
+      ['SAL1_INI','INIC SALIDA COSTURA',1,'fec'],
+      ['SAL1_FIN','FIN SALIDA COSTURA',1,'fec'],
+      ['SAL2_INI','INIC SALIDA COSTURA',2,'fec'],
+      ['SAL2_FIN','FIN SALIDA COSTURA',2,'fec'],
+      ['AVIOS','AVIOS',1,'txt'],
+      ['HILOS','HILOS',1,'txt'],
+      ['ETIQ','ETIQ',1,'txt']
+    ],
+    colTaller: 'TALLER',
+    orden: ['RESPONSABLE','TALLER','SERVICIO','CLIENTE','GRUPO','ESTILO','OP','COLOR','REQ',
+            'INICIO_CORTE','FIN_CORTE','CUOT_DIA','SAL1_INI','SAL1_FIN','SAL2_INI','SAL2_FIN',
+            'AVIOS','HILOS','ETIQ'],
+    prev: ['RESPONSABLE','TALLER','SERVICIO','CLIENTE','GRUPO','ESTILO','OP','COLOR','REQ','INICIO_CORTE','SAL2_INI','SAL2_FIN','AVIOS']
+  },
+  ACABADO: {
+    hoja: 'SERVICIOS',
+    campos: [
+      ['FECHA_DESPACHO','FECHA DESPACHO',1,'fec'],
+      ['PROVEEDOR','PROVEEDOR',1,'txt'],
+      ['GRUPO','GRUPO',1,'txt'],
+      ['ESTILO','ESTILO',1,'txt'],
+      ['OP','OP',1,'txt'],
+      ['PO','PO',1,'txt'],
+      ['COLOR','COLOR',1,'txt'],
+      ['DESTINO','DESTINO',1,'txt'],
+      ['REQ','REQ',1,'num'],
+      ['AVIOS','AVIOS',1,'txt'],
+      ['INI_ABAST','INICIO DE ABAST',1,'fec'],
+      ['FIN_ABAST','FIN DE ABAST',1,'fec'],
+      ['CUOT_DIA','CUOT/DIA',1,'num'],
+      ['INI_SALIDA','INICIO DE SALIDA',1,'fec'],
+      ['FIN_SALIDA','FIN DE SALIDA',1,'fec'],
+      ['OBSERVACION','OBSERVACION',1,'txt'],
+      ['AVIOS_PEND','AVIOS PENDIENTES',1,'txt']
+    ],
+    colTaller: 'PROVEEDOR',
+    orden: ['PROVEEDOR','RESPONSABLE','CLIENTE','FECHA_DESPACHO','GRUPO','ESTILO','OP','PO',
+            'COLOR','DESTINO','REQ','AVIOS','INI_ABAST','FIN_ABAST','CUOT_DIA',
+            'INI_SALIDA','FIN_SALIDA','OBSERVACION','AVIOS_PEND'],
+    prev: ['RESPONSABLE','PROVEEDOR','CLIENTE','FECHA_DESPACHO','GRUPO','ESTILO','OP','PO','COLOR','DESTINO','REQ','AVIOS','FIN_SALIDA']
+  }
+};
+
+var CLIENTES = {THY:'THEORY', EFI:'EILEEN FISHER', PAK:'PAKA', VIN:'VINCE',
+                QMA:'QUIMA', PEC:'PERUVIAN', HEL:'HELMUT LANG'};
+
+var MAY = {TALLER:1, PROVEEDOR:1, GRUPO:1, COLOR:1, DESTINO:1, OP:1, PO:1, ESTILO:1};
+
+/* ================= UTILIDADES ================= */
+
+function norm(s){
+  var t = String(s == null ? '' : s).replace(/\u00A0/g,' ');
+  if(t.normalize) t = t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return t.toUpperCase().replace(/[.:]/g,'').replace(/\s+/g,' ').trim();
+}
+function limpia(s){
+  return String(s == null ? '' : s).replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim();
+}
+
+/* Serial de Excel -> 'AAAA-MM-DD' sin usar objetos Date (evita el corrimiento por zona horaria) */
+function serialAISO(n){
+  if(typeof n !== 'number' || !isFinite(n)) return '';
+  var dias = Math.floor(n);
+  if(dias < 1000 || dias > 80000) return '';       /* fuera de rango razonable: no es fecha */
+  var z = dias - 25569 + 719468;                    /* dias desde el año civil 0000-03-01 */
+  var era = Math.floor(z / 146097);
+  var doe = z - era * 146097;
+  var yoe = Math.floor((doe - Math.floor(doe/1460) + Math.floor(doe/36524) - Math.floor(doe/146096)) / 365);
+  var y = yoe + era * 400;
+  var doy = doe - (365*yoe + Math.floor(yoe/4) - Math.floor(yoe/100));
+  var mp = Math.floor((5*doy + 2) / 153);
+  var d = doy - Math.floor((153*mp + 2)/5) + 1;
+  var m = mp + (mp < 10 ? 3 : -9);
+  if(m <= 2) y += 1;
+  return y + '-' + (m<10?'0':'') + m + '-' + (d<10?'0':'') + d;
+}
+function isoADMY(iso){
+  if(!iso) return '';
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : String(iso);
+}
+function hoyISO(){
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function diasEntre(isoA, isoB){
+  var a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoA), b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoB);
+  if(!a || !b) return null;
+  var da = Date.UTC(+a[1], +a[2]-1, +a[3]), db = Date.UTC(+b[1], +b[2]-1, +b[3]);
+  return Math.round((db - da) / 86400000);
+}
+
+/* ================= LECTURA DEL EXCEL ================= */
+
+function celda(ws, r, c){
+  var addr = XLSX.utils.encode_cell({r:r, c:c});
+  return ws[addr];
+}
+
+function leerPrograma(wb, tipo){
+  var def = DEF[tipo];
+  var ws = wb.Sheets[def.hoja];
+  if(!ws) throw new Error('El archivo no tiene la pestaña "' + def.hoja + '". Revisa que sea el programa de ' +
+                          (tipo === 'COSTURA' ? 'costura' : 'acabados') + '.');
+  var rng = XLSX.utils.decode_range(ws['!ref']);
+
+  /* 1) fila de encabezados: la primera de las 12 primeras que tenga OP y GRUPO */
+  var filaEnc = -1;
+  for(var r = rng.s.r; r <= Math.min(rng.s.r + 12, rng.e.r); r++){
+    var tieneOP = false, tieneGR = false;
+    for(var c = rng.s.c; c <= rng.e.c; c++){
+      var cel = celda(ws, r, c);
+      if(!cel) continue;
+      var t = norm(cel.v);
+      if(t === 'OP') tieneOP = true;
+      if(t === 'GRUPO') tieneGR = true;
+    }
+    if(tieneOP && tieneGR){ filaEnc = r; break; }
+  }
+  if(filaEnc < 0) throw new Error('No se encontró la fila de encabezados (se busca una fila con "OP" y "GRUPO") en la pestaña ' + def.hoja + '.');
+
+  /* 2) indice de columnas, respetando encabezados repetidos por orden de aparicion */
+  var vistos = {}, idx = {};
+  for(var c2 = rng.s.c; c2 <= rng.e.c; c2++){
+    var ce = celda(ws, filaEnc, c2);
+    if(!ce || ce.v == null || ce.v === '') continue;
+    var k = norm(ce.v);
+    vistos[k] = (vistos[k] || 0) + 1;
+    idx[k + '#' + vistos[k]] = c2;
+  }
+  var mapa = {}, faltan = [];
+  for(var i = 0; i < def.campos.length; i++){
+    var cp = def.campos[i], clave = cp[1] + '#' + cp[2];
+    if(idx[clave] === undefined) faltan.push(cp[1] + (cp[2] > 1 ? ' (2da vez)' : ''));
+    else mapa[cp[0]] = {col: idx[clave], tipo: cp[3]};
+  }
+  if(faltan.length) throw new Error('En la pestaña ' + def.hoja + ' faltan estas columnas: ' + faltan.join(', ') +
+                                    '. Si PCP cambió el encabezado hay que avisarlo antes de publicar.');
+
+  /* 3) recorrer filas */
+  var filas = [], responsable = '', errores = 0, sinResponsable = 0;
+  var colOP = mapa.OP.col, colTaller = mapa[def.colTaller].col;
+  var fechaArchivo = '';
+
+  /* fecha suelta en las filas de titulo (referencia, no se usa sin confirmar) */
+  for(var rr = rng.s.r; rr < filaEnc; rr++){
+    for(var cc = rng.s.c; cc <= rng.e.c; cc++){
+      var cx = celda(ws, rr, cc);
+      if(cx && cx.t === 'n' && !fechaArchivo){
+        var f = serialAISO(cx.v);
+        if(f) fechaArchivo = f;
+      }
+    }
+  }
+
+  for(var r3 = filaEnc + 1; r3 <= rng.e.r; r3++){
+    var celOP = celda(ws, r3, colOP);
+    var op = celOP && celOP.v != null ? limpia(celOP.v) : '';
+
+    if(!op){
+      /* posible fila de titulo: primer texto de la fila */
+      var titulo = '';
+      for(var c4 = rng.s.c; c4 <= rng.e.c; c4++){
+        var cel4 = celda(ws, r3, c4);
+        if(cel4 && cel4.t === 's' && limpia(cel4.v).length > 2){ titulo = limpia(cel4.v); break; }
+      }
+      if(titulo) responsable = titulo.toUpperCase();
+      continue;
+    }
+
+    var fila = {};
+    for(var campo in mapa){
+      var m = mapa[campo], cel5 = celda(ws, r3, m.col), val = '';
+      if(cel5){
+        if(cel5.t === 'e'){ errores++; val = ''; }
+        else if(m.tipo === 'fec'){
+          if(cel5.t === 'n') val = serialAISO(cel5.v);
+          else val = limpia(cel5.v);
+        }
+        else if(m.tipo === 'num'){
+          val = (cel5.t === 'n') ? Math.round(cel5.v * 100) / 100 : limpia(cel5.v);
+        }
+        else val = limpia(cel5.v);
+      }
+      if(typeof val === 'string' && MAY[campo]) val = val.toUpperCase();
+      fila[campo] = val;
+    }
+    /* La columna DESTINO trae "4164 QUISPE CHILON CLEVER": el numero es el servicio,
+       el resto es el taller. Separarlos deja un filtro por taller usable. */
+    if(tipo === 'COSTURA'){
+      var td = String(fila.TALLER || '');
+      var mt = /^(\d{3,6})\s*[-\u2013]?\s*(.+)$/.exec(td);
+      if(mt){ fila.SERVICIO = mt[1]; fila.TALLER = mt[2].trim(); }
+      else { fila.SERVICIO = ''; }
+    }
+    fila.RESPONSABLE = responsable;
+    if(!responsable) sinResponsable++;
+
+    var g = String(fila.GRUPO || ''), pref = g.split('-')[0].trim();
+    fila.CLIENTE = CLIENTES[pref] || pref;
+
+    /* fila sin taller: se hereda del titulo para no perderla */
+    if(!fila[def.colTaller]) fila[def.colTaller] = responsable;
+
+    filas.push(fila);
+  }
+
+  return {
+    tipo: tipo, filas: filas, errores: errores, sinResponsable: sinResponsable,
+    fechaArchivo: fechaArchivo, hoja: def.hoja
+  };
+}
+
+/* ================= COMUNICACION ================= */
+
+function llamar(payload){
+  if(!APP_URL){
+    return new Promise(function(res){
+      setTimeout(function(){
+        if(payload.accion === 'estado') res({ok:true, estado:{COSTURA:null, ACABADO:null}, prueba:true});
+        else if(payload.accion === 'validar') res({ok:true, filasActuales:0, maestro:{disponible:false, faltantes:[], revisadas:0}, prueba:true});
+        else res({ok:true, filas:(payload.filas||[]).length, filasAntes:0, prueba:true});
+      }, 300);
+    });
+  }
+  return fetch(APP_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); });
+}
+
+/* ================= ESTADO EN PANTALLA ================= */
+
+var ESTADO = {COSTURA:null, ACABADO:null};
+
+function pintarEstado(){
+  var cont = document.getElementById('estado');
+  var html = '';
+  [['COSTURA','Costura'],['ACABADO','Acabados']].forEach(function(par){
+    var e = ESTADO[par[0]];
+    if(!e){
+      html += '<div class="ebox"><div class="et">' + par[1] + '</div>' +
+              '<div class="ev">Sin publicar</div>' +
+              '<div class="ed">Todavía no se ha subido ningún programa.</div></div>';
+      return;
+    }
+    var d = diasEntre(e.fechaPrograma, hoyISO());
+    var clase = (d === null) ? '' : (d > DIAS_ALERTA * 2 ? 'malo' : (d > DIAS_ALERTA ? 'viejo' : 'ok'));
+    var anti = (d === null) ? '' : (d === 0 ? 'de hoy' : (d === 1 ? 'de ayer' : 'de hace ' + d + ' días'));
+    html += '<div class="ebox ' + clase + '"><div class="et">' + par[1] + '</div>' +
+            '<div class="ev">' + e.filas + ' filas</div>' +
+            '<div class="ed">Programa del <b>' + isoADMY(e.fechaPrograma) + '</b> ' + anti + '<br>' +
+            'Subido por ' + (e.usuario || '—') + ' el ' + (e.fechaHora || '—') + '</div></div>';
+  });
+  cont.innerHTML = html;
+
+  var partes = [];
+  ['COSTURA','ACABADO'].forEach(function(t){
+    if(ESTADO[t]) partes.push((t === 'COSTURA' ? 'Costura' : 'Acabados') + ': ' + isoADMY(ESTADO[t].fechaPrograma));
+  });
+  document.getElementById('hstate').textContent = partes.length ? partes.join(' · ') : 'Sin programas publicados';
+}
+
+function cargarEstado(){
+  llamar({accion:'estado'}).then(function(r){
+    if(r && r.ok && r.estado) ESTADO = r.estado;
+    pintarEstado();
+  })['catch'](function(){
+    document.getElementById('hstate').textContent = 'No se pudo leer el estado';
+    pintarEstado();
+  });
+}
+
+/* ================= FLUJO POR TIPO ================= */
+
+var LEIDO = {COSTURA:null, ACABADO:null};
+
+function conectar(tipo){
+  var drop = document.getElementById('drop' + tipo);
+  var input = document.getElementById('file' + tipo);
+  drop.addEventListener('click', function(){ input.click(); });
+  drop.addEventListener('dragover', function(ev){ ev.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('over'); });
+  drop.addEventListener('drop', function(ev){
+    ev.preventDefault(); drop.classList.remove('over');
+    if(ev.dataTransfer.files && ev.dataTransfer.files[0]) procesar(tipo, ev.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', function(){
+    if(input.files && input.files[0]) procesar(tipo, input.files[0]);
+  });
+  document.getElementById('fp' + tipo).value = hoyISO();
+}
+
+function procesar(tipo, file){
+  var res = document.getElementById('res' + tipo);
+  var drop = document.getElementById('drop' + tipo);
+  res.style.display = 'block';
+  res.innerHTML = '<div class="av">Leyendo <b>' + file.name + '</b>…</div>';
+
+  var fr = new FileReader();
+  fr.onload = function(ev){
+    var out;
+    try{
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:false});
+      out = leerPrograma(wb, tipo);
+    }catch(err){
+      LEIDO[tipo] = null;
+      drop.classList.remove('listo');
+      res.innerHTML = '<div class="av bad"><b>No se pudo leer el archivo</b>' +
+                      String(err && err.message ? err.message : err) + '</div>';
+      return;
+    }
+    if(!out.filas.length){
+      LEIDO[tipo] = null;
+      res.innerHTML = '<div class="av bad"><b>El archivo no tiene filas con OP</b>' +
+                      'Se leyó la pestaña ' + out.hoja + ' pero no se encontró ninguna fila de programa.</div>';
+      return;
+    }
+    out.archivo = file.name;
+    LEIDO[tipo] = out;
+    drop.classList.add('listo');
+    drop.querySelector('.big').textContent = file.name;
+    drop.querySelector('.sm').textContent = out.filas.length + ' filas leídas · haz clic para cambiar el archivo';
+    /* La fecha del encabezado del Excel solo se usa si es coherente con hoy:
+       en Acabados esa celda arrastra una fecha vieja y prellenaria mal. */
+    var dfa = out.fechaArchivo ? diasEntre(out.fechaArchivo, hoyISO()) : null;
+    if(dfa !== null && dfa >= -15 && dfa <= 15) document.getElementById('fp' + tipo).value = out.fechaArchivo;
+    else if(out.fechaArchivo) out.fechaSospechosa = out.fechaArchivo;
+
+    var ops = [];
+    var vistos = {};
+    out.filas.forEach(function(f){ var o = String(f.OP || ''); if(o && !vistos[o]){ vistos[o] = 1; ops.push(o); } });
+    out.opsDistintas = ops.length;
+
+    res.innerHTML = '<div class="av">Revisando las OP contra la base de datos…</div>';
+    llamar({accion:'validar', tipo:tipo, ops:ops}).then(function(v){
+      out.validacion = v || {};
+      pintarResumen(tipo);
+    })['catch'](function(){
+      out.validacion = {ok:false, filasActuales:null, maestro:{disponible:false, faltantes:[], revisadas:0}};
+      pintarResumen(tipo);
+    });
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+function pintarResumen(tipo){
+  var out = LEIDO[tipo], def = DEF[tipo], res = document.getElementById('res' + tipo);
+  var v = out.validacion || {}, maestro = v.maestro || {disponible:false, faltantes:[]};
+  var fp = document.getElementById('fp' + tipo).value || '';
+  var est = ESTADO[tipo];
+
+  var talleres = {}, responsables = {};
+  out.filas.forEach(function(f){
+    var t = f[def.colTaller]; if(t) talleres[t] = 1;
+    if(f.RESPONSABLE) responsables[f.RESPONSABLE] = 1;
+  });
+
+  var h = '';
+  h += '<div class="chips">' +
+       '<span class="chip">Filas <b>' + out.filas.length + '</b></span>' +
+       '<span class="chip">OP distintas <b>' + out.opsDistintas + '</b></span>' +
+       '<span class="chip">' + (tipo === 'COSTURA' ? 'Talleres' : 'Proveedores') + ' <b>' + Object.keys(talleres).length + '</b></span>' +
+       '<span class="chip">Bloques <b>' + Object.keys(responsables).length + '</b></span>' +
+       (out.errores ? '<span class="chip">Celdas con error <b>' + out.errores + '</b></span>' : '') +
+       '</div>';
+
+  var avisos = [], grave = false;
+
+  if(maestro.disponible){
+    if(maestro.faltantes.length){
+      grave = true;
+      var lista = maestro.faltantes.slice(0, 12).join(', ') + (maestro.faltantes.length > 12 ? ' …' : '');
+      avisos.push(['warn', maestro.faltantes.length + ' OP no existen en la base de OPs',
+        'Se revisaron ' + maestro.revisadas + ' OP distintas. No se encontraron: ' + lista +
+        '. Puede ser una OP nueva que aún no está en la base, o un error de digitación en el programa.']);
+    } else {
+      avisos.push(['good','Todas las OP existen en la base de datos',
+        'Se revisaron ' + maestro.revisadas + ' OP distintas contra la hoja OPS.']);
+    }
+  } else {
+    avisos.push(['', 'No se pudo revisar contra la base de OPs',
+      'El programa se puede publicar igual, pero esta vez no se validaron las OP.']);
+  }
+
+  if(v.filasActuales != null && v.filasActuales > 0 && out.filas.length < v.filasActuales * 0.8){
+    grave = true;
+    avisos.push(['bad','Este archivo trae bastante menos filas que el programa publicado',
+      'Publicado: ' + v.filasActuales + ' filas · este archivo: ' + out.filas.length +
+      '. Revisa que sea el archivo completo y no una copia filtrada o de otra semana.']);
+  }
+
+  if(est && est.fechaPrograma && fp){
+    var d = diasEntre(est.fechaPrograma, fp);
+    if(d !== null && d < 0){
+      grave = true;
+      avisos.push(['bad','La fecha de este programa es anterior a la publicada',
+        'Publicado: ' + isoADMY(est.fechaPrograma) + ' · este archivo: ' + isoADMY(fp) +
+        '. Si publicas, las auditoras verán un programa más viejo del que ya tienen.']);
+    }
+  }
+
+  if(out.fechaSospechosa){
+    avisos.push(['', 'El encabezado del Excel trae la fecha ' + isoADMY(out.fechaSospechosa),
+      'Está lejos de hoy, así que no se usó. Confirma abajo la fecha real del programa.']);
+  }
+  if(out.sinResponsable){
+    avisos.push(['', out.sinResponsable + ' filas sin título de bloque',
+      'Se guardan igual; en esas filas la columna Responsable queda vacía.']);
+  }
+  if(out.errores){
+    avisos.push(['', out.errores + ' celdas con error de fórmula en el Excel',
+      'Se guardan vacías. Vienen así del archivo original: aquí no se corrigen.']);
+  }
+
+  h += '<div class="avisos">';
+  avisos.forEach(function(a){
+    h += '<div class="av ' + a[0] + '"><b>' + a[1] + '</b>' + a[2] + '</div>';
+  });
+  h += '</div>';
+
+  if(grave){
+    h += '<label class="conf" style="display:flex" id="confbox' + tipo + '">' +
+         '<input type="checkbox" id="chk' + tipo + '">' +
+         '<span>Revisé los avisos de arriba y confirmo que este es el archivo que deben ver las auditoras.</span>' +
+         '</label>';
+  }
+
+  /* vista previa */
+  h += '<div class="tbl"><table><thead><tr>';
+  def.prev.forEach(function(c){ h += '<th>' + c.replace(/_/g,' ') + '</th>'; });
+  h += '</tr></thead><tbody>';
+  out.filas.slice(0, 12).forEach(function(f){
+    h += '<tr>';
+    def.prev.forEach(function(c){
+      var val = f[c];
+      if(/^(FECHA|INI|FIN|SAL)/.test(c)) val = isoADMY(val);
+      h += '<td>' + (val === '' || val == null ? '—' : String(val)) + '</td>';
+    });
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="ph" style="margin-top:6px">Primeras 12 filas de ' + out.filas.length + '.</div>';
+
+  h += '<div class="fila"><button class="btn primary" id="pub' + tipo + '">Publicar programa de ' +
+       (tipo === 'COSTURA' ? 'costura' : 'acabados') + '</button>' +
+       '<span class="ph spacer" id="msg' + tipo + '"></span></div>';
+
+  res.innerHTML = h;
+
+  var btn = document.getElementById('pub' + tipo);
+  if(grave){
+    btn.disabled = true;
+    document.getElementById('chk' + tipo).addEventListener('change', function(){
+      btn.disabled = !this.checked;
+    });
+  }
+  btn.addEventListener('click', function(){ publicar(tipo); });
+}
+
+function publicar(tipo){
+  var out = LEIDO[tipo];
+  if(!out) return;
+  var usuario = limpia(document.getElementById('usuario').value);
+  var msg = document.getElementById('msg' + tipo);
+  var btn = document.getElementById('pub' + tipo);
+
+  if(!usuario){
+    msg.innerHTML = '<span style="color:#DC2626;font-weight:700">Escribe tu nombre arriba antes de publicar.</span>';
+    document.getElementById('usuario').focus();
+    return;
+  }
+  var fp = document.getElementById('fp' + tipo).value;
+  if(!fp){
+    msg.innerHTML = '<span style="color:#DC2626;font-weight:700">Falta la fecha del programa.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  msg.textContent = 'Publicando…';
+
+  var def = DEF[tipo];
+  var filas = out.filas.map(function(f){
+    var o = {};
+    def.orden.forEach(function(c){ o[c] = (f[c] === undefined ? '' : f[c]); });
+    return o;
+  });
+  var falt = (out.validacion && out.validacion.maestro && out.validacion.maestro.faltantes) ?
+             out.validacion.maestro.faltantes.length : 0;
+
+  llamar({
+    accion:'guardar', tipo:tipo, filas:filas, usuario:usuario, archivo:out.archivo,
+    fechaPrograma:fp, opsDistintas:out.opsDistintas, opsSinMaestro:falt
+  }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) ? r.error : 'respuesta inesperada del servidor');
+    if(r.prueba){
+      msg.innerHTML = '<b style="color:#B45309">MODO PRUEBA: no se guardó nada.</b> Se habrían publicado ' +
+                      filas.length + ' filas.';
+      btn.disabled = false;
+      return;
+    }
+    ESTADO[tipo] = {fechaHora:'ahora', usuario:usuario, archivo:out.archivo,
+                    fechaPrograma:fp, filas:r.filas, opsSinMaestro:falt};
+    pintarEstado();
+    msg.innerHTML = '<b style="color:#0F7A5A">Publicado.</b> ' + r.filas + ' filas · el programa anterior (' +
+                    r.filasAntes + ' filas) quedó guardado.';
+  })['catch'](function(err){
+    btn.disabled = false;
+    msg.innerHTML = '<span style="color:#DC2626;font-weight:700">No se pudo publicar: ' +
+                    String(err && err.message ? err.message : err) +
+                    '. El archivo leído sigue aquí, vuelve a intentar.</span>';
+  });
+}
+
+/* ================= ARRANQUE ================= */
+if(!APP_URL) document.getElementById('notaPrueba').classList.remove('hide');
+conectar('COSTURA');
+conectar('ACABADO');
+cargarEstado();
+</script>
+</body>
+</html>

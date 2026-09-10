@@ -1693,6 +1693,22 @@ function agregarDer(d){
 function validar(){
   if(!T($('fecha').value)) return 'Falta la fecha.';
   var tv=$('tipo').value;
+  /* Los nombres tienen que salir del catálogo, no escribirse libres. Escribirlos
+     libres es como aparecieron "ANA G.", "FRIDA ESPINOZA Ñ." y "JESICA CHAVARRIA"
+     junto a las mismas personas con su nombre completo: el sistema las cuenta como
+     auditoras distintas, y el comparativo entre auditoras deja de servir.
+
+     Se comprueba contra CAT.personal. Si el catálogo aún no cargó no se bloquea:
+     dejar a Athina sin poder guardar por una lista que no llegó sería peor. */
+  var malAud = nombreFueraDelCatalogo($('auditor').value);
+  if(malAud) return malAud;
+  var malIns = nombreFueraDelCatalogo($('inspector').value);
+  if(malIns) return malIns;
+  for(var q=0;q<auds.length;q++){
+    var malQ = nombreFueraDelCatalogo(auds[q]);
+    if(malQ) return malQ;
+  }
+
   if(PIDE_AUDITOR[tv] && !T($('auditor').value) && !(tv==='EMPAQUE' && auds.length))
     return 'Falta la auditora.';
   if(!T($('grupo').value)) return 'Falta el grupo.';
@@ -2824,6 +2840,22 @@ Array.prototype.forEach.call(document.querySelectorAll('#bqCuerpo input'),functi
    alguna fila lo tenía vacío o escrito distinto, esa persona desaparecía; y si
    fallaba en todas, el campo quedaba sin nadie y ofrecía crear un nombre nuevo.
    Ahora los del rol que corresponde salen primero y el resto queda disponible. */
+/* Devuelve un mensaje si el nombre no está en el catálogo de personal, o cadena
+   vacía si está bien. Compara sin tildes ni dobles espacios: escribir "MARIA" o
+   "MARÍA" es la misma persona y no tiene sentido rechazarlo por eso. */
+function nombreFueraDelCatalogo(valor){
+  var v = T(valor);
+  if(!v) return '';
+  var lista = CAT.personal || [];
+  if(!lista.length) return '';          /* catálogo sin cargar: no bloquear */
+  var buscado = norm(v);
+  for(var i=0;i<lista.length;i++){
+    if(norm(lista[i][0]||'') === buscado) return '';
+  }
+  return '"'+v+'" no está en la lista de personal. Elige el nombre de la lista '+
+         'que aparece al escribir. Si falta alguien, hay que agregarlo en la base de datos.';
+}
+
 function personalPara(rol){
   var todos = CAT.personal || [];
   if(!todos.length) return [];

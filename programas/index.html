@@ -356,22 +356,78 @@ function jsonp(params){
   });
 }
 
-function cargar(tipo){
-  return jsonp({accion:'datos', tipo:tipo}).then(function(r){
-    if(!r || !r.ok) throw new Error((r && r.error) ? r.error : 'respuesta inesperada');
-    DATA[tipo] = r.filas || [];
-    if(r.estado) ESTADO = r.estado;
-    return DATA[tipo];
+/* El servidor manda las filas como arrays posicionales (pesan la mitad).
+   Aquí se vuelven objetos con nombre de columna. */
+function expandir(r){
+  if(!r.cols) return r.filas || [];
+  var cols = r.cols, out = [];
+  (r.filas || []).forEach(function(a){
+    var o = {};
+    for(var i = 0; i < cols.length; i++) o[cols[i]] = a[i];
+    out.push(o);
   });
+  return out;
 }
 
-function arrancar(){
-  document.getElementById('vt').textContent = 'Cargando el programa…';
-  document.getElementById('vd').textContent = 'Un momento.';
-  cargar('COSTURA')
-    .then(function(){ return cargar('ACABADO'); })
+function guardarLocal(tipo, r){
+  try{
+    localStorage.setItem('prog_' + tipo, JSON.stringify({
+      cols:r.cols, filas:r.filas, estado:r.estado, guardado:Date.now()
+    }));
+  }catch(e){ /* sin espacio o modo privado: se sigue sin copia local */ }
+}
+function leerLocal(tipo){
+  try{
+    var t = localStorage.getItem('prog_' + tipo);
+    if(!t) return null;
+    var r = JSON.parse(t);
+    if(!r || !r.filas) return null;
+    return r;
+  }catch(e){ return null; }
+}
+
+var CARGANDO = {COSTURA:null, ACABADO:null};
+
+function cargar(tipo, forzar){
+  if(DATA[tipo] && !forzar) return Promise.resolve(DATA[tipo]);
+  if(CARGANDO[tipo]) return CARGANDO[tipo];
+  CARGANDO[tipo] = jsonp({accion:'datos', tipo:tipo}).then(function(r){
+    CARGANDO[tipo] = null;
+    if(!r || !r.ok) throw new Error((r && r.error) ? r.error : 'respuesta inesperada');
+    DATA[tipo] = expandir(r);
+    if(r.estado) ESTADO = r.estado;
+    guardarLocal(tipo, r);
+    return DATA[tipo];
+  })['catch'](function(err){ CARGANDO[tipo] = null; throw err; });
+  return CARGANDO[tipo];
+}
+
+function arrancar(forzar){
+  /* 1) si hay copia de la última visita, se muestra de inmediato */
+  var hayLocal = false;
+  if(!DATA[TIPO]){
+    var loc = leerLocal(TIPO);
+    if(loc){
+      DATA[TIPO] = expandir(loc);
+      if(loc.estado) ESTADO = loc.estado;
+      construirFiltros(); render();
+      hayLocal = true;
+      document.getElementById('vd').textContent = 'Buscando si hay una versión más nueva…';
+    }
+  }
+  if(!hayLocal){
+    document.getElementById('vt').textContent = 'Cargando el programa de ' + DEF[TIPO].etq + '…';
+    document.getElementById('vd').textContent = 'Un momento.';
+  }
+  /* 2) se pide al servidor solo el programa que se está mirando */
+  cargar(TIPO, forzar !== false)
     .then(function(){ construirFiltros(); render(); })
     ['catch'](function(err){
+      if(hayLocal){
+        document.getElementById('vd').textContent =
+          'No se pudo verificar si hay una versión más nueva. Estás viendo la última que se cargó en este equipo.';
+        return;
+      }
       document.getElementById('vt').textContent = 'No se pudo cargar el programa';
       document.getElementById('vd').textContent = String(err && err.message ? err.message : err) +
         '. Vuelve a intentar con el botón Actualizar; si sigue igual, avisa a Sistemas.';
@@ -663,8 +719,8 @@ function cambiarTipo(t){
   document.getElementById('tabCOSTURA').classList.toggle('active', t === 'COSTURA');
   document.getElementById('tabACABADO').classList.toggle('active', t === 'ACABADO');
   document.getElementById('fTaller').value = '';
-  construirFiltros();
-  render();
+  if(DATA[TIPO]){ construirFiltros(); render(); }
+  else arrancar(false);
 }
 document.getElementById('tabCOSTURA').addEventListener('click', function(){ cambiarTipo('COSTURA'); });
 document.getElementById('tabACABADO').addEventListener('click', function(){ cambiarTipo('ACABADO'); });
@@ -702,7 +758,7 @@ document.getElementById('btnLimpiar').addEventListener('click', function(){
   render();
 });
 document.getElementById('btnExcel').addEventListener('click', descargar);
-document.getElementById('btnRefresh').addEventListener('click', arrancar);
+document.getElementById('btnRefresh').addEventListener('click', function(){ arrancar(true); });
 
 var anchoPrev = esMovil();
 window.addEventListener('resize', function(){
@@ -711,7 +767,6 @@ window.addEventListener('resize', function(){
 });
 
 arrancar();
-setInterval(arrancar, 10 * 60 * 1000);
 </script>
 
 </body>

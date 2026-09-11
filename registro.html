@@ -831,7 +831,10 @@ function afinarCamposFinal(){
      del taller, escritas así. */
   var ws=$('wServicio');
   if(ws) ws.style.display = externo ? '' : 'none';
-  if(!externo && $('servicio')) $('servicio').value='';
+  /* Se pone LIVES, no vacío. Dejarlo en blanco guardaba la misma situación de dos
+     maneras distintas —el formulario del piloto manda LIVES— y en el tablero
+     aparecía un taller sin nombre junto a los reales. */
+  if(!externo && $('servicio')) $('servicio').value='LIVES';
 
   /* LIQUIDADO va en los tres procesos de Auditoría Final —costura taller,
      acabados taller y acabados interna—: marca que esa OP ya no se vuelve a

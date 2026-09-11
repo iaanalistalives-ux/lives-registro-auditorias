@@ -842,9 +842,23 @@ function afinarCamposFinal(){
   var wl=$('wLiquidado');
   if(wl) wl.style.display='flex';
 
+  /* AUDITORA DEL TALLER ya no se pide.
+
+     Servía para comparar lo que dijo el taller contra lo que encontró LIVES, pero
+     escrito a mano se llenaba mal —llegaron nombres de personas que no eran
+     auditoras, y el proceso escrito donde va un taller— y en más de la mitad de
+     los casos quedaba vacío.
+
+     Esa comparación ahora se calcula: se cruza la auditoría del taller que
+     APROBÓ contra la auditoría interna del mismo lote que RECHAZÓ. No depende de
+     que nadie escriba un nombre.
+
+     La columna del Sheet NO se borra: tiene 414 filas del histórico y es el único
+     dato comparable que existe de 2025.
+     El campo queda oculto siempre y se manda vacío. */
   var wa=$('wAudTaller');
-  if(wa) wa.style.display = (!externo && acabados) ? '' : 'none';
-  if(externo || !acabados){ if($('audTaller')) $('audTaller').value=''; }
+  if(wa) wa.style.display = 'none';
+  if($('audTaller')) $('audTaller').value='';
 }
 ['lote','licencia','nivelAql'].forEach(function(id){
   var e=$(id); if(e) e.addEventListener('change', sugerirMuestra);

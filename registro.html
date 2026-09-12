@@ -1272,8 +1272,15 @@ function buscarLote(){
   else if(t==='FINAL') listo = g&&e&&T($('po').value)&&T($('destino').value);
   else listo = g&&e&&l;
   if(!listo){ $('prev').classList.remove('on'); prevLote=null; esReaud=''; return; }
+  /* Se manda el PROCESO para que el servidor solo devuelva las auditorías previas
+     de ese mismo proceso. Un lote pasa por costura, por acabados en el taller y
+     por la revisión interna: son tres auditorías distintas del mismo lote, y el
+     reproceso de una lo hace quien hizo esa auditoría, en su proceso. Sin esto,
+     al digitar una de acabados aparecían las de costura y se ofrecía reprocesar
+     un rechazo de otro proceso. */
   jsonp({accion:'buscar', tipo:$('tipo').value, grupo:g, estilo:e, color:c, lote:l,
          po:U($('po').value), pedido:N($('pedido').value),
+         proceso:procesoTexto(),
          op:U($('op')?$('op').value:''), destino:U($('destino').value)}, function(r){
     if(!r||!r.ok) return;
     prevLote=r;
@@ -2812,6 +2819,26 @@ function bqBuscar(){
 }
 
 var corrId='';
+/* El proceso con el MISMO texto con que se guarda en el Sheet.
+
+   El desplegable interno vale 'COSTURA' o 'ACABADOS', pero en la tabla figura
+   'Costura (taller)', 'Acabados (taller)' o 'Acabados Final (interno)'. Mandar el
+   valor corto haría que el servidor no encontrara ninguna auditoría previa y las
+   escondiera todas — peor que mostrar las de otro proceso. */
+function procesoTexto(){
+  var sel=$('procFinal');
+  if(sel && sel.value){
+    if(sel.value==='COSTURA_TALLER')   return 'Costura (taller)';
+    if(sel.value==='ACABADOS_TALLER')  return 'Acabados (taller)';
+    if(sel.value==='ACABADOS_INTERNO') return 'Acabados Final (interno)';
+  }
+  /* Respaldo para los tipos que no usan el selector unificado. */
+  var p=U($('proceso')?$('proceso').value:''), i=U($('intExt')?$('intExt').value:'');
+  if(!p) return '';
+  if(p==='COSTURA') return 'Costura (taller)';
+  return (i==='INTERNO') ? 'Acabados Final (interno)' : 'Acabados (taller)';
+}
+
 /* Qué campos tiene sentido corregir en cada tipo de auditoría. Es la misma
    lógica del formulario: si al digitar no se pide un dato, al corregir tampoco
    debe aparecer. Pedir la auditora en una auditoría de CLIENTE —que la hace el

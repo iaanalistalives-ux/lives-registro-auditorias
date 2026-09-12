@@ -629,18 +629,18 @@
         <div class="f sm"><label for="cFecha">Fecha</label><input type="date" id="cFecha"></div>
         <div class="f"><label for="cGrupo">Grupo</label><input type="text" id="cGrupo"></div>
         <div class="f"><label for="cEstilo">Estilo</label><input type="text" id="cEstilo"></div>
-        <div class="f"><label for="cColor">Color</label><input type="text" id="cColor"></div>
+        <div class="f" id="wcColor"><label for="cColor">Color</label><input type="text" id="cColor"></div>
       </div>
       <div class="row" style="margin-top:8px">
-        <div class="f sm"><label for="cPo">PO</label><input type="text" id="cPo"></div>
-        <div class="f sm"><label for="cPedido">Pedido</label><input type="number" id="cPedido"></div>
+        <div class="f sm" id="wcPo"><label for="cPo">PO</label><input type="text" id="cPo"></div>
+        <div class="f sm" id="wcPedido"><label for="cPedido">Pedido</label><input type="number" id="cPedido"></div>
         <div class="f sm"><label for="cLote">Lote</label><input type="number" id="cLote"></div>
         <div class="f sm"><label for="cMuestra">Muestra</label><input type="number" id="cMuestra"></div>
       </div>
       <div class="row" style="margin-top:8px">
-        <div class="f"><label for="cAuditor">Auditora</label><input type="text" id="cAuditor"></div>
-        <div class="f"><label for="cInspector">Inspectora</label><input type="text" id="cInspector"></div>
-        <div class="f"><label for="cServicio">Taller</label><input type="text" id="cServicio"></div>
+        <div class="f" id="wcAuditor"><label for="cAuditor">Auditora</label><input type="text" id="cAuditor"></div>
+        <div class="f" id="wcInspector"><label for="cInspector">Inspectora</label><input type="text" id="cInspector"></div>
+        <div class="f" id="wcServicio"><label for="cServicio">Taller</label><input type="text" id="cServicio"></div>
         <div class="f sm"><label for="cResultado">Resultado</label>
           <select id="cResultado"><option value="APROBADO">APROBADO</option>
             <option value="RECHAZADO">RECHAZADO</option></select></div>
@@ -870,6 +870,17 @@ function afinarCamposFinal(){
   var e=$(id); if(e) e.addEventListener('change', afinarCamposFinal);
 });
 
+/* Vacía los campos condicionales que no están a la vista en el tipo actual. */
+function limpiarOcultos(){
+  (typeof TODOS_COND!=='undefined' ? TODOS_COND : []).forEach(function(id){
+    if(visible(id)) return;
+    var e=$(id); if(!e) return;
+    e.querySelectorAll('input,select,textarea').forEach(function(x){
+      if(x.type==='checkbox'||x.type==='radio') x.checked=false; else x.value='';
+    });
+  });
+}
+
 function aplicarCamposDelTipo(){
   var t=$('tipo').value;
   TODOS_COND.forEach(function(id){ var e=$(id); if(e) e.style.display='none'; });
@@ -878,6 +889,9 @@ function aplicarCamposDelTipo(){
   });
   if($('wReproceso')) $('wReproceso').style.display='none';
   afinarCamposFinal();
+  /* Limpiar lo que queda oculto. Un valor escondido termina guardado en el Sheet
+     igual, y además bloquea la validación sin que se vea por qué. */
+  limpiarOcultos();
 }
 
 function aplicarTipo(){
@@ -1717,9 +1731,13 @@ function validar(){
 
      Se comprueba contra CAT.personal. Si el catálogo aún no cargó no se bloquea:
      dejar a Athina sin poder guardar por una lista que no llegó sería peor. */
-  var malAud = nombreFueraDelCatalogo($('auditor').value);
+  /* Solo se revisan los campos VISIBLES. Al cambiar de tipo, los que se ocultan
+     conservan lo que se escribió antes: validarlos hacía que el formulario
+     reclamara un nombre que la digitadora no ve en ninguna parte —"no está en la
+     lista de personal" señalando un campo invisible—, sin forma de corregirlo. */
+  var malAud = visible('wAuditor') ? nombreFueraDelCatalogo($('auditor').value) : '';
   if(malAud) return malAud;
-  var malIns = nombreFueraDelCatalogo($('inspector').value);
+  var malIns = visible('wInspector') ? nombreFueraDelCatalogo($('inspector').value) : '';
   if(malIns) return malIns;
   for(var q=0;q<auds.length;q++){
     var malQ = nombreFueraDelCatalogo(auds[q]);
@@ -2794,8 +2812,37 @@ function bqBuscar(){
 }
 
 var corrId='';
+/* Qué campos tiene sentido corregir en cada tipo de auditoría. Es la misma
+   lógica del formulario: si al digitar no se pide un dato, al corregir tampoco
+   debe aparecer. Pedir la auditora en una auditoría de CLIENTE —que la hace el
+   cliente, no LIVES— invita a escribir un nombre que no debería existir. */
+var CAMPOS_CORR = {
+  LINEAS:   ['wcAuditor','wcInspector'],
+  SERVINSP: ['wcAuditor','wcInspector'],
+  EMPAQUE:  ['wcAuditor','wcPo','wcPedido'],
+  CLIENTE:  ['wcPedido'],
+  FINAL:    ['wcAuditor','wcServicio','wcPo','wcPedido','wcColor']
+};
+var TODOS_CORR = ['wcAuditor','wcInspector','wcServicio','wcPo','wcPedido','wcColor'];
+
+function ajustarCamposCorreccion(tipo){
+  var permitidos = CAMPOS_CORR[U(tipo)] || TODOS_CORR;
+  TODOS_CORR.forEach(function(id){
+    var e=$(id); if(!e) return;
+    var mostrar = permitidos.indexOf(id)>=0;
+    e.style.display = mostrar ? '' : 'none';
+    /* Se limpia lo que se oculta: si no, al guardar se mandaría un valor que en
+       ese tipo no existe y quedaría escrito en el Sheet. */
+    if(!mostrar){
+      var inp=e.querySelector('input,select');
+      if(inp) inp.value='';
+    }
+  });
+}
+
 function abrirCorreccion(r){
   corrId=r.id;
+  ajustarCamposCorreccion(r.tipo);
   $('corrTit').textContent=r.grupo+' · '+r.estilo+' · '+(r.color||'')+' · '+r.fecha;
   $('cFecha').value=r.fecha; $('cGrupo').value=r.grupo; $('cEstilo').value=r.estilo;
   $('cColor').value=r.color; $('cPo').value=r.po; $('cPedido').value=r.pedido||'';
@@ -2860,6 +2907,12 @@ Array.prototype.forEach.call(document.querySelectorAll('#bqCuerpo input'),functi
 /* Devuelve un mensaje si el nombre no está en el catálogo de personal, o cadena
    vacía si está bien. Compara sin tildes ni dobles espacios: escribir "MARIA" o
    "MARÍA" es la misma persona y no tiene sentido rechazarlo por eso. */
+/* ¿Está ese bloque a la vista? */
+function visible(id){
+  var e=$(id);
+  return !!(e && getComputedStyle(e).display!=='none');
+}
+
 function nombreFueraDelCatalogo(valor){
   var v = T(valor);
   if(!v) return '';

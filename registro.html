@@ -524,7 +524,7 @@
         En la hoja: <kbd>Enter</kbd> y <kbd>Tab</kbd> avanzan a la celda de al lado; al terminar la
         fila pasan a los defectos, y con el buscador vacío bajan a la fila siguiente.
         <kbd>Enter</kbd> en el buscador agrega el defecto y salta a su cantidad ·
-        <kbd>F2</kbd> agrega a la lista · <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia.
+        <kbd>F2</kbd> agrega a la lista · <kbd>Ctrl+Enter</kbd> guarda todo · <kbd>Esc</kbd> limpia (pregunta antes, y no funciona mientras corriges).
       </details>
     </div>
   </div>
@@ -1746,6 +1746,22 @@ function validar(){
   if(malAud) return malAud;
   var malIns = visible('wInspector') ? nombreFueraDelCatalogo($('inspector').value) : '';
   if(malIns) return malIns;
+
+  /* El TALLER también sale de una lista cerrada. Escrito libre aparecían dos
+     formas del mismo taller —"DEISY GAVIDIA" y "DEYSI GAVIDIA"— y el sistema las
+     cuenta como talleres distintos: el comparativo entre talleres deja de servir
+     y en los filtros salen duplicados.
+
+     LIVES se acepta siempre: es lo que llevan las auditorías internas. */
+  if(visible('wServicio')){
+    var tal = T($('servicio').value);
+    var listaT = CAT.talleres || [];
+    if(tal && listaT.length && norm(tal)!=='lives'){
+      var hayT = listaT.some(function(x){ return norm(x[0]||'') === norm(tal); });
+      if(!hayT) return '"'+tal+'" no está en la lista de talleres. Elige uno de los que '+
+                       'aparecen al escribir. Si falta alguno, hay que agregarlo en la base de datos.';
+    }
+  }
   for(var q=0;q<auds.length;q++){
     var malQ = nombreFueraDelCatalogo(auds[q]);
     if(malQ) return malQ;
@@ -3150,11 +3166,39 @@ $('btnGuardar').onclick=guardar;
 $('btnEnviar').onclick=enviarTodo;
 $('btnLimpiar').onclick=function(){ limpiarRegistro(false); };
 
+/* ¿Hay algo que se perdería al limpiar? Solo se miran los campos que la
+   digitadora llena a mano; los que se completan solos desde la OP no cuentan. */
+function hayAlgoEscrito(){
+  var conDato = ['grupo','estilo','color','po','lote','muestra','op','pedido','destino']
+    .some(function(id){ var e=$(id); return e && T(e.value); });
+  return conDato || (typeof defs!=='undefined' && defs.length)
+                 || (typeof ders!=='undefined' && ders.length);
+}
+
 document.addEventListener('keydown', function(e){
   if(e.key==='F2'){ e.preventDefault(); guardar(); }
   /* Ctrl+Enter manda todo lo pendiente, sin soltar el teclado. */
   if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); enviarTodo(); }
-  if(e.key==='Escape' && e.target.tagName!=='INPUT'){ limpiarRegistro(false); }
+  /* Escape limpia el formulario, pero NO mientras se corrige una auditoría ya
+     guardada: ahí se perdía lo cargado de golpe. Athina lo pulsa para cerrar una
+     lista de sugerencias o por costumbre, y el formulario quedaba en blanco como
+     si hubiera tocado el botón de limpiar. No hay forma de deshacerlo.
+
+     Tampoco limpia si hay algo escrito: en ese caso pide confirmación. Un atajo
+     de una tecla que borra trabajo sin preguntar es demasiado fácil de disparar
+     sin querer. */
+  if(e.key==='Escape' && e.target.tagName!=='INPUT'){
+    if(editando){
+      $('hGuardar').className='hint err';
+      $('hGuardar').textContent='Estás corrigiendo una auditoría: Escape no limpia. '+
+        'Usa "Cancelar corrección" si quieres salir.';
+      return;
+    }
+    if(hayAlgoEscrito()){
+      if(!confirm('¿Limpiar el formulario? Se perderá lo que has escrito.')) return;
+    }
+    limpiarRegistro(false);
+  }
 });
 
 /* lo fijo se recuerda entre sesiones: la auditora no lo reescribe cada mañana */

@@ -277,6 +277,44 @@ function subir(){
   $('barra').className='barra on';
   $('msgSube').className='hint'; $('msgSube').textContent='Preparando…';
 
+  /* Primero se intenta mandar la tabla completa en un solo envío: tarda unos
+     segundos en vez de varios minutos. Si ese envío no llega, se usa el método
+     por partes de siempre. */
+  $('msgSube').textContent='Enviando las '+FILAS.length.toLocaleString('es-PE')+' filas…';
+  $('barraI').style.width='30%';
+  subirDeUnaVez().then(function(r){
+    if(r && r.ok){ terminarCarga(r); return; }
+    if(r && r.error && !/^(respuesta|http)/i.test(r.error)){ falla(r.error); return; }
+    subirPorPartes();
+  }).catch(function(e){
+    console.warn('Envío completo no disponible, se usa el envío por partes:', e);
+    subirPorPartes();
+  });
+}
+
+/* Un solo envío con todas las filas. Se manda como texto para que el navegador
+   no pida permiso previo al Apps Script. */
+function subirDeUnaVez(){
+  var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
+  var filas = FILAS.map(function(f){
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente];
+  });
+  return fetch(API, {
+    method:'POST',
+    body: JSON.stringify({accion:'opscompleta', clave:CLAVE, usuario:U($('usuario').value),
+                          total:FILAS.length, filas:filas}),
+    signal: control ? control.signal : undefined
+  }).then(function(r){
+    clearTimeout(reloj);
+    if(!r.ok) return {ok:false, error:'http '+r.status};
+    return r.json().catch(function(){ return {ok:false, error:'respuesta ilegible'}; });
+  }, function(e){ clearTimeout(reloj); throw e; });
+}
+
+function subirPorPartes(){
+  $('barraI').style.width='0%';
+  $('msgSube').className='hint'; $('msgSube').textContent='Enviando por partes…';
   /* La descripción de tela ahora viaja en cada fila porque la pestaña OPS tiene
      su propia columna DESC_TELA. Se dejó de mandar el diccionario aparte. */
   jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value)},
@@ -286,24 +324,28 @@ function subir(){
     }, function(m){ falla(m); });
 }
 
+function terminarCarga(r){
+  $('barraI').style.width='100%';
+  var t=(r&&r.total)||FILAS.length;
+  $('msgSube').className = (t===FILAS.length) ? 'hint ok' : 'hint err';
+  $('msgSube').textContent = (t===FILAS.length)
+    ? ('Listo. La tabla quedó con '+t.toLocaleString('es-PE')+' filas.')
+    : ('Atención: se leyeron '+FILAS.length.toLocaleString('es-PE')+
+       ' filas pero la tabla quedó con '+t.toLocaleString('es-PE')+
+       '. Vuelve a subir el archivo.');
+  $('pill').className='pill ok';
+  $('pill').textContent=t+' filas cargadas';
+  $('btnSubir').disabled=false;
+}
+
 function mandarTrozo(desde, intento){
   intento = intento || 0;
   if(desde>=FILAS.length){
     jsonp({accion:'opscarga', clave:CLAVE, modo:'fin', usuario:U($('usuario').value),
            total:FILAS.length},
       function(r){
-        $('barraI').style.width='100%';
-        $('msgSube').className='hint ok';
-        var t=(r&&r.total)||FILAS.length;
-        $('msgSube').className = (t===FILAS.length) ? 'hint ok' : 'hint err';
-        $('msgSube').textContent = (t===FILAS.length)
-          ? ('Listo. La tabla quedó con '+t.toLocaleString('es-PE')+' filas.')
-          : ('Atención: se leyeron '+FILAS.length.toLocaleString('es-PE')+
-             ' filas pero la tabla quedó con '+t.toLocaleString('es-PE')+
-             '. Vuelve a subir el archivo.');
-        $('pill').className='pill ok';
-        $('pill').textContent=((r&&r.total)||FILAS.length)+' filas cargadas';
-        $('btnSubir').disabled=false;
+        if(!r||!r.ok){ falla((r&&r.error)||'no se pudo terminar'); return; }
+        terminarCarga(r);
       }, function(m){ falla(m); });
     return;
   }

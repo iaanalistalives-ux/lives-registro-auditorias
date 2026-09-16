@@ -966,8 +966,235 @@ function resaltar(nombre,q){
 }
 
 /* ---------------- transporte JSONP (evita CORS con Apps Script) ---------------- */
-var jn=0;
+/* =====================================================================
+   CATÁLOGOS Y BASE DE OP DESDE SUPABASE (desde el 16/09/2026)
+   ---------------------------------------------------------------------
+   Los catálogos (defectos, personal, talleres, clientes, líneas, destinos)
+   y la base de OP se leen de Supabase en vez del Apps Script: responde en
+   segundos y no depende de que el script esté ocupado.
+
+   Cada función devuelve EXACTAMENTE lo mismo que devolvía el Apps Script
+   (mismas columnas, mismo orden, mismos filtros), así que el resto del
+   formulario no cambia. Si Supabase no responde, se usa el Apps Script
+   como antes.
+
+   Supabase recibe una copia de los Sheets cada 10 minutos: un catálogo
+   editado en el Sheet aparece aquí en ese plazo.
+   La clave es la PUBLICABLE: solo permite leer estas vistas.
+   ===================================================================== */
+var SBR_URL = 'https://xxfufpddgoyhbotjmaiy.supabase.co';
+var SBR_KEY = 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+var SBR_PAGINA = 1000;
+var SBR_ESPERA = 15000;   // si en 15 s no responde, se usa el Apps Script
+
+function sbrT(v){ return String(v == null ? '' : v).trim(); }
+function sbrU(v){ return sbrT(v).toUpperCase(); }
+
+function sbrLeer(vista, select){
+  var todas = [];
+  function pagina(desde){
+    var url = SBR_URL + '/rest/v1/' + vista + '?select=' + encodeURIComponent(select) +
+              '&order=orden.asc&limit=' + SBR_PAGINA + '&offset=' + desde;
+    var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var reloj = setTimeout(function(){ if (control) control.abort(); }, SBR_ESPERA);
+    return fetch(url, { headers: { apikey: SBR_KEY }, cache: 'no-store',
+                        signal: control ? control.signal : undefined })
+      .then(function(r){
+        clearTimeout(reloj);
+        if (!r.ok) throw new Error('Supabase ' + r.status);
+        return r.json();
+      })
+      .then(function(lote){
+        todas = todas.concat(lote);
+        return lote.length === SBR_PAGINA ? pagina(desde + SBR_PAGINA) : todas;
+      }, function(e){ clearTimeout(reloj); throw e; });
+  }
+  return pagina(0);
+}
+
+/* Cada vista se pide una sola vez por carga de página. */
+var SBR_CACHE = {};
+function sbrVista(nombre, select){
+  if (!SBR_CACHE[nombre]) {
+    SBR_CACHE[nombre] = sbrLeer(nombre, select).then(function(filas){
+      if (!filas.length) throw new Error(nombre + ' llegó vacía');
+      return filas;
+    });
+    /* Si falla, se olvida para poder reintentar después. */
+    SBR_CACHE[nombre].catch(function(){ delete SBR_CACHE[nombre]; });
+  }
+  return SBR_CACHE[nombre];
+}
+function sbrDefectos(){ return sbrVista('publico_ref_defectos', 'cod,seccion,categoria_madre,subtipo,activo,orden'); }
+function sbrPersonal(){ return sbrVista('publico_ref_personal', 'nombre,rol,activo,orden'); }
+function sbrTalleres(){ return sbrVista('publico_ref_talleres', 'nombre,proceso,activo,orden'); }
+function sbrClientes(){ return sbrVista('publico_ref_clientes', 'prefijo,cliente,activo,orden'); }
+function sbrLineas(){   return sbrVista('publico_ref_lineas', 'nombre,activo,orden'); }
+function sbrDestinos(){ return sbrVista('publico_ref_destinos', 'codigo,destino,activo,orden'); }
+function sbrOps(){      return sbrVista('publico_ref_ops', 'op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido,orden'); }
+
+/* ---------- Lo mismo que accion=hoja del Apps Script ---------- */
+function sbrProcesoPiloto(v){
+  var t = sbrU(v);
+  if (t.indexOf('COSTURA') >= 0)  return 'Costura (taller)';
+  if (t.indexOf('ACABADOS') >= 0) return 'Acabados (taller)';
+  return sbrT(v);
+}
+function sbrHoja(nombre){
+  var n = sbrU(nombre);
+  if (n === 'TALLERES') {
+    return sbrTalleres().then(function(f){
+      return f.filter(function(x){ return sbrT(x.nombre) && sbrU(x.activo) !== 'NO'; })
+              .map(function(x){ return [sbrProcesoPiloto(x.proceso), sbrT(x.nombre)]; });
+    });
+  }
+  if (n === 'AUDITORAS') {
+    return sbrPersonal().then(function(f){
+      return f.filter(function(x){
+        return sbrT(x.nombre) && sbrU(x.activo) !== 'NO' && sbrU(x.rol).indexOf('AUDITOR') >= 0;
+      }).map(function(x){ return [sbrT(x.nombre), sbrT(x.rol)]; });
+    });
+  }
+  if (n === 'CATÁLOGO' || n === 'CATALOGO') {
+    return sbrDefectos().then(function(f){
+      return f.map(function(x){ return [x.cod, x.seccion, x.categoria_madre, x.subtipo, x.activo].map(sbrT); });
+    });
+  }
+  if (n === 'CLIENTES') {
+    return sbrClientes().then(function(f){
+      return f.map(function(x){ return [x.prefijo, x.cliente, x.activo].map(sbrT); });
+    });
+  }
+  return Promise.reject(new Error('hoja no disponible en Supabase: ' + nombre));
+}
+
+/* ---------- Lo mismo que accion=ops ---------- */
+function sbrOpsPiloto(){
+  return sbrOps().then(function(f){
+    return f.filter(function(x){ return sbrT(x.op); }).map(function(x){
+      return { op: sbrT(x.op), grupo: sbrT(x.grupo), estilo: sbrT(x.estilo),
+               color: sbrT(x.color), po: sbrT(x.po), estiloCli: sbrT(x.e_cliente),
+               codTela: sbrT(x.cod_tela), descTela: sbrT(x.desc_tela),
+               destino: sbrT(x.destino), pedido: sbrT(x.pedido) };
+    });
+  });
+}
+
+/* ---------- Lo mismo que accion=catalogos ---------- */
+function sbrActivos(filas, cols){
+  return filas.filter(function(x){
+    if (!sbrT(x[cols[0]])) return false;
+    var a = sbrU(x.activo);
+    return a !== 'NO' && a !== 'FALSE' && a !== '0';
+  }).map(function(x){ return cols.map(function(c){ return sbrT(x[c]); }); });
+}
+function sbrHoyLima(){
+  var p = {};
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).forEach(function(x){ p[x.type] = x.value; });
+  return p.year + '-' + p.month + '-' + p.day;
+}
+function sbrCatalogos(){
+  return Promise.all([sbrDefectos(), sbrPersonal(), sbrTalleres(), sbrClientes(), sbrLineas(), sbrDestinos()])
+    .then(function(r){
+      return {
+        ok: true,
+        defectos: sbrActivos(r[0], ['cod', 'seccion', 'categoria_madre', 'subtipo']),
+        personal: sbrActivos(r[1], ['nombre', 'rol']),
+        talleres: sbrActivos(r[2], ['nombre', 'proceso']),
+        clientes: sbrActivos(r[3], ['prefijo', 'cliente']),
+        lineas:   sbrActivos(r[4], ['nombre']),
+        destinos: sbrActivos(r[5], ['codigo', 'destino']),
+        vias: [['AIR', 'Aéreo'], ['SEA', 'Marítimo']],
+        multiAuditor: { LINEAS: false, SERVINSP: false, EMPAQUE: true, CLIENTE: true, FINAL: false },
+        toleranciaCero: { LINEAS: true, SERVINSP: true, EMPAQUE: false, CLIENTE: false, FINAL: false },
+        hoy: sbrHoyLima(),
+        fuente: 'supabase'
+      };
+    });
+}
+
+/* ---------- Lo mismo que accion=opsclave ---------- */
+function sbrOpsClave(p){
+  return sbrOps().then(function(tabla){
+    var fOp = sbrU(p.op), fGr = sbrU(p.grupo), fEs = sbrU(p.estilo),
+        fCo = sbrU(p.color), fPo = sbrU(p.po), fDe = sbrU(p.destino);
+    var filas = [];
+    tabla.forEach(function(r){
+      if (fOp && sbrU(r.op) !== fOp) return;
+      if (fGr && sbrU(r.grupo) !== fGr) return;
+      if (fEs && sbrU(r.estilo) !== fEs) return;
+      if (fCo && sbrU(r.color) !== fCo) return;
+      if (fPo && sbrU(r.po) !== fPo) return;
+      if (fDe && sbrU(r.destino) !== fDe) return;
+      var ped = parseFloat(String(r.pedido == null ? '' : r.pedido).replace(/,/g, ''));
+      filas.push({ op: sbrT(r.op), grupo: sbrT(r.grupo), estilo: sbrT(r.estilo),
+                   eCliente: sbrT(r.e_cliente), color: sbrT(r.color), po: sbrT(r.po),
+                   codTela: sbrT(r.cod_tela), descTela: sbrT(r.desc_tela),
+                   destino: sbrT(r.destino), pedido: isFinite(ped) ? ped : 0 });
+    });
+    if (!filas.length) return { ok: true, existe: false };
+    function unicos(campo){
+      var v = [], s = {};
+      filas.forEach(function(f){ if (f[campo] && !s[f[campo]]) { s[f[campo]] = 1; v.push(f[campo]); } });
+      return v.sort();
+    }
+    var ops = unicos('op'), grupos = unicos('grupo'), estilos = unicos('estilo');
+    return {
+      ok: true, existe: true, n: filas.length,
+      ops: ops, grupos: grupos, estilos: estilos,
+      colores: unicos('color'), pos: unicos('po'), destinos: unicos('destino'),
+      op: ops.length === 1 ? ops[0] : '',
+      grupo: grupos.length === 1 ? grupos[0] : '',
+      estilo: estilos.length === 1 ? estilos[0] : '',
+      codTela: filas[0].codTela, descTela: filas[0].descTela,
+      eCliente: filas[0].eCliente,
+      pedido: filas.length === 1 ? filas[0].pedido : 0,
+      filas: filas.slice(0, 60)
+    };
+  });
+}
+
+/* ---------- Lo mismo que accion=opssugerir ---------- */
+function sbrOpsSugerir(p){
+  var campo = sbrU(p.campo), q = sbrU(p.q);
+  if (!q || q.length < 2) return Promise.resolve({ ok: true, valores: [] });
+  var col = { OP: 'op', GRUPO: 'grupo', ESTILO: 'estilo', COLOR: 'color', PO: 'po', DESTINO: 'destino' }[campo];
+  if (!col) return Promise.resolve({ ok: true, valores: [] });
+  return sbrOps().then(function(tabla){
+    var vistos = {}, out = [];
+    for (var i = 0; i < tabla.length && out.length < 25; i++) {
+      var v = sbrU(tabla[i][col]);
+      if (!v || vistos[v] || v.indexOf(q) !== 0) continue;
+      vistos[v] = true; out.push(v);
+    }
+    for (var j = 0; j < tabla.length && out.length < 25; j++) {
+      var v2 = sbrU(tabla[j][col]);
+      if (!v2 || vistos[v2] || v2.indexOf(q) < 0) continue;
+      vistos[v2] = true; out.push(v2);
+    }
+    return { ok: true, campo: campo, valores: out.sort() };
+  });
+}
+/* ===================== fin del módulo de Supabase ===================== */
+
+
+/* Las consultas de catálogos y de la base de OP se resuelven con Supabase.
+   Todo lo demás (guardar, buscar lote, sugerencias del historial, editar,
+   anular) sigue yendo al Apps Script como siempre. Si Supabase falla, la
+   consulta se manda al Apps Script sin que la pantalla lo note. */
+var SBR_ACCIONES = { catalogos: sbrCatalogos, opsclave: sbrOpsClave, opssugerir: sbrOpsSugerir };
 function jsonp(params, ok, fallo){
+  var local = SBR_ACCIONES[params && params.accion];
+  if (!local) return jsonpScript(params, ok, fallo);
+  local(params).then(function(r){ ok(r); }, function(e){
+    console.warn('Supabase no respondió para ' + params.accion + ', se usa el Apps Script:', e);
+    jsonpScript(params, ok, fallo);
+  });
+}
+
+var jn=0;
+function jsonpScript(params, ok, fallo){
   var cb='cb'+(++jn)+'_'+Date.now();
   var s=document.createElement('script');
   var t=setTimeout(function(){ limpiar(); fallo && fallo('tiempo agotado'); }, 60000);

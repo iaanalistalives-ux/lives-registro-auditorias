@@ -1183,7 +1183,43 @@ function sbrOpsSugerir(p){
    Todo lo demás (guardar, buscar lote, sugerencias del historial, editar,
    anular) sigue yendo al Apps Script como siempre. Si Supabase falla, la
    consulta se manda al Apps Script sin que la pantalla lo note. */
-var SBR_ACCIONES = { catalogos: sbrCatalogos, opsclave: sbrOpsClave, opssugerir: sbrOpsSugerir };
+/* ---------- Lecturas del registro (SQL 13) ----------
+   Funciones de Supabase que devuelven lo mismo que el Apps Script para
+   sugerir, recientes, buscar, buscaraud y leer. Probadas contra el backend
+   real con 5,028 casos. Si Supabase no responde, o responde ok:false (por
+   ejemplo, una auditoría recién guardada que todavía no llegó), se usa el
+   Apps Script como antes. */
+function sbrRpc(fn, params){
+  var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var reloj = setTimeout(function(){ if (control) control.abort(); }, SBR_ESPERA);
+  var p = {};
+  for (var k in (params || {})) { if (k !== 'accion' && params[k] !== undefined && params[k] !== null) p[k] = params[k]; }
+  return fetch(SBR_URL + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: { apikey: SBR_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: p }),
+      cache: 'no-store',
+      signal: control ? control.signal : undefined
+    })
+    .then(function(r){
+      clearTimeout(reloj);
+      if (!r.ok) return r.text().then(function(t){ throw new Error('Supabase ' + r.status + ' ' + t.slice(0, 120)); });
+      return r.json();
+    }, function(e){ clearTimeout(reloj); throw e; })
+    .then(function(res){
+      if (!res || res.ok !== true) throw new Error(fn + ': ' + ((res && res.error) || 'sin respuesta'));
+      return res;
+    });
+}
+function sbrSugerir(p){   return sbrRpc('registro_sugerir', p); }
+function sbrRecientes(p){ return sbrRpc('registro_recientes', p); }
+function sbrBuscarLote(p){ return sbrRpc('registro_buscar', p); }
+function sbrBuscarAud(p){ return sbrRpc('registro_buscaraud', p); }
+function sbrLeerAud(p){   return sbrRpc('registro_leer', p); }
+
+var SBR_ACCIONES = { catalogos: sbrCatalogos, opsclave: sbrOpsClave, opssugerir: sbrOpsSugerir,
+                     sugerir: sbrSugerir, recientes: sbrRecientes, buscar: sbrBuscarLote,
+                     buscaraud: sbrBuscarAud, leer: sbrLeerAud };
 function jsonp(params, ok, fallo){
   var local = SBR_ACCIONES[params && params.accion];
   if (!local) return jsonpScript(params, ok, fallo);

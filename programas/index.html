@@ -221,6 +221,9 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
     tras aplicar los filtros — no del programa completo.</p>
     <p><b>Guiones y celdas vacías.</b> Un guion significa que el Excel de PCP no tenía dato ahí, o que
     la celda traía un error de fórmula. No se rellena ni se estima nada.</p>
+    <p><b>Datos al…</b> Arriba a la derecha se indica a qué hora se copiaron por última vez los datos
+    que estás viendo. Si dice "(respaldo)", la base principal no respondió y los datos vienen
+    directo del Sheet: son los mismos, solo tardan más.</p>
     <p><b>Frescura.</b> Arriba se indica de qué fecha es el programa y quién lo subió. Si lleva más de
     tres días sin actualizarse, el aviso cambia de color: conviene confirmar con PCP antes de
     programar auditorías con esas fechas.</p>
@@ -229,7 +232,11 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
 </div>
 
 <script>
+/* v2 (17/09/2026): lee de Supabase; si no responde, vuelve solo al Apps Script */
 var APP_URL = 'https://script.google.com/macros/s/AKfycbysmAxeZUtMCf13Jv7VZVU7AC-9Ut28yABhLcKbRizSKPO4i2JRsdcAmZLKvlzBE1dJ/exec';
+var SB_URL = 'https://xxfufpddgoyhbotjmaiy.supabase.co';
+var SB_KEY = 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+var SB_SEG = 15000;
 var DIAS_ALERTA = 3;
 var PAGINA = 30;
 
@@ -372,7 +379,7 @@ function expandir(r){
 function guardarLocal(tipo, r){
   try{
     localStorage.setItem('prog_' + tipo, JSON.stringify({
-      cols:r.cols, filas:r.filas, estado:r.estado, guardado:Date.now()
+      cols:r.cols, filas:r.filas, estado:r.estado, sello:r.sello || '', guardado:Date.now()
     }));
   }catch(e){ /* sin espacio o modo privado: se sigue sin copia local */ }
 }
@@ -387,15 +394,73 @@ function leerLocal(tipo){
 }
 
 var CARGANDO = {COSTURA:null, ACABADO:null};
+var SELLO = '';      /* "Datos al DD/MM HH:MM" */
+var FUENTE = '';     /* '' = Supabase · 'respaldo' = Apps Script · 'local' = copia del equipo */
+
+/* ---------- lectura desde Supabase ---------- */
+function sbGet(ruta){
+  var ctrl = window.AbortController ? new AbortController() : null;
+  var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, SB_SEG) : null;
+  return fetch(SB_URL + '/rest/v1/' + ruta, {
+    headers:{apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY},
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function(res){
+    if(t) clearTimeout(t);
+    if(!res.ok) throw new Error('Supabase ' + res.status);
+    return res.json();
+  }, function(e){ if(t) clearTimeout(t); throw e; });
+}
+function dosDig(n){ return ('0' + n).slice(-2); }
+function selloDe(fechaHoraISO){
+  var d = new Date(fechaHoraISO);
+  if(isNaN(d)) return '';
+  return 'Datos al ' + dosDig(d.getDate()) + '/' + dosDig(d.getMonth()+1) + ' ' +
+         dosDig(d.getHours()) + ':' + dosDig(d.getMinutes());
+}
+/* Devuelve lo mismo que el Apps Script: {ok, cols, filas, estado} */
+function leerSupabase(tipo){
+  return sbGet('publico_programas_estado?select=tipo,cols,actualizado,fechaHora,usuario,fechaPrograma,filas,hay_carga')
+  .then(function(est){
+    var estado = {COSTURA:null, ACABADO:null}, cols = null, act = '';
+    est.forEach(function(e){
+      if(e.hay_carga) estado[e.tipo] = {fechaHora:e.fechaHora || '', usuario:e.usuario || '',
+                                        fechaPrograma:e.fechaPrograma || '', filas:Number(e.filas || 0)};
+      if(e.tipo === tipo){ cols = e.cols; act = e.actualizado; }
+    });
+    if(!cols) throw new Error('Supabase no tiene el programa de ' + tipo);
+    var filas = [];
+    function lote(desde){
+      return sbGet('publico_programas?select=n,fila&tipo=eq.' + tipo + '&n=gt.' + desde + '&order=n&limit=1000')
+      .then(function(rs){
+        rs.forEach(function(x){ filas.push(x.fila); });
+        if(rs.length === 1000) return lote(rs[rs.length - 1].n);
+      });
+    }
+    return lote(0).then(function(){
+      return {ok:true, cols:cols, filas:filas, estado:estado, sello:selloDe(act)};
+    });
+  });
+}
+function leerRespaldo(tipo){
+  return jsonp({accion:'datos', tipo:tipo}).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) ? r.error : 'respuesta inesperada');
+    var g = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(String(r.generado || ''));
+    r.sello = g ? ('Datos al ' + g[3] + '/' + g[2] + ' ' + g[4]) : '';
+    r.respaldo = true;
+    return r;
+  });
+}
 
 function cargar(tipo, forzar){
   if(DATA[tipo] && !forzar) return Promise.resolve(DATA[tipo]);
   if(CARGANDO[tipo]) return CARGANDO[tipo];
-  CARGANDO[tipo] = jsonp({accion:'datos', tipo:tipo}).then(function(r){
+  CARGANDO[tipo] = leerSupabase(tipo)['catch'](function(){ return leerRespaldo(tipo); })
+  .then(function(r){
     CARGANDO[tipo] = null;
-    if(!r || !r.ok) throw new Error((r && r.error) ? r.error : 'respuesta inesperada');
     DATA[tipo] = expandir(r);
     if(r.estado) ESTADO = r.estado;
+    SELLO = r.sello || '';
+    FUENTE = r.respaldo ? 'respaldo' : '';
     guardarLocal(tipo, r);
     return DATA[tipo];
   })['catch'](function(err){ CARGANDO[tipo] = null; throw err; });
@@ -410,6 +475,7 @@ function arrancar(forzar){
     if(loc){
       DATA[TIPO] = expandir(loc);
       if(loc.estado) ESTADO = loc.estado;
+      SELLO = loc.sello || ''; FUENTE = 'local';
       construirFiltros(); render();
       hayLocal = true;
       document.getElementById('vd').textContent = 'Buscando si hay una versión más nueva…';
@@ -426,6 +492,7 @@ function arrancar(forzar){
       if(hayLocal){
         document.getElementById('vd').textContent =
           'No se pudo verificar si hay una versión más nueva. Estás viendo la última que se cargó en este equipo.';
+        document.getElementById('hstate').textContent += ' · copia de este equipo';
         return;
       }
       document.getElementById('vt').textContent = 'No se pudo cargar el programa';
@@ -563,6 +630,7 @@ function render(){
   ['COSTURA','ACABADO'].forEach(function(t){
     if(ESTADO[t]) partes.push((t === 'COSTURA' ? 'Costura' : 'Acabados') + ' ' + isoADMY(ESTADO[t].fechaPrograma));
   });
+  if(SELLO) partes.push(SELLO + (FUENTE === 'respaldo' ? ' (respaldo)' : ''));
   document.getElementById('hstate').textContent = partes.join(' · ') || 'Sin programas publicados';
 
   var filas = ordenar(filtrar());

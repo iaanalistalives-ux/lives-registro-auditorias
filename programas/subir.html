@@ -208,6 +208,11 @@ font-size:12.5px;margin-bottom:14px;}
 /* ================= CONFIGURACION ================= */
 var APP_URL = 'https://script.google.com/macros/s/AKfycbysmAxeZUtMCf13Jv7VZVU7AC-9Ut28yABhLcKbRizSKPO4i2JRsdcAmZLKvlzBE1dJ/exec'; /* URL /exec del Apps Script. Vacio = modo prueba */
 var DIAS_ALERTA = 3;   /* a partir de cuantos dias el programa se marca como viejo */
+/* v2 (17/09/2026): el estado se lee de Supabase (lo mismo que ven las auditoras);
+   si no responde, se pide al Apps Script. Publicar sigue pasando por el Apps Script,
+   que copia a Supabase en el mismo momento. */
+var SB_URL = 'https://xxfufpddgoyhbotjmaiy.supabase.co';
+var SB_KEY = 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
 
 /* ================= MAPEO DE COLUMNAS ================= */
 var DEF = {
@@ -487,8 +492,31 @@ function pintarEstado(){
   document.getElementById('hstate').textContent = partes.length ? partes.join(' · ') : 'Sin programas publicados';
 }
 
+function estadoSupabase(){
+  var ctrl = window.AbortController ? new AbortController() : null;
+  var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, 10000) : null;
+  return fetch(SB_URL + '/rest/v1/publico_programas_estado?select=tipo,fechaHora,usuario,fechaPrograma,filas,hay_carga', {
+    headers:{apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY},
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function(res){
+    if(t) clearTimeout(t);
+    if(!res.ok) throw new Error('Supabase ' + res.status);
+    return res.json();
+  }).then(function(est){
+    if(!est.length) throw new Error('Supabase sin programas');
+    var out = {COSTURA:null, ACABADO:null};
+    est.forEach(function(e){
+      if(e.hay_carga) out[e.tipo] = {fechaHora:e.fechaHora || '', usuario:e.usuario || '',
+                                     fechaPrograma:e.fechaPrograma || '', filas:Number(e.filas || 0)};
+    });
+    return {ok:true, estado:out};
+  });
+}
+
 function cargarEstado(){
-  llamar({accion:'estado'}).then(function(r){
+  var pedir = APP_URL ? estadoSupabase()['catch'](function(){ return llamar({accion:'estado'}); })
+                      : llamar({accion:'estado'});
+  pedir.then(function(r){
     if(r && r.ok && r.estado) ESTADO = r.estado;
     pintarEstado();
   })['catch'](function(){
@@ -728,8 +756,13 @@ function publicar(tipo){
     ESTADO[tipo] = {fechaHora:'ahora', usuario:usuario, archivo:out.archivo,
                     fechaPrograma:fp, filas:r.filas, opsSinMaestro:falt};
     pintarEstado();
+    if(r.estado) ESTADO = r.estado;
+    pintarEstado();
     msg.innerHTML = '<b style="color:#0F7A5A">Publicado.</b> ' + r.filas + ' filas · el programa anterior (' +
-                    r.filasAntes + ' filas) quedó guardado.';
+                    r.filasAntes + ' filas) quedó guardado.' +
+                    (r.supabase === 'pendiente'
+                      ? '<br><b style="color:#B45309">Las auditoras lo verán dentro de la próxima hora:</b> la copia rápida no respondió y se reintenta sola. No hace falta volver a publicar.'
+                      : ' Las auditoras ya lo ven.');
   })['catch'](function(err){
     btn.disabled = false;
     msg.innerHTML = '<span style="color:#DC2626;font-weight:700">No se pudo publicar: ' +

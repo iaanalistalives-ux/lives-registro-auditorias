@@ -208,7 +208,7 @@ font-size:12.5px;margin-bottom:14px;}
 /* ================= CONFIGURACION ================= */
 var APP_URL = 'https://script.google.com/macros/s/AKfycbysmAxeZUtMCf13Jv7VZVU7AC-9Ut28yABhLcKbRizSKPO4i2JRsdcAmZLKvlzBE1dJ/exec'; /* URL /exec del Apps Script. Vacio = modo prueba */
 var DIAS_ALERTA = 3;   /* a partir de cuantos dias el programa se marca como viejo */
-/* v2 (17/09/2026): el estado se lee de Supabase (lo mismo que ven las auditoras);
+/* v3 (17/09/2026): el estado se lee de Supabase (lo mismo que ven las auditoras);
    si no responde, se pide al Apps Script. Publicar sigue pasando por el Apps Script,
    que copia a Supabase en el mismo momento. */
 var SB_URL = 'https://xxfufpddgoyhbotjmaiy.supabase.co';
@@ -761,7 +761,7 @@ function publicar(tipo){
     msg.innerHTML = '<b style="color:#0F7A5A">Publicado.</b> ' + r.filas + ' filas · el programa anterior (' +
                     r.filasAntes + ' filas) quedó guardado.' +
                     (r.supabase === 'pendiente'
-                      ? '<br><b style="color:#B45309">Las auditoras lo verán dentro de la próxima hora:</b> la copia rápida no respondió y se reintenta sola. No hace falta volver a publicar.'
+                      ? '<br><b style="color:#B45309">Las auditoras lo verán en unos minutos:</b> la copia rápida no respondió y se reintenta sola. No hace falta volver a publicar.'
                       : ' Las auditoras ya lo ven.');
   })['catch'](function(err){
     btn.disabled = false;

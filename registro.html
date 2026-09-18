@@ -1052,6 +1052,14 @@ function mostrarError(donde, e){
   }catch(_){}
 }
 window.addEventListener('error', function(ev){
+  /* "Script error." sin detalle viene de una respuesta del Apps Script (otra dirección),
+     normalmente una que llegó tarde o con una página de error de Google. Eso ya lo
+     maneja la cola de envíos, que reintenta sin duplicar y avisa si algo quedó sin
+     confirmar: no se muestra la franja roja por eso. (18/09) */
+  if (ev && !ev.error && /^Script error\.?$/i.test(String(ev.message || ''))) {
+    console.warn('Respuesta del Apps Script no válida o tardía; la cola la reintenta.');
+    return;
+  }
   mostrarError('la página', (ev && (ev.error || ev.message)) || 'desconocido');
 });
 
@@ -1583,7 +1591,13 @@ var jn=0;
 function jsonpScript(params, ok, fallo){
   var cb='cb'+(++jn)+'_'+Date.now();
   var s=document.createElement('script');
-  var t=setTimeout(function(){ limpiar(); fallo && fallo('tiempo agotado'); }, 60000);
+  var t=setTimeout(function(){
+    limpiar();
+    /* Si la respuesta llega después, encuentra dónde caer y no rompe la página.
+       La cola ya la reintentó con el mismo identificador, así que no se duplica. */
+    window[cb]=function(){ try{ delete window[cb]; }catch(e){ window[cb]=undefined; } };
+    fallo && fallo('tiempo agotado');
+  }, 60000);
   function limpiar(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
     if(s.parentNode) s.parentNode.removeChild(s); }
   window[cb]=function(r){ limpiar(); ok(r); };

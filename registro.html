@@ -1600,7 +1600,14 @@ function jsonpScript(params, ok, fallo){
   }, 60000);
   function limpiar(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
     if(s.parentNode) s.parentNode.removeChild(s); }
-  window[cb]=function(r){ limpiar(); ok(r); };
+  /* Lo que se hace con la respuesta corre aquí dentro con try/catch: si fallara,
+     el navegador lo taparía como "Script error." (la respuesta viene de otra
+     dirección) y no se sabría qué pasó. Así se muestra el error real. (18/09) */
+  window[cb]=function(r){
+    limpiar();
+    try { ok(r); }
+    catch (e) { console.error(e); mostrarError('al procesar la respuesta del servidor', e); }
+  };
   s.onerror=function(){ limpiar(); fallo && fallo('sin conexión'); };
   var qs=[];
   for(var k in params){ if(params[k]!==undefined && params[k]!==null) qs.push(k+'='+encodeURIComponent(params[k])); }

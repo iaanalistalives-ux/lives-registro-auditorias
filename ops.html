@@ -25,25 +25,12 @@
   box-shadow:0 10px 30px rgba(14,59,54,.13);}
 #lsCapa .lsCab{background:#0E3B36;border-bottom:3px solid #10B981;padding:20px;display:flex;justify-content:center;}
 #lsCapa .lsCab img{height:34px;display:block;}
-#lsCapa .lsCuerpo{padding:24px 24px 20px;}
-#lsCapa .lsTit{font-size:19px;font-weight:800;color:#1a1a1a;margin-bottom:5px;}
-#lsCapa .lsSub{font-size:13px;color:#0F7A5A;margin-bottom:18px;line-height:1.4;}
-#lsCapa .lsCampo{margin-bottom:15px;}
-#lsCapa label{display:block;font-size:10.5px;font-weight:800;color:#5F726C;text-transform:uppercase;
-  letter-spacing:.7px;margin-bottom:6px;}
-#lsCapa input{width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1a1a1a;min-height:44px;
-  padding:11px 13px;border:1.5px solid #DCE5E2;border-radius:9px;background:#fff;outline:none;}
-#lsCapa input:focus{border-color:#0F7A5A;}
-#lsCapa .lsBtn{width:100%;min-height:46px;background:#0F7A5A;color:#fff;border:none;border-radius:9px;
-  font-family:inherit;font-size:15px;font-weight:800;padding:13px;cursor:pointer;}
+#lsCapa .lsCuerpo{padding:24px 24px 22px;text-align:center;}
+#lsCapa .lsTit{font-size:19px;font-weight:800;color:#1a1a1a;margin-bottom:8px;}
+#lsCapa .lsSub{font-size:13.5px;color:#5F726C;margin-bottom:22px;line-height:1.5;}
+#lsCapa .lsBtn{display:inline-block;min-height:46px;background:#0F7A5A;color:#fff;border:none;border-radius:9px;
+  font-family:inherit;font-size:15px;font-weight:800;padding:13px 26px;text-decoration:none;line-height:20px;}
 #lsCapa .lsBtn:hover{background:#0B815E;}
-#lsCapa .lsBtn:disabled{opacity:.6;cursor:default;}
-#lsCapa .lsErr{display:none;background:#FDE8E6;color:#B42318;border-radius:9px;padding:10px 12px;
-  font-size:13px;font-weight:700;margin-bottom:14px;}
-#lsCapa .lsErr.ver{display:block;}
-#lsCapa .lsPie{margin-top:16px;padding-top:14px;border-top:1px dashed #DCE5E2;font-size:11.5px;
-  color:#5F726C;line-height:1.6;text-align:center;}
-#lsCapa .lsPie a{color:#0F7A5A;font-weight:700;}
 </style>
 <script id="lsJs">
 (function(){
@@ -66,7 +53,15 @@
 
   /* ---------- guardar y leer la sesión (mismo formato que el portal) ---------- */
   function leerJ(area, k){ try{ return JSON.parse(area.getItem(k) || 'null'); }catch(e){ return null; } }
-  function valida(d){ return !!(d && d.token && d.permisos); }
+  function valida(d){
+    /* 21/09: una sesión sin llave de Supabase (d.sb.refresh) es una sesión VIEJA,
+       de antes del cambio del lunes — típicamente una pestaña o app que nunca se
+       cerró desde entonces. Antes se aceptaba igual y fallaba después, en silencio,
+       en la primera lectura a Supabase: parecía "conectada" pero no leía nada, y al
+       escribir la clave de nuevo no siempre se notaba el arreglo. Ahora se descarta
+       de una vez y se pide entrar limpio, con recarga, como una sesión nueva. */
+    return !!(d && d.token && d.permisos && d.sb && d.sb.access && d.sb.refresh);
+  }
 
   /* La sesión vigente. Si hay dos copias (la de esta pestaña y el respaldo común) y son
      de la misma persona, se queda con la llave más nueva: otra pestaña o el portal pudo
@@ -196,9 +191,9 @@
         if (r.status !== 401) return r;
         /* 401: la llave venció o la cerraron. Se renueva una vez y se reintenta. */
         return llave(true).then(function(tk2){
-          if (!tk2){ pedirSesion(false); return r; }
+          if (!tk2){ pedirSesion(); return r; }
           return fetchBase(url, conLlave(init, tk2)).then(function(r2){
-            if (r2.status === 401) pedirSesion(false);
+            if (r2.status === 401) pedirSesion();
             return r2;
           });
         });
@@ -219,8 +214,12 @@
     }catch(e){}
   }
 
-  /* ---------- pantalla de acceso ---------- */
-  var recargarAlEntrar = true;
+  /* ---------- aviso de "sin sesión" (21/09: sin formulario propio) ----------
+     El portal es la ÚNICA puerta. Esta herramienta nunca pide usuario ni clave: si
+     no hay sesión del portal (o quedó vieja/vencida), solo avisa y enlaza de vuelta
+     al portal. Entrar ahí es lo único que arregla esto — no hay nada que escribir
+     aquí. Esto es a propósito: evita que cada herramienta tenga su propia puerta
+     que pueda fallar o quedar desincronizada del portal. */
   function capa(){
     var c = document.getElementById('lsCapa');
     if (c) return c;
@@ -229,96 +228,26 @@
     c.setAttribute('role', 'dialog');
     c.innerHTML =
       '<div class="lsCaja"><div class="lsCab"><img alt="LIVES" src="' + LOGO + '"></div>' +
-      '<div class="lsCuerpo"><div class="lsTit" id="lsTit">Entra para usar esta herramienta</div>' +
-      '<div class="lsSub" id="lsSub">Con tu usuario y clave de siempre, los mismos del portal.</div>' +
-      '<div class="lsErr" id="lsErr"></div>' +
-      '<div class="lsCampo"><label for="lsUsu">Usuario</label>' +
-      '<input type="text" id="lsUsu" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Tu usuario"></div>' +
-      '<div class="lsCampo"><label for="lsCla">Clave de acceso</label>' +
-      '<input type="password" id="lsCla" autocomplete="current-password" placeholder="••••••"></div>' +
-      '<button class="lsBtn" id="lsBtn" type="button">Entrar</button>' +
-      '<div class="lsPie">Lo que ya escribiste en la pantalla no se pierde.<br>' +
-      '<a href="' + PORTAL + '" target="_top">Ir al portal</a></div></div></div>';
+      '<div class="lsCuerpo"><div class="lsTit" id="lsTit">Abre esto desde el portal</div>' +
+      '<div class="lsSub" id="lsSub">Esta herramienta no tiene su propia entrada. ' +
+      'Ve al portal LIVES e inicia sesión ahí; esta pantalla se abre sola en cuanto lo hagas.</div>' +
+      '<a class="lsBtn" href="' + PORTAL + '" target="_top">Ir al portal</a></div></div>';
     document.body.appendChild(c);
-    document.getElementById('lsBtn').addEventListener('click', entrar);
-    ['lsUsu', 'lsCla'].forEach(function(id){
-      document.getElementById(id).addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
-    });
     return c;
   }
-  function mostrarError(t){ var e = document.getElementById('lsErr'); e.textContent = t; e.classList.add('ver'); }
 
   var pidiendo = false;
-  /* alInicio = true: no había sesión al abrir; tras entrar se recarga (no hay nada escrito).
-     alInicio = false: la sesión venció mientras se trabajaba; tras entrar solo se cierra el
-     aviso, para no borrar lo que la persona estaba llenando. */
-  function pedirSesion(alInicio){
+  function pedirSesion(){
     if (pidiendo) return;
     pidiendo = true;
-    recargarAlEntrar = !!alInicio;
-    function abrir(){
-      var c = capa();
-      if (!alInicio){
-        document.getElementById('lsTit').textContent = 'Tu sesión venció';
-        document.getElementById('lsSub').textContent = 'Vuelve a entrar para seguir. Lo que escribiste sigue en la pantalla.';
-      }
-      var s = sesion();
-      if (s && s.usuario) document.getElementById('lsUsu').value = s.usuario;
-      c.classList.add('ver');
-      setTimeout(function(){
-        var u = document.getElementById('lsUsu');
-        (u.value ? document.getElementById('lsCla') : u).focus();
-      }, 50);
-    }
+    function abrir(){ capa().classList.add('ver'); }
     if (document.body) abrir(); else document.addEventListener('DOMContentLoaded', abrir);
-  }
-
-  function entrar(){
-    var btn = document.getElementById('lsBtn');
-    var usuario = document.getElementById('lsUsu').value.trim().toLowerCase();
-    var clave = String(document.getElementById('lsCla').value || '').trim().toLowerCase();
-    document.getElementById('lsErr').classList.remove('ver');
-    if (!usuario || !clave){ mostrarError('Escribe tu usuario y tu clave.'); return; }
-    btn.disabled = true; btn.textContent = 'Comprobando…';
-    var eq = equipo();
-    function fin(t){ btn.disabled = false; btn.textContent = 'Entrar'; document.getElementById('lsCla').value = ''; if (t) mostrarError(t); }
-    pedir('/auth/v1/token?grant_type=password', { email: usuario + DOMINIO, password: PREFIJO + clave })
-      .then(function(r){
-        if (r.status >= 500) throw new Error('Supabase ' + r.status);
-        if (!r.ok){
-          pedir('/rest/v1/rpc/registrar_ingreso_fallido', { p_usuario: usuario, p_equipo: eq }).catch(function(){});
-          var j = r.json || {};
-          var bloqueado = /banned/i.test(String(j.error_code || j.code || '') + ' ' + String(j.msg || j.message || j.error_description || ''));
-          fin(bloqueado ? 'Tu acceso está desactivado. Habla con el área de Datos e IA.' : 'Usuario o clave incorrectos.');
-          return;
-        }
-        var t = r.json || {};
-        return pedir('/rest/v1/rpc/mi_sesion', { p_equipo: eq }, t.access_token).then(function(m){
-          if (!m.ok || !m.json) throw new Error('mi_sesion ' + m.status);
-          var d = m.json;
-          if (!d.ok){ fin(d.error || 'No se pudo abrir tu sesión.'); return; }
-          d.token = 'supabase';
-          d.sb = { access: t.access_token, refresh: t.refresh_token,
-                   exp: Date.now() + (Number(t.expires_in) || 3600) * 1000 };
-          return pedir('/rest/v1/rpc/version_sesion', {}, null, 5000)
-            .then(function(v){ d.vsesion = (v.ok && typeof v.json === 'number') ? v.json : null; },
-                  function(){ d.vsesion = null; })
-            .then(function(){
-              guardar(d);
-              pidiendo = false;
-              if (recargarAlEntrar){ fijarNombre(d); location.reload(); return; }
-              document.getElementById('lsCapa').classList.remove('ver');
-              fin('');
-            });
-        });
-      })
-      .catch(function(){ fin('No hay conexión con el sistema de accesos. Acércate a una zona con mejor señal y vuelve a intentarlo.'); });
   }
 
   /* ---------- al abrir ---------- */
   var s0 = sesion();
   if (!s0){
-    pedirSesion(true);
+    pedirSesion();
   } else {
     fijarNombre(s0);
     /* Si alguien ejecutó cerrar_todas_las_sesiones(), esta sesión ya no vale. Sin señal
@@ -326,7 +255,7 @@
     pedir('/rest/v1/rpc/version_sesion', {}, null, 8000).then(function(v){
       if (!v.ok || typeof v.json !== 'number') return;
       var s = sesion(); if (!s) return;
-      if (s.vsesion === undefined || (s.vsesion !== null && s.vsesion !== v.json)){ borrar(); pedirSesion(true); return; }
+      if (s.vsesion === undefined || (s.vsesion !== null && s.vsesion !== v.json)){ borrar(); pedirSesion(); return; }
       if (s.vsesion === null){ s.vsesion = v.json; guardar(s); }
     }).catch(function(){});
     /* Abierta fuera del portal: se anota igual que cuando se abre desde el portal. */
@@ -343,10 +272,10 @@
   }
 
   window.LIVES_SESION = {
-    version: 'lives-sesion v1 · 2026-09-18',
+    version: 'lives-sesion v2 · 2026-09-21 (sin login propio, solo portal)',
     actual: function(){ var s = sesion(); return s ? { usuario: s.usuario, nombre: s.nombre, conSupabase: !!s.sb } : null; },
     llave: function(){ return llave(false); },
-    pedir: function(){ pedirSesion(false); }
+    pedir: function(){ pedirSesion(); }
   };
 })();
 </script>

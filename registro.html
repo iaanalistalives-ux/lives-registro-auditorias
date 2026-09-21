@@ -2564,6 +2564,58 @@ function enviarTodo(){
 /* Se manda de uno en uno. Antes salían todos a la vez y Apps Script los ponía
    en fila esperando el mismo candado: los últimos se quedaban sin tiempo y
    fallaban aunque no hubiera nada mal. */
+/* ===== PARALELO — solo comparación, NUNCA afecta lo que ve Athina (21/09) =====
+   Solo para AUDITORÍA FINAL, que es el tipo que comparte con el formulario de
+   auditoras. Los demás tipos (LINEAS, SERVINSP, EMPAQUE, CLIENTE) siguen solo
+   por Apps Script; esto no los toca.
+   Manda los mismos datos a sync_guardar_auditoria_paralelo en Supabase, que
+   escribe en tablas APARTE (auditorias_paralelo), nunca en la tabla real que
+   ya alimenta los dashboards. Usa el mismo token que ya lleva el envío, para
+   poder comparar después con SQL.
+   Va por XMLHttpRequest a propósito, no por window.fetch: así nunca dispara el
+   aviso de "sin sesión" del bloque de sesión si algo falla — esto es invisible
+   siempre, incluso si falla. */
+function compararParalelo(envio, idReal){
+  try{
+    if (String(envio.tipo || '').toUpperCase() !== 'FINAL') return;
+    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
+    window.LIVES_SESION.llave().then(function(tk){
+      if (!tk) return;
+      try{
+        function jparse(v, def){ try{ return JSON.parse(v); }catch(e){ return def; } }
+        var defs = jparse(envio.defectos, []).map(function(d){
+          return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad,
+                    cod: d.cod, seccion: d.seccion, categoria: d.categoria, subtipo: d.subtipo, nota: d.nota };
+        });
+        var body = {
+          tipo: 'FINAL', fecha: envio.fecha, grupo: envio.grupo, estilo: envio.estilo,
+          nivelAql: String(envio.nivelAql || '1.5'), lote: envio.lote, muestra: envio.muestra,
+          captura: 'DIGITADO',
+          licencia: envio.licencia === '1', override: envio.override === 'SÍ',
+          reproceso: envio.reproceso === '1', esReauditoria: envio.esReauditoria || '',
+          reprocesaDe: envio.reprocesaDe || '', motivoReproceso: envio.motivoReproceso || '',
+          pedido: envio.pedido || 0, op: envio.op || '',
+          proceso: envio.proceso || '', intExt: envio.intExt || '', servicio: envio.servicio || '',
+          auditores: jparse(envio.auditores, []), digitador: envio.digitador || '',
+          colores: jparse(envio.colores, []), destinos: jparse(envio.destinos, []),
+          defectos: defs, resultado: envio.resultado || '',
+          overrideAutoriza: envio.overrideAutoriza || '', overrideMotivo: envio.overrideMotivo || '',
+          eCliente: envio.eCliente || '',
+          token: envio.token
+        };
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+        /* sin manejo de respuesta a propósito: esto es solo para comparar después con
+           SQL. Ni un error aquí debe tocar lo que Athina ve o hace. */
+        xhr.send(JSON.stringify({ payload: body }));
+      }catch(e){}
+    }).catch(function(){});
+  }catch(e){}
+}
+
 function procesarCola(){
   if(cola.some(function(i){ return i.enviando; })) return;
   var it = null;
@@ -2577,6 +2629,7 @@ function procesarCola(){
         it.estado='ok';
         it.msg = r.repetido ? 'Ya estaba guardada, no se duplicó.' : (r.mensaje||'Guardado.');
         it.nAud=r.nAuditoria; it.idAud=r.id;
+        if (!r.repetido) compararParalelo(it.envio, r.id);
       }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; }
       pintarLog(); procesarCola();

@@ -3211,6 +3211,33 @@ function elegirDefFila(o, inp){
   cerrarDropFila();
 }
 
+/* ===== CATÁLOGO RÁPIDO — directo a Supabase (21/09) =====
+   Reemplaza accion:'agregarcat' del Apps Script. Devuelve el mismo formato
+   {ok, agregado, valor} que ya espera el código de arriba, así que no hace
+   falta tocar quien lo llama. Silencioso si falla: como antes, es un "de
+   paso" mientras se digita, no algo que deba interrumpir a Athina. */
+function agregarCatSupabase(que, valor, detalle, callback){
+  callback = callback || function(){};
+  try{
+    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') { callback({ok:false}); return; }
+    window.LIVES_SESION.llave().then(function(tk){
+      if (!tk) { callback({ok:false}); return; }
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_agregar_cat', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+      xhr.onload = function(){
+        var r = null; try{ r = JSON.parse(xhr.responseText); }catch(e){}
+        callback(r || {ok:false});
+      };
+      xhr.onerror = function(){ callback({ok:false}); };
+      xhr.send(JSON.stringify({ p_que: que, p_valor: valor, p_detalle: detalle || null,
+                                  p_usuario: U($('digitador').value) }));
+    }).catch(function(){ callback({ok:false}); });
+  }catch(e){ callback({ok:false}); }
+}
+
 /* Guarda el defecto nuevo en el catálogo del Sheet y lo usa al instante. */
 function registrarDefectoNuevo(nombre, luego){
   nombre=U(nombre);                       // en MAYÚSCULAS, como todo lo demás
@@ -3220,8 +3247,7 @@ function registrarDefectoNuevo(nombre, luego){
     guardarLocal('lives_cat_aud', CAT);
   }
   luego && luego(d);
-  jsonp({accion:'agregarcat', clave:CLAVE, que:'DEFECTO', valor:nombre,
-         detalle:'Otros', usuario:U($('digitador').value)}, function(r){
+  agregarCatSupabase('DEFECTO', nombre, 'Otros', function(r){
     if(r && r.ok && r.agregado) setTimeout(cargarCatalogos, 400);
   });
 }
@@ -3783,8 +3809,10 @@ autocompletar('destino','dDestino', function(){
     CAT.destinos.push([cod,'POR IDENTIFICAR']);
     guardarLocal('lives_cat_aud', CAT);
   }
-  jsonp({accion:'agregarcat', clave:CLAVE, que:'DESTINO', valor:cod,
-         detalle:'POR IDENTIFICAR', usuario:U($('digitador').value)}, function(){});
+  /* 21/09: solo se permite crear DEFECTOS desde este formulario — el resto de
+     catálogos (destinos, auditoras, etc.) ya no se amplía desde aquí. Esto
+     solo se recuerda en esta sesión del navegador para que salga de nuevo
+     como sugerencia; no se guarda en ningún catálogo real. */
 });
 autocompletar('po','dPo', function(){ return (SUG.PO||[]).map(function(v){ return {texto:v}; }); });
 $('btnGuardar').onclick=guardar;

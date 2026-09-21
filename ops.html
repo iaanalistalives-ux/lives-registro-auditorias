@@ -571,22 +571,23 @@ function subir(){
   });
 }
 
-/* Un solo envío con todas las filas. Se manda como texto para que el navegador
-   no pida permiso previo al Apps Script. */
+/* 21/09: un solo envío con todas las filas, DIRECTO a Supabase — ya no pasa
+   por el Sheet ni por Apps Script. sync_ops_reemplazar borra la tabla y la
+   vuelve a llenar en una sola transacción: si algo falla a mitad de camino,
+   Postgres deshace todo solo y la tabla queda como estaba, nunca a medias. */
 function subirDeUnaVez(){
   var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
   var filas = FILAS.map(function(f){
     return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente];
   });
-  return fetch(API, {
-    method:'POST',
-    body: JSON.stringify({accion:'opscompleta', clave:CLAVE, usuario:U($('usuario').value),
-                          total:FILAS.length, filas:filas}),
+  return fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_ops_reemplazar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ p_filas: filas, p_usuario: U($('usuario').value) }),
     signal: control ? control.signal : undefined
   }).then(function(r){
     clearTimeout(reloj);
-    if(!r.ok) return {ok:false, error:'http '+r.status};
+    if(!r.ok) return r.text().then(function(t){ return {ok:false, error:'Supabase '+r.status+': '+t.slice(0,160)}; });
     return r.json().catch(function(){ return {ok:false, error:'respuesta ilegible'}; });
   }, function(e){ clearTimeout(reloj); throw e; });
 }

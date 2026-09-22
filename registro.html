@@ -631,14 +631,14 @@
 
       <div class="row">
         <div class="f sm ac" id="wOp">
-          <label for="op">OP</label>
-          <input type="text" id="op" autocomplete="off" placeholder="Opcional">
+          <label for="op">OP *</label>
+          <input type="text" id="op" autocomplete="off" placeholder="Obligatoria">
           <div class="drop" id="dOp"></div>
-          <div class="hint" id="hOp">Llena lo demás sola</div>
+          <div class="hint" id="hOp">Obligatoria: el resto del pedido sale de la base de OPs</div>
         </div>
         <div class="f ac">
           <label for="grupo">Grupo</label>
-          <input type="text" id="grupo" autocomplete="off" placeholder="THY-100">
+          <input type="text" id="grupo" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dGrupo"></div>
           <div class="hint" id="hGrupo">El cliente sale solo del prefijo</div>
         </div>
@@ -652,17 +652,17 @@
         </div>
         <div class="f ac">
           <label for="estilo">Estilo</label>
-          <input type="text" id="estilo" autocomplete="off">
+          <input type="text" id="estilo" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dEstilo"></div>
         </div>
         <div class="f ac" id="wECliente">
           <label for="eCliente">Estilo cliente</label>
-          <input type="text" id="eCliente" autocomplete="off">
+          <input type="text" id="eCliente" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dECliente"></div>
         </div>
         <div class="f ac">
           <label for="color">Color</label>
-          <input type="text" id="color" autocomplete="off">
+          <input type="text" id="color" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dColor"></div>
         </div>
       </div>
@@ -670,17 +670,17 @@
       <div class="row" id="rowPo" style="margin-top:10px">
         <div class="f ac" id="wPo">
           <label for="po">PO</label>
-          <input type="text" id="po" autocomplete="off">
+          <input type="text" id="po" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dPo"></div>
         </div>
         <div class="f ac" id="wDestino">
           <label for="destino">Destino</label>
-          <input type="text" id="destino" autocomplete="off" placeholder="USA, ECO…">
+          <input type="text" id="destino" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
           <div class="drop" id="dDestino"></div>
         </div>
         <div class="f" id="wPedido">
           <label for="pedido">Pedido</label>
-          <input type="text" id="pedido" autocomplete="off">
+          <input type="text" id="pedido" class="ro" readonly tabindex="-1" autocomplete="off" placeholder="Sale de la OP">
         </div>
       </div>
 
@@ -760,7 +760,8 @@
           <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--stone)">
             · la auditora revisa varios juntos; el lote y la muestra son del conjunto,
             aquí solo se anota qué había dentro</span></div>
-        <div class="row" style="align-items:flex-end">
+        <div class="hint" style="margin:4px 0 6px">Toca las opciones de la OP (arriba) para agregar cada color: color, estilo cliente y PO salen de la base de OPs.</div>
+        <div class="row" style="align-items:flex-end;display:none">
           <div class="f"><label for="lnColor">Color</label><input type="text" id="lnColor" autocomplete="off"></div>
           <div class="f"><label for="lnEcli">Estilo cliente</label><input type="text" id="lnEcli" autocomplete="off"></div>
           <div class="f sm"><label for="lnPo">PO</label><input type="text" id="lnPo" autocomplete="off"></div>
@@ -786,7 +787,7 @@
         <button class="btn" id="btnGuardar" type="button">Agregar a la lista <span class="kbd">F2</span></button>
         <button class="btn sec" id="btnLimpiar" type="button">Limpiar <span class="kbd">Esc</span></button>
         <button class="btn env" id="btnEnviar" type="button" disabled>Guardar todo</button>
-        <span class="mant">Al agregar, mantener:
+        <span class="mant" style="display:none">Al agregar, mantener:
           <label><input type="checkbox" id="mGrupo" checked> Grupo</label>
           <label><input type="checkbox" id="mEstilo" checked> Estilo</label>
           <label><input type="checkbox" id="mColor"> Color</label>
@@ -904,15 +905,16 @@
     <div class="mtHead">Corregir auditoría</div>
     <div class="mtBody">
       <div class="mtLote" id="corrTit"></div>
+      <div class="hint" style="margin:0 0 8px">Grupo, estilo, color, PO y pedido salen de la OP y no se corrigen aquí. Si la OP estaba mal, anula esta auditoría y vuelve a digitarla con la OP correcta.</div>
       <div class="row">
         <div class="f sm"><label for="cFecha">Fecha</label><input type="date" id="cFecha"></div>
-        <div class="f"><label for="cGrupo">Grupo</label><input type="text" id="cGrupo"></div>
-        <div class="f"><label for="cEstilo">Estilo</label><input type="text" id="cEstilo"></div>
-        <div class="f" id="wcColor"><label for="cColor">Color</label><input type="text" id="cColor"></div>
+        <div class="f"><label for="cGrupo">Grupo</label><input type="text" id="cGrupo" class="ro" readonly tabindex="-1"></div>
+        <div class="f"><label for="cEstilo">Estilo</label><input type="text" id="cEstilo" class="ro" readonly tabindex="-1"></div>
+        <div class="f" id="wcColor"><label for="cColor">Color</label><input type="text" id="cColor" class="ro" readonly tabindex="-1"></div>
       </div>
       <div class="row" style="margin-top:8px">
-        <div class="f sm" id="wcPo"><label for="cPo">PO</label><input type="text" id="cPo"></div>
-        <div class="f sm" id="wcPedido"><label for="cPedido">Pedido</label><input type="number" id="cPedido"></div>
+        <div class="f sm" id="wcPo"><label for="cPo">PO</label><input type="text" id="cPo" class="ro" readonly tabindex="-1"></div>
+        <div class="f sm" id="wcPedido"><label for="cPedido">Pedido</label><input type="number" id="cPedido" class="ro" readonly tabindex="-1"></div>
         <div class="f sm"><label for="cLote">Lote</label><input type="number" id="cLote"></div>
         <div class="f sm"><label for="cMuestra">Muestra</label><input type="number" id="cMuestra"></div>
       </div>
@@ -1189,8 +1191,8 @@ function aplicarTipo(){
   /* Se avisa antes de llegar al guardado. */
   var hOp=$('hOp'), fx=T($('fecha').value), hh=new Date();
   var mm=hh.getFullYear()+'-'+('0'+(hh.getMonth()+1)).slice(-2);
-  if(hOp && fx.slice(0,7)===mm && !T($('op').value)){
-    hOp.className='hint'; hOp.textContent='Obligatoria este mes';
+  if(hOp && !T($('op').value)){
+    hOp.className='hint'; hOp.textContent='Obligatoria: el resto del pedido sale de la base de OPs';
   }
   var wc = $('color') ? $('color').closest('.f') : null;
   if(wc) wc.style.display = esCli ? 'none' : '';
@@ -1640,6 +1642,7 @@ function pintarChips(){
 function autocompletar(inputId, dropId, fuente, alElegir){
   var inp=$(inputId), dr=$(dropId), opts=[], sel=-1;
   function buscar(){
+    if(inp.readOnly){ cerrar(); return; }   /* 22/09: los datos del pedido no se eligen a mano */
     var q=inp.value, base=fuente();
     opts=[];
     for(var i=0;i<base.length && opts.length<30;i++) if(coincide(base[i].texto,q)) opts.push(base[i]);
@@ -1727,30 +1730,52 @@ var OPS_ACT = null;
 
 function limpiarTela(){ $('tela').value=''; }
 
+/* 22/09: TODO sale de la OP. Grupo, estilo, estilo cliente, color, PO, destino y
+   pedido solo se llenan desde la base de OPs; no se escriben a mano. Sin OP, o con
+   una OP que no está en la base, no se puede agregar la auditoría. En una
+   corrección los datos vienen de la auditoría guardada y no se tocan. */
+var OP_RESUELTA = '';
+var OP_INEXISTENTE = '';   /* última OP que se buscó y no estaba en la base */
+var OPS_FILAS = null;          /* base de OPs completa, para validar al guardar */
+function cargarOpsFilas(){
+  return sbrOps().then(function(f){ OPS_FILAS=f; return f; });
+}
+function limpiarLoteOP(){
+  ['grupo','estilo','eCliente','color','po','destino','pedido','cliente'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
+  limpiarTela(); lineas=[]; pintarLineas();
+  if($('opcOps')){ $('opcOps').style.display='none'; $('opcOps').innerHTML=''; }
+  prevLote=null; esReaud='';
+}
 function consultarOps(){
-  var op=U($('op')?$('op').value:''), gr=U($('grupo').value), es=U($('estilo').value);
-  if(!op && !gr && !es){ OPS_ACT=null; limpiarTela(); $('hOp').className='hint';
-    $('hOp').textContent='Llena lo demás sola'; return; }
-  jsonp({accion:'opsclave', op:op, grupo:gr, estilo:es}, function(r){
+  if(editando) return;
+  var op=U($('op')?$('op').value:'');
+  if(!op){
+    if(OP_RESUELTA || T($('grupo').value)) limpiarLoteOP();
+    OP_RESUELTA=''; OPS_ACT=null;
+    $('hOp').className='hint'; $('hOp').textContent='Obligatoria: el resto del pedido sale de la base de OPs';
+    return;
+  }
+  if(op===OP_RESUELTA) return;
+  limpiarLoteOP(); OPS_ACT=null; OP_RESUELTA='';
+  $('hOp').className='hint'; $('hOp').textContent='Buscando la OP…';
+  jsonp({accion:'opsclave', op:op}, function(r){
+    if(U($('op').value)!==op) return;               /* ya escribió otra */
     if(!r || !r.ok || !r.existe){
-      OPS_ACT=null; limpiarTela();
-      if(op){ $('hOp').className='hint err';
-        $('hOp').textContent='Esa OP no está en la tabla. Digita a mano.'; }
+      OP_INEXISTENTE=op;
+      $('hOp').className='hint err';
+      $('hOp').textContent='Esa OP no está en la base de OPs. Sin OP no se puede digitar: revisa el número o avisa a Christian para que actualice la base.';
       return;
     }
-    OPS_ACT=r;
+    OPS_ACT=r; OP_RESUELTA=op;
     $('hOp').className='hint'+(r.n>1?'':' ok');
-    $('hOp').textContent = r.n>1
-      ? 'Esta OP tiene varias opciones — elige abajo.'
-      : 'Datos cargados del sistema.';
-    /* Solo se llena lo que es único: nunca se elige por ella. */
-    if(r.op && $('op') && !T($('op').value)) $('op').value=r.op;
-    if(r.grupo && !T($('grupo').value)){ $('grupo').value=r.grupo; aplicarCliente(); }
-    if(r.estilo && !T($('estilo').value)) $('estilo').value=r.estilo;
-    /* El estilo cliente es único por OP: se llena solo, no se elige. */
-    if(r.eCliente && $('eCliente') && !T($('eCliente').value)) $('eCliente').value=r.eCliente;
+    $('hOp').textContent = r.n>1 ? 'Esta OP tiene varias opciones — elige abajo.' : 'Datos cargados de la base de OPs.';
+    if(r.grupo){ $('grupo').value=r.grupo; aplicarCliente(); }
+    if(r.estilo) $('estilo').value=r.estilo;
+    if(r.eCliente && $('eCliente')) $('eCliente').value=r.eCliente;
     if(r.codTela) $('tela').value=r.codTela+(r.descTela?(' · '+r.descTela):'');
     ofrecerOpciones(r);
+  }, function(){
+    $('hOp').className='hint err'; $('hOp').textContent='Sin conexión: no se pudo consultar la OP.';
   });
 }
 
@@ -1769,11 +1794,7 @@ function ofrecerOpciones(r){
 
   /* Una sola combinación: se pone sin preguntar. */
   if(filas.length===1){
-    var f=filas[0];
-    if(f.color && !T($('color').value)) $('color').value=f.color;
-    if(f.po && !T($('po').value)) $('po').value=f.po;
-    if(f.destino && !T($('destino').value)) $('destino').value=f.destino;
-    if(f.pedido && $('pedido') && !T($('pedido').value)) $('pedido').value=f.pedido;
+    ponerCombinacion(filas[0]);
     cont.style.display='none'; cont.innerHTML='';
     buscarLote();
     return;
@@ -1790,21 +1811,65 @@ function ofrecerOpciones(r){
         (f.pedido?('<span class="ped">'+f.pedido.toLocaleString('es-PE')+' prendas</span>'):'')+
       '</button>';
     }).join('');
-  cont.style.display='';
+  /* Antes decía display='' y la regla .opcOps{display:none} del CSS lo volvía a
+     ocultar: las opciones de una OP con varias combinaciones nunca se veían. */
+  cont.style.display='block';
 
   Array.prototype.forEach.call(cont.querySelectorAll('.opcItem'),function(b){
     b.onclick=function(){
       var f=filas[+b.dataset.i];
-      if(f.color) $('color').value=f.color;
-      if(f.po) $('po').value=f.po;
-      if(f.destino) $('destino').value=f.destino;
-      if(f.pedido && $('pedido')) $('pedido').value=f.pedido;
-      if(f.codTela) $('tela').value=f.codTela+(f.descTela?(' · '+f.descTela):'');
-      if(f.eCliente && $('eCliente')) $('eCliente').value=f.eCliente;
-      cont.style.display='none';
+      ponerCombinacion(f);
+      /* En Cliente se auditan varios colores juntos: las opciones quedan a la vista
+         para seguir agregando. En los demás tipos se elige una sola. */
+      if($('tipo').value!=='CLIENTE') cont.style.display='none';
       buscarLote();
     };
   });
+}
+
+/* Pone en el formulario una combinación exacta de la base de OPs (siempre la
+   reemplaza: nunca se mezcla con algo escrito antes). En Cliente, cada opción
+   tocada se suma como un color auditado. */
+function ponerCombinacion(f){
+  $('color').value=f.color||''; $('po').value=f.po||''; $('destino').value=f.destino||'';
+  if($('pedido')) $('pedido').value=(f.pedido!=null && f.pedido!=='') ? f.pedido : '';
+  if(f.codTela) $('tela').value=f.codTela+(f.descTela?(' · '+f.descTela):'');
+  if($('eCliente')) $('eCliente').value=f.eCliente||$('eCliente').value;
+  if($('tipo').value==='CLIENTE'){
+    var c=U(f.color), e=U(f.eCliente), po=U(f.po);
+    if(!lineas.some(function(l){ return l.color===c && l.eCliente===e && l.po===po; })){
+      lineas.push({color:c, eCliente:e, po:po}); pintarLineas();
+    }
+  }
+}
+
+/* ¿Lo que está en el formulario es exactamente una combinación de la base de OPs?
+   Devuelve '' si todo calza, o el mensaje de lo que no calza. */
+function validarContraOps(){
+  var op=U($('op').value);
+  var filas=(OPS_FILAS||[]).filter(function(r){ return U(r.op)===op; });
+  if(!filas.length) return 'La OP '+op+' no está en la base de OPs.';
+  var g=U($('grupo').value), es=U($('estilo').value);
+  filas=filas.filter(function(r){ return U(r.grupo)===g && U(r.estilo)===es; });
+  if(!filas.length) return 'El grupo y el estilo no corresponden a la OP '+op+'. Vuelve a escribir la OP.';
+  var t=$('tipo').value, conPo=visible('wPo'), conDest=visible('wDestino');
+  if(t==='CLIENTE'){
+    for(var i=0;i<lineas.length;i++){
+      var l=lineas[i];
+      var ok=filas.some(function(r){ return U(r.color)===U(l.color) && (!conPo || U(r.po)===U(l.po)); });
+      if(!ok) return 'El color '+l.color+(l.po?(' / PO '+l.po):'')+' no está en la OP '+op+'.';
+    }
+    if(conDest && !filas.some(function(r){ return U(r.destino)===U($('destino').value); }))
+      return 'El destino no corresponde a la OP '+op+'.';
+    return '';
+  }
+  var c=U($('color').value), po=U($('po').value), de=U($('destino').value);
+  var ok2=filas.some(function(r){
+    return U(r.color)===c && (!conPo || U(r.po)===po) && (!conDest || U(r.destino)===de);
+  });
+  if(!ok2) return 'Color, PO o destino no corresponden a una opción de la OP '+op+'. Elige la opción de la lista.';
+  if(conPo && !po) return 'Esta opción de la OP no tiene PO en la base de OPs. Avisa a Christian para que actualice la base.';
+  return '';
 }
 
 /* Al elegir un color o un PO, se vuelve a consultar con eso puesto para que
@@ -2341,6 +2406,18 @@ function validar(){
 
   if(PIDE_AUDITOR[tv] && !T($('auditor').value) && !(tv==='EMPAQUE' && auds.length))
     return 'Falta la auditora.';
+  /* 22/09: la OP es obligatoria siempre (antes solo en el mes en curso) y todo el
+     pedido tiene que ser una combinación exacta de la base de OPs. En una corrección
+     el lote viene de la auditoría guardada y no se valida de nuevo. */
+  if(!editando){
+    if(!T($('op').value)) return 'Falta la OP. Es obligatoria: todo el pedido sale de la base de OPs.';
+    if(U($('op').value)===OP_INEXISTENTE) return 'La OP '+OP_INEXISTENTE+' no está en la base de OPs. Sin OP no se puede digitar: revisa el número o avisa a Christian.';
+    if(U($('op').value)!==OP_RESUELTA) return 'La OP todavía no se cargó de la base. Sal del campo OP y espera a que se llenen los datos.';
+    if(!OPS_FILAS) return 'Todavía no carga la base de OPs para revisar. Espera unos segundos y vuelve a intentar.';
+    var malOp=validarContraOps();
+    if(malOp) return malOp;
+  }
+
   if(!T($('grupo').value)) return 'Falta el grupo.';
   if(!T($('cliente').value)) return 'El prefijo del grupo no está en el catálogo.';
   if(!T($('estilo').value)) return 'Falta el estilo.';
@@ -2373,11 +2450,6 @@ function validar(){
      la tabla. Las de meses anteriores ya se despacharon y no están, así que
      exigirlas impediría digitar los papeles atrasados. Así la regla deja de
      depender de que alguien se acuerde. */
-  var fp=T($('fecha').value), hoy=new Date();
-  var mesActual = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2);
-  if(fp.slice(0,7)===mesActual && !T($('op').value))
-    return 'Falta la OP. Es obligatoria en los papeles del mes en curso.';
-
   if(prevLote && (prevLote.existe || (prevLote.rechazosOtraPO||[]).length) && !esReaud)
     return 'Ese lote ya tiene auditorías o un rechazo sin corregir: indica arriba si esta es re-auditoría o una auditoría distinta.';
   if(totalDef()>N($('muestra').value)) return 'Hay más prendas defectuosas que la muestra.';
@@ -2392,6 +2464,13 @@ var pend = leerLocal('lives_pend_aud') || [];
 function guardarPend(){ try{ guardarLocal('lives_pend_aud', pend); }catch(e){} }
 
 function guardar(){
+  if(!editando && !OPS_FILAS){
+    $('hGuardar').className='hint'; $('hGuardar').textContent='Cargando la base de OPs…';
+    cargarOpsFilas().then(function(){ guardar(); }, function(){
+      $('hGuardar').className='hint err'; $('hGuardar').textContent='No se pudo cargar la base de OPs. Revisa la conexión y vuelve a intentar.';
+    });
+    return;
+  }
   var err=validar();
   if(err){ $('hGuardar').className='hint err'; $('hGuardar').textContent=err; return; }
   if(editando){ guardarEdicion(); return; }
@@ -2426,7 +2505,7 @@ function guardar(){
     derivados: ders.filter(function(d){ return d.cantidad>0; })
                    .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
     derivadosDet: JSON.stringify(ders.filter(function(d){ return d.cantidad>0; })),
-    op: U($('op').value),
+    op: OP_RESUELTA,
     codTela: (OPS_ACT && OPS_ACT.codTela) ? OPS_ACT.codTela : '',
     descTela: (OPS_ACT && OPS_ACT.descTela) ? OPS_ACT.descTela : '',
     eCliente: U($('eCliente').value),
@@ -2508,6 +2587,8 @@ function cargarEnvioEnForm(e){
   $('fecha').value=e.fecha;
   if(e.auditores){ try{ $('auditor').value=(JSON.parse(e.auditores)[0])||''; }catch(err){} }
   $('inspector').value=e.inspector||''; $('linea').value=e.linea||'';
+  if($('op')) $('op').value=e.op||''; OP_RESUELTA=U(e.op||'');
+  OPS_ACT = e.codTela ? {codTela:e.codTela, descTela:e.descTela} : null;
   $('grupo').value=e.grupo||''; $('estilo').value=e.estilo||''; $('color').value=e.color||'';
   $('eCliente').value=e.eCliente||'';
   $('po').value=e.po||''; $('pedido').value=e.pedido||'';
@@ -2522,6 +2603,7 @@ function cargarEnvioEnForm(e){
   $('reproceso').checked=e.reproceso==='1';
   try{ $('destino').value=(JSON.parse(e.destinos)[0]||{}).codigo||''; }catch(err){}
   try{ defs=JSON.parse(e.defectos)||[]; }catch(err){ defs=[]; }
+  if(e.tipo==='CLIENTE'){ try{ lineas=JSON.parse(e.colores||'[]')||[]; }catch(err){ lineas=[]; } pintarLineas(); }
   aplicarCliente(); pintarDefs(); pintarDers();
 }
 
@@ -2766,13 +2848,19 @@ function limpiarRegistro(exito){
   ['lnColor','lnEcli','lnPo'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
   prevLote=null; esReaud=''; OPS_ACT=null;
   if($('opcOps')) $('opcOps').style.display='none';
+  /* La siguiente auditoría también sale de la OP: si fue un guardado y la OP sigue
+     escrita, se vuelven a ofrecer sus opciones; si se limpió a mano, se borra la OP. */
+  ['eCliente','cliente'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
+  OP_RESUELTA='';
+  if(exito && T($('op').value)) setTimeout(consultarOps, 0);
+  else if($('op')) $('op').value='';
   modoReproceso(false);
   if($('wReproceso')) $('wReproceso').style.display='none';
   $('prev').classList.remove('on');
   pintarDefs();
   $('hGuardar').className='hint '+(exito?'ok':'');
   $('hGuardar').textContent = exito ? 'Guardado. Sigue con la siguiente.' : '';
-  $('grupo').focus();
+  $('op').focus();
 }
 
 /* ---------------- editar y anular ---------------- */
@@ -3351,6 +3439,10 @@ function bloqueDeHoja(){
       faltaCli = faltaCli || U(f.grupo).substring(0,3);
       return;
     }
+    /* 22/09: grupo, estilo y color tienen que existir juntos en la base de OPs. */
+    if(!OPS_FILAS){ errores.push('Todavía no carga la base de OPs. Espera unos segundos y vuelve a intentar.'); return; }
+    var enOps=OPS_FILAS.some(function(r){ return U(r.grupo)===U(f.grupo) && U(r.estilo)===U(f.estilo) && U(r.color)===U(f.color); });
+    if(!enOps){ errores.push('Fila '+(i+1)+': '+U(f.grupo)+' · '+U(f.estilo)+' · '+U(f.color)+' no está en la base de OPs.'); return; }
     if(N(f.muestra)<=0){ errores.push('Fila '+(i+1)+': falta la muestra.'); return; }
     if(N(f.lote)>0 && N(f.muestra)>N(f.lote)){ errores.push('Fila '+(i+1)+': la muestra es mayor que el lote.'); return; }
     if(totalFila(f)>N(f.muestra)){ errores.push('Fila '+(i+1)+': hay más defectuosas que la muestra.'); return; }
@@ -3947,6 +4039,7 @@ function cargarRecientes(){
   $('fecha').value = hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2)+'-'+('0'+hoy.getDate()).slice(-2);
   aplicarTipo();
   cargarCatalogos();
+  cargarOpsFilas().catch(function(){ /* se reintenta al guardar */ });
   restaurarCola();
   pintarPend();
   setTimeout(verVista, 1100);

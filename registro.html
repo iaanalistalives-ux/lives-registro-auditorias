@@ -2777,6 +2777,36 @@ function limpiarRegistro(exito){
 
 /* ---------------- editar y anular ---------------- */
 
+/* ===== PARALELO — editar/anular, invisible, nunca afecta a Athina (22/09) =====
+   Mismo patrón del resto: XHR directo, nunca pide sesión, nunca lanza error
+   hacia el flujo real. Si la auditoría no es de tipo Final, o nunca se guardó
+   en paralelo (los demás tipos no se guardan en paralelo todavía), la función
+   del lado de Supabase simplemente no encuentra nada y no hace nada — no hace
+   falta filtrar por tipo aquí. */
+function paraleloXhr(fnNombre, body){
+  try{
+    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
+    window.LIVES_SESION.llave().then(function(tk){
+      if (!tk) return;
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/' + fnNombre, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+      xhr.send(JSON.stringify(body));
+    }).catch(function(){});
+  }catch(e){}
+}
+function compararParaleloEditar(id, cambios, auditoresJson, defectosJson){
+  var body = { payload: { id: id, cambios: cambios } };
+  if (auditoresJson !== undefined){ try{ body.payload.auditores = JSON.parse(auditoresJson); }catch(e){} }
+  if (defectosJson !== undefined){ try{ body.payload.defectos = JSON.parse(defectosJson); }catch(e){} }
+  paraleloXhr('sync_editar_auditoria_paralelo', body);
+}
+function compararParaleloAnular(id, motivo, usuario){
+  paraleloXhr('sync_anular_auditoria_paralelo', { p_id: id, p_motivo: motivo, p_usuario: usuario });
+}
+
 function itemPorId(idAud){
   for(var i=0;i<cola.length;i++) if(cola[i].idAud===idAud) return cola[i];
   return null;
@@ -2872,7 +2902,10 @@ function guardarEdicion(){
   cancelarEdicion();
   jsonp(envio, function(r){
     var it=itemPorId(id);
-    if(r&&r.ok){ if(it){ it.etiqueta=etq; it.msg='Corregida'; it.estado='ok'; } }
+    if(r&&r.ok){
+      if(it){ it.etiqueta=etq; it.msg='Corregida'; it.estado='ok'; }
+      compararParaleloEditar(id, cambios, envio.auditores, envio.defectos);
+    }
     else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo corregir'; }
     pintarLog();
   }, function(){
@@ -2903,6 +2936,7 @@ function confirmarAnular(motivo){
     function(r){
       if(r&&r.ok){
         if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; guardados=Math.max(0,guardados-1); }
+        compararParaleloAnular(idAud, motivo, U($('digitador').value));
         /* Si venía de la búsqueda por OP, marcarla ahí también: sin esto la fila
            sigue viéndose normal y da la impresión de que la anulación no funcionó. */
         if(ANUL_BQ){ ANUL_BQ.estado='ANULADO'; ANUL_BQ=null; bqPintar(); }
@@ -3563,7 +3597,11 @@ if($('corrGuardar')) $('corrGuardar').onclick=function(){
          cambios:JSON.stringify(cambios),
          auditores:JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[])},
     function(r){
-      if(r&&r.ok){ $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.'; bqBuscar(); }
+      if(r&&r.ok){
+        $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.';
+        compararParaleloEditar(corrId, cambios, JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[]));
+        bqBuscar();
+      }
       else { $('bqMsg').className='hint err'; $('bqMsg').textContent=(r&&r.error)||'No se pudo corregir.'; }
     }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
 };

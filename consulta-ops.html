@@ -319,6 +319,7 @@ html.embebido body{padding-top:0!important;margin-top:0!important;}
 .btn.primary:hover{background:var(--sage-dark);}
 .btn:disabled{opacity:.5;cursor:default;}
 #verFiltros{display:none;}
+.fechas{display:grid;grid-template-columns:repeat(3,minmax(160px,220px));gap:10px;margin-top:10px;}
 
 .verdict{display:flex;align-items:center;gap:16px;background:var(--card);border-radius:0 var(--r) var(--r) 0;
   box-shadow:var(--sh);padding:14px 20px;margin-bottom:14px;border-left:6px solid var(--slate);}
@@ -357,6 +358,7 @@ td .v{cursor:pointer;border-bottom:1px dotted transparent;}
 td .v:hover{color:var(--sage);border-bottom-color:var(--sage);}
 td.op .v{font-weight:700;color:var(--sage-dark);}
 td.tela{max-width:320px;}
+td.fec{white-space:nowrap;}
 .vacio{color:#B7C4C0;}
 
 .mas{text-align:center;margin-top:14px;}
@@ -388,7 +390,9 @@ details.help p{color:var(--stone);margin:8px 0 0;max-width:130ch;}
   #q{min-width:0;width:100%;flex-basis:100%;}
   #verFiltros{display:inline-block;flex:1;}
   .bar .filtros{grid-template-columns:1fr 1fr;}
-  .bar.cerrada .filtros{display:none;}
+  .bar.cerrada .filtros,.bar.cerrada .fechas{display:none;}
+  .fechas{grid-template-columns:1fr 1fr;}
+  .fechas .campo:first-child{grid-column:span 2;}
   .verdict{padding:12px 14px;gap:12px;}
   .verdict .dot{width:34px;height:34px;font-size:17px;}
   .verdict .t{font-size:16px;}
@@ -437,6 +441,20 @@ details.help p{color:var(--stone);margin:8px 0 0;max-width:130ch;}
       <button class="btn" id="limpiar" type="button">Limpiar</button>
       <button class="btn primary" id="excel" type="button" disabled>Descargar Excel</button>
     </div>
+    <div class="fechas" id="fechas">
+      <div class="campo"><label for="fRango">Fecha de creación</label>
+        <select id="fRango">
+          <option value="">Todas las fechas</option>
+          <option value="d30">Últimos 30 días</option>
+          <option value="m3">Últimos 3 meses</option>
+          <option value="m12">Últimos 12 meses</option>
+          <option value="y2026">Año 2026</option>
+          <option value="y2025">Año 2025</option>
+          <option value="pers">Personalizado</option>
+        </select></div>
+      <div class="campo"><label for="fDesde">Desde</label><input type="date" id="fDesde"></div>
+      <div class="campo"><label for="fHasta">Hasta</label><input type="date" id="fHasta"></div>
+    </div>
     <div class="filtros" id="filtros"></div>
     <div class="chips" id="chips"></div>
   </div>
@@ -457,12 +475,13 @@ details.help p{color:var(--stone);margin:8px 0 0;max-width:130ch;}
   <details class="help">
     <summary>¿Cómo leo esta pantalla?</summary>
     <p><b>Qué es una fila:</b> una línea de la base de OPs (la misma que se carga en «Cargar OPs» y que usan los formularios de auditoría). Una misma OP aparece en varias filas si tiene varios colores o varias PO.</p>
-    <p><b>De dónde sale:</b> de Supabase (vista <i>publico_ref_ops</i>), que es copia del Sheet de OPs. Arriba a la derecha se ve cuándo fue la última copia. Si una OP se cargó en el Sheet después de esa hora y no aparece aquí, la copia no la trajo todavía.</p>
+    <p><b>De dónde sale:</b> de la base de OPs en Supabase (vista <i>publico_ref_ops</i>). Arriba a la derecha se ve la fecha de creación de la OP más reciente que hay en la base.</p>
+    <p><b>Fecha de creación:</b> es la fecha en que se creó la OP; todas las líneas de una misma OP tienen la misma. El rango «Desde / Hasta» incluye los dos días. Los rangos rápidos («últimos 30 días», «últimos 3 meses»…) se cuentan hasta hoy. La tabla sale ordenada de la más reciente a la más antigua; toca cualquier encabezado para ordenar por otra columna.</p>
     <p><b>Cómo filtran las casillas:</b> si eliges un valor de la lista (o lo escribes completo), busca ese valor exacto; si escribes solo una parte, busca todo lo que la contenga. Ejemplo: «EFI-10» trae EFI-100, EFI-101…; «EFI-100» trae solo EFI-100. Mayúsculas y minúsculas dan igual. Los filtros se suman entre sí. La lista de cada casilla muestra solo los valores que quedan con los demás filtros puestos.</p>
-    <p><b>Cliente:</b> es el código con que empieza el grupo (EFI, PAK, THY…), no un catálogo aparte.</p>
+    <p><b>Cliente:</b> es lo que va antes del guion en el grupo (EFI, PAK, THY, VI2…), no un catálogo aparte.</p>
     <p><b>Pedido:</b> la columna «Pedido» tal como viene en la base. El total de arriba es la suma de esa columna sobre las filas que se ven.</p>
     <p><b>Compartir una búsqueda:</b> los filtros quedan en la dirección de la página; si la copias y la envías, la otra persona ve lo mismo (con su propia sesión del portal).</p>
-    <p><b>Excel:</b> descarga exactamente las filas filtradas, con OP, PO y códigos como texto para que Excel no los cambie.</p>
+    <p><b>Excel:</b> descarga exactamente las filas filtradas, con OP, PO y códigos como texto para que Excel no los cambie, y la fecha de creación como fecha de Excel (se puede filtrar y ordenar).</p>
   </details>
 </div>
 
@@ -729,6 +748,7 @@ var PAGINA = 200;
 /* Columnas de la tabla, en orden. f = filtro propio en la barra. */
 var COLS = [
   {c:'op',        t:'OP',            f:'op'},
+  {c:'fecha',     t:'Fecha creación',f:null, fecha:true},
   {c:'cliente',   t:'Cliente',       f:'sel'},
   {c:'grupo',     t:'Grupo',         f:'txt'},
   {c:'estilo',    t:'Estilo',        f:'txt'},
@@ -742,13 +762,18 @@ var COLS = [
 ];
 
 var DATOS = [], FILTRADAS = [], mostrar = PAGINA;
-var ORD = {c:'op', dir:-1};
+var ORD = {c:'fecha', dir:-1};
+var SINFECHA = false, FMAX = '';
 var F = {};          /* filtros activos: campo -> texto */
 var ultimaCopia = null;
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
 function norm(s){ return String(s==null?'':s).trim().toUpperCase(); }
+function fTxt(iso){ return iso ? iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4) : ''; }
+function hoyISO(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isoAdd(iso, dias){ var d = new Date(iso+'T12:00:00'); d.setDate(d.getDate()+dias); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isoMeses(iso, m){ var d = new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+m); d.setDate(d.getDate()+1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmtN(n){ return Number(n||0).toLocaleString('es-PE',{maximumFractionDigits:2}); }
 
 /* ---------- lectura con un reintento; nunca deja la pantalla bloqueada ---------- */
@@ -771,10 +796,10 @@ function traer(url){
   });
 }
 
-function cargarTodo(){
+function cargarTodo(conFecha){
   var tam = 1000, filas = [];
   function pagina(off){
-    var url = SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido'
+    var url = SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido' + (conFecha ? ',fecha_creacion' : '')
       + '&order=op.desc,grupo.asc,estilo.asc,color.asc,po.asc,destino.asc,cod_tela.asc,pedido.asc'
       + '&limit=' + tam + '&offset=' + off;
     return traer(url).then(function(lote){
@@ -802,23 +827,38 @@ function iniciar(){
   avisar('');
   $('tabla').innerHTML = '<div class="cargando">Cargando la base de OPs…</div>';
   $('hEstado').textContent = 'Cargando…';
-  Promise.all([cargarTodo(), cargarFecha()]).then(function(res){
+  SINFECHA = false;
+  var carga = cargarTodo(true).catch(function(e){
+    /* Si la vista todavía no tiene la columna de fecha (falta la SQL 31), se carga sin ella. */
+    if(e && !e.sesion && /HTTP 400/.test(e.message||'')){ SINFECHA = true; return cargarTodo(false); }
+    throw e;
+  });
+  Promise.all([carga]).then(function(res){
     DATOS = res[0].map(function(r){
       var g = norm(r.grupo);
-      var m = g.match(/^([A-Z]+)/);
+      var fe = r.fecha_creacion ? String(r.fecha_creacion).slice(0,10) : '';
       return {
         op: norm(r.op), grupo: g, estilo: norm(r.estilo), e_cliente: norm(r.e_cliente),
         color: norm(r.color), po: norm(r.po), cod_tela: norm(r.cod_tela),
         desc_tela: String(r.desc_tela==null?'':r.desc_tela).trim(),
         destino: norm(r.destino), pedido: (r.pedido===null||r.pedido===''||r.pedido===undefined)?null:Number(r.pedido),
-        cliente: m ? m[1] : ''
+        cliente: (g.indexOf('-')>0 ? g.split('-')[0] : g).trim(),
+        fecha: fe
       };
     });
     DATOS.forEach(function(d){
-      d._todo = [d.op,d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
+      d._todo = [d.op,fTxt(d.fecha),d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
     });
+    FMAX = DATOS.reduce(function(a,d){ return d.fecha>a ? d.fecha : a; }, '');
+    if(SINFECHA){
+      COLS = COLS.filter(function(k){ return k.c!=='fecha'; });
+      ORD = {c:'op', dir:-1};
+      $('fechas').style.display = 'none';
+      avisar('La base todavía no muestra la fecha de creación: falta ejecutar en Supabase la SQL 31 (agrega la fecha a la vista). Mientras tanto la pantalla funciona igual, sin fecha.');
+    }
     EXISTE = {};
     armarFiltros();
+    armarFechas();
     leerHash();
     $('excel').disabled = false;
     aplicar();
@@ -857,6 +897,30 @@ function armarFiltros(){
   });
 }
 
+/* ---------- rango de fechas de creación ---------- */
+function armarFechas(){
+  if(SINFECHA) return;
+  var fmin = DATOS.reduce(function(a,d){ return d.fecha && d.fecha<a ? d.fecha : a; }, '9999');
+  ['fDesde','fHasta'].forEach(function(id){ $(id).min = fmin; $(id).max = FMAX; });
+  $('fRango').onchange = function(){
+    var v = this.value, hoy = hoyISO();
+    if(v==='') { F.desde=''; F.hasta=''; }
+    else if(v==='d30'){ F.desde = isoAdd(hoy,-29); F.hasta = ''; }
+    else if(v==='m3' || v==='m12'){ F.desde = isoMeses(hoy, -(+v.slice(1))); F.hasta = ''; }
+    else if(v==='y2026' || v==='y2025'){ F.desde = v.slice(1)+'-01-01'; F.hasta = v.slice(1)+'-12-31'; }
+    else return;
+    $('fDesde').value = F.desde || ''; $('fHasta').value = F.hasta || '';
+    mostrar = PAGINA; aplicar();
+  };
+  function manual(){
+    var a = $('fDesde').value, b = $('fHasta').value;
+    if(a && b && a > b){ var x=a; a=b; b=x; $('fDesde').value=a; $('fHasta').value=b; }
+    F.desde = a; F.hasta = b; $('fRango').value = (a||b) ? 'pers' : '';
+    mostrar = PAGINA; aplicar();
+  }
+  $('fDesde').onchange = manual; $('fHasta').onchange = manual;
+}
+
 /* Un valor completo que existe en la base se busca exacto; una parte, por "contiene". */
 var EXISTE = {};
 function existe(c, v){
@@ -866,6 +930,8 @@ function existe(c, v){
 function pasa(d, saltar){
   for(var c in F){
     if(c===saltar || !F[c]) continue;
+    if(c==='desde'){ if(!d.fecha || d.fecha < F.desde) return false; continue; }
+    if(c==='hasta'){ if(!d.fecha || d.fecha > F.hasta) return false; continue; }
     var v = norm(F[c]);
     if(c==='q'){
       var partes = v.split(/\s+/);
@@ -907,8 +973,9 @@ function chips(){
   var h = '';
   Object.keys(F).forEach(function(c){
     if(!F[c]) return;
-    var nombre = c==='q' ? 'Buscar' : (COLS.filter(function(k){return k.c===c;})[0]||{}).t;
-    h += '<span class="chip">'+esc(nombre)+': '+esc(F[c])+' <button type="button" data-c="'+c+'" title="Quitar">×</button></span>';
+    var nombre = c==='q' ? 'Buscar' : c==='desde' ? 'Creada desde' : c==='hasta' ? 'Creada hasta' : (COLS.filter(function(k){return k.c===c;})[0]||{}).t;
+    var val = (c==='desde'||c==='hasta') ? fTxt(F[c]) : F[c];
+    h += '<span class="chip">'+esc(nombre)+': '+esc(val)+' <button type="button" data-c="'+c+'" title="Quitar">×</button></span>';
   });
   $('chips').innerHTML = h;
   [].forEach.call($('chips').querySelectorAll('button'), function(b){
@@ -917,7 +984,9 @@ function chips(){
 }
 function quitar(c){
   F[c] = '';
-  if(c==='q') $('q').value = ''; else { var el=$('f_'+c); if(el) el.value=''; }
+  if(c==='q') $('q').value = '';
+  else if(c==='desde' || c==='hasta'){ $(c==='desde'?'fDesde':'fHasta').value = ''; $('fRango').value = (F.desde||F.hasta) ? 'pers' : ''; }
+  else { var el=$('f_'+c); if(el) el.value=''; }
   mostrar = PAGINA; aplicar();
 }
 function fijar(c, v){
@@ -941,6 +1010,10 @@ function leerHash(){
     var i = par.indexOf('='); if(i<1) return;
     var c = par.slice(0,i), v = '';
     try{ v = decodeURIComponent(par.slice(i+1)); }catch(e){ return; }
+    if(c==='desde' || c==='hasta'){
+      if(SINFECHA || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      F[c] = v; $(c==='desde'?'fDesde':'fHasta').value = v; $('fRango').value = 'pers'; $('bar').classList.remove('cerrada'); return;
+    }
     if(c!=='q' && !COLS.some(function(k){ return k.c===c && k.f; })) return;
     F[c] = v;
     if(c==='q') $('q').value = v; else { var el=$('f_'+c); if(el) el.value = v; $('bar').classList.remove('cerrada'); }
@@ -995,12 +1068,7 @@ function resumen(){
       + (hayFiltro ? '' : '. Usa los filtros o el buscador para acotar.');
   }
 
-  var est = fmtN(total) + ' filas en la base';
-  if(ultimaCopia && ultimaCopia.ultima_copia){
-    var f = new Date(ultimaCopia.ultima_copia);
-    if(!isNaN(f)) est += ' · copia del Sheet: ' + f.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})
-      + ' ' + f.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
-  }
+  var est = fmtN(total) + ' filas en la base' + (FMAX ? ' · OP más reciente creada el ' + fTxt(FMAX) : '');
   $('hEstado').textContent = est;
 }
 
@@ -1008,6 +1076,7 @@ function celda(k, d){
   var v = d[k.c];
   var vacio = (v===null || v===undefined || v==='');
   var cls = (k.c==='op'?'op':'') + (k.c==='desc_tela'?' tela':'') + (k.num?' num':'');
+  if(k.fecha) return '<td class="fec" data-l="'+esc(k.t)+'">'+(vacio ? '<span class="vacio">—</span>' : esc(fTxt(v)))+'</td>';
   var txt = vacio ? '<span class="vacio">—</span>'
           : (k.num ? esc(fmtN(v)) : (k.f ? '<span class="v" data-c="'+k.c+'" data-v="'+esc(v)+'" title="Filtrar por este valor">'+esc(v)+'</span>' : esc(v)));
   return '<td class="'+cls+'" data-l="'+esc(k.t)+'">'+txt+'</td>';
@@ -1033,7 +1102,7 @@ function pintar(){
   [].forEach.call($('tabla').querySelectorAll('th'), function(th){
     th.onclick = function(){
       var c = th.dataset.c;
-      if(ORD.c===c) ORD.dir = -ORD.dir; else { ORD.c = c; ORD.dir = (c==='op'||c==='pedido') ? -1 : 1; }
+      if(ORD.c===c) ORD.dir = -ORD.dir; else { ORD.c = c; ORD.dir = (c==='op'||c==='pedido'||c==='fecha') ? -1 : 1; }
       ordenar(); pintar();
     };
   });
@@ -1053,8 +1122,8 @@ function descripcionFiltros(){
   var p = [];
   Object.keys(F).forEach(function(c){
     if(!F[c]) return;
-    var nombre = c==='q' ? 'Buscar' : (COLS.filter(function(k){return k.c===c;})[0]||{}).t;
-    p.push(nombre + ': ' + F[c]);
+    var nombre = c==='q' ? 'Buscar' : c==='desde' ? 'Creada desde' : c==='hasta' ? 'Creada hasta' : (COLS.filter(function(k){return k.c===c;})[0]||{}).t;
+    p.push(nombre + ': ' + ((c==='desde'||c==='hasta') ? fTxt(F[c]) : F[c]));
   });
   return p.length ? p.join(' · ') : 'Base completa, sin filtros';
 }
@@ -1070,9 +1139,13 @@ $('excel').onclick = function(){
     hoja   : 'OPs',
     congelarCols: 1,
     columnas: COLS.map(function(k){
-      return { campo:k.c, titulo:k.t, tipo: k.num ? 'entero' : 'alfanumerico', ancho: k.c==='desc_tela' ? 42 : undefined };
+      return { campo: k.fecha ? '_fechaXls' : k.c, titulo:k.t, tipo: k.num ? 'entero' : (k.fecha ? 'fecha' : 'alfanumerico'), ancho: k.c==='desc_tela' ? 42 : (k.fecha ? 14 : undefined) };
     }),
-    filas: FILTRADAS
+    filas: FILTRADAS.map(function(d){
+      var o = {}; for(var k in d) o[k] = d[k];
+      o._fechaXls = d.fecha ? new Date(Date.UTC(+d.fecha.slice(0,4), +d.fecha.slice(5,7)-1, +d.fecha.slice(8,10))) : null;
+      return o;
+    })
   }).catch(function(e){
     avisar('No se pudo generar el Excel: ' + esc(e && e.message ? e.message : e));
   }).then(function(){ b.disabled = false; b.textContent = txt; });
@@ -1088,6 +1161,7 @@ $('q').addEventListener('input', function(){
 $('limpiar').onclick = function(){
   F = {}; $('q').value = '';
   [].forEach.call($('filtros').querySelectorAll('input,select'), function(el){ el.value=''; });
+  $('fRango').value = ''; $('fDesde').value = ''; $('fHasta').value = '';
   mostrar = PAGINA; aplicar();
 };
 $('verFiltros').onclick = function(){ $('bar').classList.toggle('cerrada'); };

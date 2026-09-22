@@ -381,10 +381,11 @@
   <div class="card">
     <h2>1 · Elige el archivo</h2>
     <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
-      COLOR · OP · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
+      COLOR · OP · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
       por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
-      (<i>Cod_GrupoPro, Est_Prop, des_present, cod_tela, desc_tela, cod_destino,
-      Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.</div>
+      (<i>Cod_GrupoPro, Est_Prop, des_present, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
+      Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.
+      La fecha de creaci&oacute;n es obligatoria: la tabla se reemplaza entera, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas.</div>
 
     <div class="drop" id="zona">
       <div class="ic">📄</div>
@@ -403,7 +404,7 @@
 
     <div class="tbl">
       <table>
-        <thead><tr><th>OP</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
+        <thead><tr><th>OP</th><th>F. creación</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
           <th>PO</th><th>Cód. tela</th><th>Destino</th><th>Pedido</th></tr></thead>
         <tbody id="prev"></tbody>
       </table>
@@ -425,15 +426,9 @@
 </div>
 
 <script>
-/* Antes escribía en el Sheet "Base de Datos" (pestaña OPS) vía Apps Script.
-   Desde el 21/09 sube directo a la tabla ops en Supabase (ver subirDeUnaVez).
-   Esta constante API/CLAVE queda del Apps Script, sin usarse ya para esta carga. */
-var API   = 'https://script.google.com/macros/s/AKfycbyuw2qdB-8HVy60G04LxDfD3WSy7OkjNYIvxti2kFm7JMz0sOYVuobClHLWu49gRU9bcg/exec';
-var CLAVE = 'livessac';
-/* 15 filas por envío. Con 40 la dirección llegaba a 14 000 caracteres y el
-   navegador la cortaba: la carga moría a mitad sin motivo aparente.
-   Con 15, incluyendo ya la descripción de tela, el peor trozo mide ~5 000. */
-var TROZO = 15;
+/* 22/09: la carga va SOLO directo a Supabase (sync_ops_reemplazar). Se quitaron la
+   dirección del Apps Script, su clave y el envío por partes al Sheet: ese respaldo
+   escribía en una pestaña que ya nadie lee, así que una falla parecía un éxito. */
 
 var FILAS = [];
 
@@ -443,22 +438,6 @@ function U(v){ return T(v).toUpperCase(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
 function num(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; }
-
-var jn=0;
-function jsonp(params, ok, fallo){
-  var cb='cb'+(++jn)+'_'+Date.now();
-  var s=document.createElement('script');
-  var t=setTimeout(function(){ limpiar(); fallo && fallo('tiempo agotado'); }, 60000);
-  function limpiar(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
-    if(s.parentNode) s.parentNode.removeChild(s); }
-  window[cb]=function(r){ limpiar(); ok(r); };
-  s.onerror=function(){ limpiar(); fallo && fallo('sin conexión'); };
-  var qs=[];
-  for(var k in params){ if(params[k]!==undefined && params[k]!==null) qs.push(k+'='+encodeURIComponent(params[k])); }
-  qs.push('callback='+cb);
-  s.src=API+'?'+qs.join('&');
-  document.body.appendChild(s);
-}
 
 /* Los encabezados se buscan por nombre, tolerando tildes y mayúsculas: así el
    archivo puede venir con las columnas en cualquier orden. */
@@ -482,15 +461,37 @@ var COLS = {
   descTela:['DESCRIPCIONTELA','DESCTELA','DESCRIPCIONDETELA','DESTELA','TELA'],
   destino:['DESTINO','CODDESTINO','CODIGODESTINO','DESTINOFINAL'],
   pedido:['PEDIDO','REQUERIDAS','REQUERIDA','CANTREQUERIDA','CANTIDADREQUERIDA','CANTIDAD','CANT'],
+  fechaCreacion:['FECHACREACION','FECCREACIONOP','FECHACREACIONOP','FECCREACION','FECHADECREACION','FECHADECREACIONOP','FECCREAOP','FECHAOP'],
   eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI']
 };
+
+/* Fecha de creación de la OP -> 'AAAA-MM-DD'. El sistema la entrega como texto
+   día/mes/año (18/08/2025); también se aceptan celdas de fecha de Excel y AAAA-MM-DD.
+   Si no se puede leer queda vacía y se avisa en la revisión: nunca se inventa. */
+function fechaISO(v){
+  function ok(a,m,d){
+    var f=new Date(Date.UTC(a,m-1,d));
+    if(f.getUTCFullYear()!==a || f.getUTCMonth()!==m-1 || f.getUTCDate()!==d) return '';
+    return a+'-'+('0'+m).slice(-2)+'-'+('0'+d).slice(-2);
+  }
+  if(v instanceof Date && !isNaN(v)) return ok(v.getFullYear(), v.getMonth()+1, v.getDate());
+  if(typeof v==='number' && isFinite(v) && v>20000 && v<80000){
+    var f=new Date(Math.round((v-25569)*86400000));
+    return ok(f.getUTCFullYear(), f.getUTCMonth()+1, f.getUTCDate());
+  }
+  var s=T(v), m;
+  if((m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/))) return ok(+m[3], +m[2], +m[1]);
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return ok(+m[1], +m[2], +m[3]);
+  return '';
+}
+function fechaTxt(iso){ return iso ? iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4) : ''; }
 
 function leerArchivo(file){
   $('msgLee').textContent='';
   var fr=new FileReader();
   fr.onload=function(e){
     try{
-      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array', cellDates:true});
 
       /* Se buscan las columnas en TODAS las hojas, no solo en la primera: el
          archivo del sistema viene con varias (V1, V2, V3…) y las buenas suelen
@@ -520,7 +521,8 @@ function leerArchivo(file){
                  eCliente:U(r[mapa.eCliente]),
                  color:U(r[mapa.color]), po:U(r[mapa.po]), codTela:U(r[mapa.codTela]),
                  descTela:T(r[mapa.descTela]), destino:U(r[mapa.destino]),
-                 pedido:num(r[mapa.pedido]) };
+                 pedido:num(r[mapa.pedido]),
+                 fechaCreacion:fechaISO(r[mapa.fechaCreacion]) };
       }).filter(function(f){ return f.op; });
 
       if(!FILAS.length) throw new Error('ninguna fila tiene OP');
@@ -534,15 +536,18 @@ function leerArchivo(file){
 }
 
 function mostrar(nombre, hojaUsada){
-  var ops={}, gr={}, sinTela=0, sinPedido=0;
+  var ops={}, gr={}, sinTela=0, sinPedido=0, sinFecha=0, fMin='', fMax='';
   FILAS.forEach(function(f){
     ops[f.op]=1; if(f.grupo) gr[f.grupo]=1;
     if(!f.codTela) sinTela++;
     if(!f.pedido) sinPedido++;
+    if(!f.fechaCreacion) sinFecha++;
+    else { if(!fMin || f.fechaCreacion<fMin) fMin=f.fechaCreacion; if(!fMax || f.fechaCreacion>fMax) fMax=f.fechaCreacion; }
   });
   $('subPrev').innerHTML='Archivo <b>'+esc(nombre)+'</b>'+
     (hojaUsada?(' · hoja <b>'+esc(hojaUsada)+'</b>'):'')+
-    '. Así se va a guardar. Revisa que los datos se vean bien antes de reemplazar.';
+    '. Así se va a guardar. Revisa que los datos se vean bien antes de reemplazar.'+
+    (fMin ? (' OPs creadas entre el <b>'+fechaTxt(fMin)+'</b> y el <b>'+fechaTxt(fMax)+'</b>.') : '');
   $('kpis').innerHTML=
     '<div class="kpi"><div class="v">'+FILAS.length.toLocaleString('es-PE')+'</div>'+
       '<div class="l">Filas</div></div>'+
@@ -551,10 +556,11 @@ function mostrar(nombre, hojaUsada){
     '<div class="kpi"><div class="v">'+Object.keys(gr).length.toLocaleString('es-PE')+'</div>'+
       '<div class="l">Grupos</div></div>'+
     (sinTela?('<div class="kpi bad"><div class="v">'+sinTela+'</div><div class="l">Sin código de tela</div></div>'):'')+
-    (sinPedido?('<div class="kpi bad"><div class="v">'+sinPedido+'</div><div class="l">Sin cantidad de pedido</div></div>'):'');
+    (sinPedido?('<div class="kpi bad"><div class="v">'+sinPedido+'</div><div class="l">Sin cantidad de pedido</div></div>'):'')+
+    (sinFecha?('<div class="kpi bad"><div class="v">'+sinFecha+'</div><div class="l">Sin fecha de creación legible</div></div>'):'');
 
   $('prev').innerHTML=FILAS.slice(0,60).map(function(f){
-    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
+    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
       '<td>'+esc(f.eCliente)+'</td><td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td>'+
       '<td>'+esc(f.codTela)+'</td><td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
   }).join('');
@@ -582,11 +588,9 @@ function subir(){
   $('barraI').style.width='30%';
   subirDeUnaVez().then(function(r){
     if(r && r.ok){ terminarCarga(r); return; }
-    if(r && r.error && !/^(respuesta|http)/i.test(r.error)){ falla(r.error); return; }
-    subirPorPartes();
+    falla((r && r.error) || 'Supabase no confirmó la carga. La tabla quedó como estaba; vuelve a intentar.');
   }).catch(function(e){
-    console.warn('Envío completo no disponible, se usa el envío por partes:', e);
-    subirPorPartes();
+    falla('Sin conexión con la base de datos. La tabla quedó como estaba; vuelve a intentar.');
   });
 }
 
@@ -598,7 +602,7 @@ function subirDeUnaVez(){
   var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
   var filas = FILAS.map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente];
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente,f.fechaCreacion||null];
   });
   return fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_ops_reemplazar', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -609,18 +613,6 @@ function subirDeUnaVez(){
     if(!r.ok) return r.text().then(function(t){ return {ok:false, error:'Supabase '+r.status+': '+t.slice(0,160)}; });
     return r.json().catch(function(){ return {ok:false, error:'respuesta ilegible'}; });
   }, function(e){ clearTimeout(reloj); throw e; });
-}
-
-function subirPorPartes(){
-  $('barraI').style.width='0%';
-  $('msgSube').className='hint'; $('msgSube').textContent='Enviando por partes…';
-  /* La descripción de tela ahora viaja en cada fila porque la pestaña OPS tiene
-     su propia columna DESC_TELA. Se dejó de mandar el diccionario aparte. */
-  jsonp({accion:'opscarga', clave:CLAVE, modo:'inicio', usuario:U($('usuario').value)},
-    function(r){
-      if(!r||!r.ok){ falla((r&&r.error)||'no se pudo empezar'); return; }
-      mandarTrozo(0);
-    }, function(m){ falla(m); });
 }
 
 function terminarCarga(r){
@@ -635,43 +627,6 @@ function terminarCarga(r){
   $('pill').className='pill ok';
   $('pill').textContent=t+' filas cargadas';
   $('btnSubir').disabled=false;
-}
-
-function mandarTrozo(desde, intento){
-  intento = intento || 0;
-  if(desde>=FILAS.length){
-    jsonp({accion:'opscarga', clave:CLAVE, modo:'fin', usuario:U($('usuario').value),
-           total:FILAS.length},
-      function(r){
-        if(!r||!r.ok){ falla((r&&r.error)||'no se pudo terminar'); return; }
-        terminarCarga(r);
-      }, function(m){ falla(m); });
-    return;
-  }
-  /* Se mandan como arreglos, no como objetos: ocupa un tercio del espacio.
-     ESTE ORDEN debe coincidir con ORDEN_ENVIO del Apps Script. */
-  var parte=FILAS.slice(desde, desde+TROZO).map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente];
-  });
-  jsonp({accion:'opscarga', clave:CLAVE, modo:'trozo', filas:JSON.stringify(parte),
-         idx:Math.floor(desde/TROZO), tam:TROZO},
-    function(r){
-      if(!r||!r.ok){ falla((r&&r.error)||'error al enviar'); return; }
-      var hecho=Math.min(desde+TROZO, FILAS.length);
-      $('barraI').style.width=(hecho/FILAS.length*100).toFixed(1)+'%';
-      $('msgSube').className='hint';
-      $('msgSube').textContent='Enviando '+hecho.toLocaleString('es-PE')+' de '+
-        FILAS.length.toLocaleString('es-PE')+'…';
-      mandarTrozo(hecho);
-    }, function(m){
-      /* Un tropiezo de red no debe tirar la carga entera: se reintenta el
-         mismo trozo antes de rendirse. */
-      if(intento<3){
-        $('msgSube').className='hint';
-        $('msgSube').textContent='Reintentando desde la fila '+(desde+1)+'…';
-        setTimeout(function(){ mandarTrozo(desde, intento+1); }, 1500*(intento+1));
-      } else falla(m);
-    });
 }
 
 function falla(m){
@@ -700,6 +655,11 @@ $('usuario').addEventListener('change',function(){
   try{ localStorage.setItem('lives_ops_usuario', $('usuario').value); }catch(e){}
 });
 try{ $('usuario').value = localStorage.getItem('lives_ops_usuario') || ''; }catch(e){}
+</script>
+<script>
+/* El nombre de quien carga sale de la sesión del portal. */
+(function(){ try{ var s=window.LIVES_SESION&&window.LIVES_SESION.actual(); var u=document.getElementById('usuario');
+  if(s&&u&&!u.value) u.value=(s.nombre||s.usuario||''); }catch(e){} })();
 </script>
 </body>
 </html>

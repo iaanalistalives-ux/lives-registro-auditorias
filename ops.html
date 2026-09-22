@@ -280,6 +280,24 @@
 })();
 </script>
 <!-- ===== fin lives-sesion v1 ===== -->
+<!-- Herramienta del área IA del portal: solo la abre Christian (usuario ctalepcio).
+     Con otra cuenta, la pantalla se reemplaza por un aviso y no se carga nada. -->
+<script>
+(function(){
+  var s = window.LIVES_SESION ? window.LIVES_SESION.actual() : null;
+  if (!s) return;                                   /* sin sesión: ya avisa el bloque */
+  if (String(s.usuario || '').trim().toLowerCase() === 'ctalepcio') return;
+  window.LIVES_SOLO_DUENO_BLOQUEO = true;
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.innerHTML =
+      '<div style="font-family:Calibri,Arial,sans-serif;max-width:520px;margin:60px auto;padding:24px;' +
+      'background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(14,59,54,.1);text-align:center">' +
+      '<div style="font-size:18px;font-weight:700;color:#0E3B36;margin-bottom:8px">Sin acceso a Subir Base OPs</div>' +
+      '<div style="font-size:14px;color:#5F726C">Esta herramienta es de uso exclusivo de Christian Talepcio (área IA del portal).</div></div>';
+    document.body.style.background = '#F1F6F4';
+  });
+})();
+</script>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Actualizar órdenes de producción · Base de Datos · LIVES</title>
@@ -355,9 +373,9 @@
   <div class="aviso">
     <b>Esta tabla se reemplaza entera cada vez.</b> No se acumula: lo que subas pasa a ser
     la única lista de órdenes de producción. Es una foto del sistema, no un histórico.
-    Las auditorías ya guardadas no se tocan. Destino: Sheet <b>Base de Datos</b>, pestaña
-    <b>OPS</b>. Si la carga se corta a la mitad, OPS queda como estaba: el reemplazo ocurre
-    recién al final, cuando el conteo cuadra.
+    Las auditorías ya guardadas no se tocan. Destino: tabla <b>ops</b>, directo en Supabase
+    (ya no en el Sheet). Si la carga se corta a la mitad, la tabla queda como estaba: el
+    reemplazo ocurre entero o no ocurre — nunca a medias.
   </div>
 
   <div class="card">
@@ -407,8 +425,9 @@
 </div>
 
 <script>
-/* Apps Script del Sheet "Base de Datos" (pestaña OPS). Si algún día se publica
-   una versión nueva del script, esta dirección cambia y hay que actualizarla. */
+/* Antes escribía en el Sheet "Base de Datos" (pestaña OPS) vía Apps Script.
+   Desde el 21/09 sube directo a la tabla ops en Supabase (ver subirDeUnaVez).
+   Esta constante API/CLAVE queda del Apps Script, sin usarse ya para esta carga. */
 var API   = 'https://script.google.com/macros/s/AKfycbyuw2qdB-8HVy60G04LxDfD3WSy7OkjNYIvxti2kFm7JMz0sOYVuobClHLWu49gRU9bcg/exec';
 var CLAVE = 'livessac';
 /* 15 filas por envío. Con 40 la dirección llegaba a 14 000 caracteres y el

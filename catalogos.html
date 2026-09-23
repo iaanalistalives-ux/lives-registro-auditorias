@@ -578,12 +578,13 @@ function sesionActual(){
   try{ return window.LIVES_SESION ? window.LIVES_SESION.actual() : null; }catch(e){ return null; }
 }
 function usuario(){ var s = sesionActual(); return s ? (s.nombre || s.usuario || '') : ''; }
-/* Herramienta del área IA del portal: solo la abre Christian (usuario ctalepcio).
-   Ningún permiso la abre para otra cuenta, ni TODO. */
-var DUENO = 'ctalepcio';
+/* Herramienta del área IA del portal: solo la abren las cuentas de esta lista.
+   Ningún permiso del portal la abre para otra cuenta, ni TODO.
+   23/09/2026: se agrega Rodrigo Camogliano (rcamogliano). */
+var AUTORIZADOS = ['ctalepcio', 'rcamogliano'];
 function tienePermiso(){
   var s = sesionActual();
-  return !!(s && String(s.usuario || '').trim().toLowerCase() === DUENO);
+  return !!(s && AUTORIZADOS.indexOf(String(s.usuario || '').trim().toLowerCase()) >= 0);
 }
 
 /* ---------- Supabase ---------- */
@@ -1204,7 +1205,7 @@ function arrancar(){
   if (!sesionActual()) return;                      // el bloque de sesión ya mostró el aviso
   if (!tienePermiso()){
     $('vista').innerHTML = '<div class="panel"><span class="tira"></span><div class="pt">Sin permiso para Catálogos</div>' +
-      '<div class="ph">Esta herramienta es de uso exclusivo de Christian Talepcio (área IA del portal).</div></div>';
+      '<div class="ph">Esta herramienta es de uso exclusivo de Christian Talepcio y Rodrigo Camogliano.</div></div>';
     $('hstate').textContent = usuario();
     return;
   }

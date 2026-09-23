@@ -1889,6 +1889,43 @@ function afinarOps(){
 /* ---------------- búsqueda de lote ---------------- */
 var esReaud = '';   // 'SI' o 'NO' — lo decide quien digita, no el sistema
 
+/* 23/09 · Mismo conteo que el formulario de las auditoras: el número cuenta las
+   VUELTAS del lote, o sea los reprocesos. Un lote que llega limpio es siempre la
+   1.ª auditoría, aunque sea la 2.ª o la 3.ª tanda del mismo pedido. Si lo rechazan,
+   su reproceso es la 2.ª; si lo vuelven a rechazar, el siguiente reproceso es la
+   3.ª, y así: un lote puede tener varios rechazos antes de aprobarse.
+   La cadena se arma con el vínculo reprocesa_de que guarda cada reproceso.
+   Esto es lo que se MUESTRA; lo que se guarda no cambia. */
+var VUELTAS = {};   // id de auditoría previa -> vuelta
+function calcularVueltas(previas){
+  VUELTAS = {};
+  var porId = {};
+  (previas||[]).forEach(function(x){ if(x && x.id) porId[String(x.id).trim()] = x; });
+  function vuelta(x, prof){
+    if(!x) return 1;
+    var id = String(x.id||'').trim();
+    if(id && VUELTAS[id] != null) return VUELTAS[id];
+    var padre = porId[String(x.reprocesa_de||'').trim()];
+    var v;
+    if(padre && (prof||0) < 20) v = vuelta(padre, (prof||0)+1) + 1;
+    else v = (x.esReproceso || x.reproceso) ? 2 : 1;   // marcada reproceso sin el vínculo
+    if(id) VUELTAS[id] = v;
+    return v;
+  }
+  (previas||[]).forEach(function(x){ vuelta(x, 0); });
+}
+function vueltaDeId(id){
+  var v = VUELTAS[String(id||'').trim()];
+  return v != null ? v : 1;
+}
+/* Vuelta que le tocaría a un reproceso si no sabemos de cuál rechazo viene. */
+function vueltaSiguienteSuelta(){
+  var max = 1;
+  for(var k in VUELTAS) if(VUELTAS[k] > max) max = VUELTAS[k];
+  return max + 1;
+}
+function txtVuelta(v){ return v + '.ª' + (v > 1 ? ' reproceso' : ''); }
+
 function buscarLote(){
   var g=U($('grupo').value), e=U($('estilo').value), c=U($('color').value), l=N($('lote').value);
   var t=$('tipo').value;
@@ -1918,8 +1955,9 @@ function buscarLote(){
        completa no hay ninguna auditoría previa (antes el panel no aparecía). */
     var otras=(r.rechazosOtraPO||[]).map(function(x){ var y={}; for(var k in x) y[k]=x[k]; y.otraPO=true; return y; });
     if(!r.existe && !otras.length){ p.classList.remove('on'); return; }
+    calcularVueltas(r.previas);
     var f=r.previas.map(function(x){
-      return '<tr><td>'+esc(x.fecha)+'</td><td>'+x.nAuditoria+'.ª</td><td>'+x.muestra+'</td>'+
+      return '<tr><td>'+esc(x.fecha)+'</td><td>'+esc(txtVuelta(vueltaDeId(x.id)))+'</td><td>'+x.muestra+'</td>'+
              '<td>'+x.defectuosas+'</td><td><b>'+esc(x.resultado)+'</b></td><td>'+esc(x.auditor)+'</td></tr>';
     }).join('');
     /* Una sola pregunta con salidas claras, en vez de tres controles que podían
@@ -1992,7 +2030,7 @@ function modoReproceso(activo){
 $('reproceso').addEventListener('change', function(){
   modoReproceso($('reproceso').checked);
   if($('reproceso').checked && prevLote && prevLote.existe){
-    fijarReaud('SI', prevLote.siguienteAuditoria);
+    fijarReaud('SI', vueltaSiguienteSuelta());
   }
   veredicto();
 });
@@ -2008,8 +2046,9 @@ function elegirReproceso(x){
   if(!T(m)){ $('decMsg').innerHTML='<b style="color:#DC2626">Falta el motivo.</b>'; return; }
   reprocesaDe=x.id; motivoRep=T(m); esReaud='SI';
   $('reproceso').checked=true; modoReproceso(true);
-  $('decMsg').innerHTML='<b>Reproceso de la auditoría del '+esc(x.fecha)+'.</b> '+
-    'No suma lote: son las mismas prendas.';
+  var vRep = vueltaDeId(x.id) + 1;
+  $('decMsg').innerHTML='<b>Entra como '+vRep+'.ª auditoría de este lote</b> — reproceso de la del '+
+    esc(x.fecha)+'. No suma lote: son las mismas prendas.';
   veredicto();
 }
 
@@ -2021,14 +2060,16 @@ function reprocesoSinOrigen(){
   if(!T(m)){ $('decMsg').innerHTML='<b style="color:#DC2626">Falta el motivo.</b>'; return; }
   reprocesaDe=''; motivoRep=T(m); esReaud='SI';
   $('reproceso').checked=true; modoReproceso(true);
-  $('decMsg').innerHTML='<b>Reproceso sin origen registrado.</b> No suma lote.';
+  $('decMsg').innerHTML='<b>Entra como '+vueltaSiguienteSuelta()+'.ª auditoría de este lote</b> — '+
+    'reproceso sin el rechazo registrado. No suma lote.';
   veredicto();
 }
 
 function marcarTandaNueva(n){
   reprocesaDe=''; motivoRep=''; esReaud='NO';
   $('reproceso').checked=false; modoReproceso(false);
-  $('decMsg').innerHTML='<b>Tanda '+n+' del pedido.</b> Son prendas distintas: suma lote.';
+  $('decMsg').innerHTML='<b>1.ª auditoría de este lote</b> — tanda '+n+' del pedido. '+
+    'Son prendas distintas: suma lote. El número sube solo si este lote se rechaza y vuelve reprocesado.';
   veredicto();
 }
 
@@ -2037,8 +2078,8 @@ function fijarReaud(v, n){
   $('btnRea').classList.toggle('on', v==='SI');
   $('btnNoRea').classList.toggle('on', v==='NO');
   $('decMsg').innerHTML = v==='SI'
-    ? '<b>Entra como '+n+'.ª auditoría</b> — no vuelve a sumar cantidad auditada.'
-    : '<b>Entra como auditoría nueva</b> — suma normal en los indicadores.';
+    ? '<b>Entra como '+n+'.ª auditoría de este lote</b> (reproceso) — no vuelve a sumar cantidad auditada.'
+    : '<b>Entra como 1.ª auditoría de este lote</b> (tanda nueva) — suma normal en los indicadores.';
 }
 
 /* ---------------- defectos ---------------- */

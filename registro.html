@@ -523,6 +523,21 @@
         color:#333;cursor:pointer;}
   .opcItem:hover{border-color:var(--sage);box-shadow:0 1px 4px rgba(15,122,90,.15);}
   .opcItem b{color:var(--petrol);}
+  /* 24/09: Auditoría de Cliente con varias OPs y hoja por OP */
+  .opcItem.on{border-color:var(--sage);background:#ECFDF5;}
+  .opcItem .chk{font-weight:800;color:var(--sage);min-width:14px;}
+  .opcTodas{margin:0 0 8px;}
+  .opsCli{display:none;margin:10px 0 0;padding:10px 12px;border:1px solid var(--wl);border-radius:10px;background:#fff;}
+  .opCliChip{display:inline-flex;align-items:center;gap:6px;margin:4px 6px 4px 0;padding:5px 10px;
+    border-radius:999px;background:var(--wl);font-size:13px;}
+  .opCliChip b{color:var(--petrol);}
+  .opCliChip i{cursor:pointer;font-style:normal;font-weight:800;color:var(--stone);padding:0 2px;}
+  .opCliTot{margin-top:6px;font-size:14px;}
+  .opCliTot span{color:var(--stone);font-size:12.5px;}
+  table.hj select{width:100%;border:1px solid var(--wl);background:#fff;padding:4px 6px;
+    font-size:13.5px;border-radius:5px;font-family:inherit;}
+  table.hj select:focus{border-color:var(--sage);outline:none;}
+  table.hj input.ro{background:transparent;color:var(--sage);font-weight:700;cursor:default;}
   .opcItem .sep{color:var(--stone);}
   .opcItem .ped{margin-left:auto;font-weight:700;color:var(--sage);font-size:12.5px;
         background:var(--wl);border-radius:12px;padding:2px 10px;white-space:nowrap;}
@@ -831,7 +846,7 @@
     <div class="hjWrap">
       <table class="hj">
         <thead><tr>
-          <th style="width:30px">#</th><th>Grupo</th><th>Color</th><th>Estilo</th>
+          <th style="width:30px">#</th><th style="width:92px">OP</th><th>Grupo</th><th>Color</th><th>Estilo</th>
           <th style="width:74px">Lote</th><th style="width:80px">Muestra</th>
           <th>Defectos</th><th style="width:60px">Total</th>
           <th style="width:104px">Resultado</th><th style="width:34px"></th>
@@ -1199,6 +1214,7 @@ function aplicarTipo(){
   if(typeof verVista==='function' && $('cardHoja')) verVista();
   if($('cardHoja') && $('cardHoja').style.display!=='none'){ pintarChipsHoja(); pintarHoja(); }
   aplicarCamposDelTipo();
+  if(typeof pintarOpsCli==='function') pintarOpsCli();
   /* Se volvió a declarar: al mover el bloque de campos a su propia función se
      fue con él la declaración, y el resto seguía usándola. */
   var t = $('tipo').value;
@@ -1639,7 +1655,7 @@ function pintarChips(){
 }
 
 /* ---------------- autocompletado genérico ---------------- */
-function autocompletar(inputId, dropId, fuente, alElegir){
+function autocompletar(inputId, dropId, fuente, alElegir, extra){
   var inp=$(inputId), dr=$(dropId), opts=[], sel=-1;
   function buscar(){
     if(inp.readOnly){ cerrar(); return; }   /* 22/09: los datos del pedido no se eligen a mano */
@@ -1655,7 +1671,10 @@ function autocompletar(inputId, dropId, fuente, alElegir){
     }
     /* Ofrecer «usar este valor nuevo» solo si el catálogo sí cargó. Si llegó
        vacío, lo que corresponde es avisar, no invitar a inventar un nombre. */
-    if(!opts.length && norm(q).length>=2){
+    if(!opts.length && norm(q).length>=2 && extra && extra.sinNuevo){
+      opts.push({texto: base.length ? (extra.vacio||'Sin resultados') : 'Cargando la lista…', tag:'', vacio:true});
+    }
+    else if(!opts.length && norm(q).length>=2){
       if(base.length) opts.push({texto:norm(q), tag:'nuevo', nuevo:true});
       else opts.push({texto:'No se cargó la lista — revisa la conexión', tag:'', vacio:true});
     }
@@ -1679,7 +1698,7 @@ function autocompletar(inputId, dropId, fuente, alElegir){
     });
   }
   function cerrar(){ dr.classList.remove('on'); opts=[]; sel=-1; }
-  function elegir(o){ if(!o) return; inp.value=o.texto; cerrar(); alElegir && alElegir(o); }
+  function elegir(o){ if(!o || o.vacio) return; inp.value=o.texto; cerrar(); alElegir && alElegir(o); }
   inp.addEventListener('input', buscar);
   /* Al entrar al campo se muestran las opciones aunque no haya escrito nada:
      así puede elegir de la lista en vez de tener que adivinar cómo se escribe. */
@@ -1738,16 +1757,47 @@ var OP_RESUELTA = '';
 var OP_INEXISTENTE = '';   /* última OP que se buscó y no estaba en la base */
 var OPS_FILAS = null;          /* base de OPs completa, para validar al guardar */
 function cargarOpsFilas(){
-  return sbrOps().then(function(f){ OPS_FILAS=f; return f; });
+  return sbrOps().then(function(f){
+    OPS_FILAS=f; OPS_IDX=null;
+    /* La hoja pudo pintarse antes de que llegara la base: se repinta con las listas de color. */
+    if($('cardHoja') && $('cardHoja').style.display!=='none' && typeof pintarHoja==='function') pintarHoja();
+    return f;
+  });
+}
+/* 24/09: la lista de OPs que aparece al escribir sale de la base de OPs completa,
+   con su grupo y estilo al lado. Antes salía solo de lo digitado en la sesión y
+   casi nunca mostraba nada. */
+var OPS_IDX=null, OPS_TAG={};
+function indiceOps(){
+  if(OPS_IDX) return OPS_IDX;
+  if(!OPS_FILAS) return [];
+  var m={}, out=[];
+  OPS_FILAS.forEach(function(r){
+    var op=U(r.op); if(!op) return;
+    if(!m[op]){ m[op]={texto:op, g:{}, e:{}, n:0}; out.push(m[op]); }
+    if(r.grupo) m[op].g[U(r.grupo)]=1;
+    if(r.estilo) m[op].e[U(r.estilo)]=1;
+    m[op].n++;
+  });
+  OPS_TAG={};
+  out.forEach(function(o){
+    o.tag=Object.keys(o.g).join('/')+' · '+Object.keys(o.e).join('/')+(o.n>1?(' · '+o.n+' opciones'):'');
+    OPS_TAG[o.texto]=o.tag; delete o.g; delete o.e;
+  });
+  out.sort(function(a,b){ return b.texto.localeCompare(a.texto,'es',{numeric:true}); });
+  OPS_IDX=out;
+  return out;
 }
 function limpiarLoteOP(){
   ['grupo','estilo','eCliente','color','po','destino','pedido','cliente'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
   limpiarTela(); lineas=[]; pintarLineas();
+  OPS_CLI=[]; if(typeof pintarOpsCli==='function') pintarOpsCli();
   if($('opcOps')){ $('opcOps').style.display='none'; $('opcOps').innerHTML=''; }
   prevLote=null; esReaud='';
 }
 function consultarOps(){
   if(editando) return;
+  if($('tipo').value==='CLIENTE'){ consultarOpCliente(U($('op')?$('op').value:'')); return; }
   var op=U($('op')?$('op').value:'');
   if(!op){
     if(OP_RESUELTA || T($('grupo').value)) limpiarLoteOP();
@@ -1779,6 +1829,113 @@ function consultarOps(){
   });
 }
 
+/* ===== 24/09 · Auditoría de Cliente con varias OPs =====
+   El cliente a veces audita varias OPs en una sola pasada y anota un solo lote y
+   una sola muestra. Athina escribe cada OP (se van sumando), toca los colores que
+   el cliente revisó de cada una, y el pedido es la suma de todo lo elegido.
+   Lote, muestra, defectos y resultado se ponen una sola vez, como en el papel.
+   Se guarda UNA auditoría: OP, grupo, estilo y PO van juntos con « + », igual que
+   los colores cuando son varios. */
+var OPS_CLI=[];   /* [{op, filas}] */
+function opsCliTexto(){ return OPS_CLI.map(function(x){ return x.op; }).join(' + '); }
+function totalPedidoCli(){ return lineas.reduce(function(a,l){ return a+(N(l.pedido)||0); },0); }
+function cabeceraCliente(){
+  if($('tipo').value!=='CLIENTE' || editando){ pintarOpsCli(); return; }
+  var todas=[]; OPS_CLI.forEach(function(x){ todas=todas.concat(x.filas||[]); });
+  $('grupo').value=unicosDe(todas.map(function(r){ return r.grupo; })).join(' + ');
+  $('estilo').value=unicosDe(todas.map(function(r){ return r.estilo; })).join(' + ');
+  aplicarCliente();
+  $('eCliente').value=unicosDe(lineas.map(function(l){ return l.eCliente; })).join(' + ');
+  $('color').value=unicosDe(lineas.map(function(l){ return l.color; })).join(' + ');
+  $('po').value=unicosDe(lineas.map(function(l){ return l.po; })).join(' + ');
+  $('destino').value=unicosDe(lineas.map(function(l){ return l.destino; })).join(' + ');
+  var tot=totalPedidoCli(); $('pedido').value = tot>0 ? tot : '';
+  var t0=todas[0];
+  $('tela').value = (t0 && t0.codTela) ? (t0.codTela+(t0.descTela?(' · '+t0.descTela):'')) : '';
+  OPS_ACT = (t0 && t0.codTela) ? {codTela:t0.codTela, descTela:t0.descTela} : null;
+  pintarOpsCli();
+}
+function pintarOpsCli(){
+  var box=$('opsCli');
+  if(!box){
+    box=document.createElement('div'); box.id='opsCli'; box.className='opsCli';
+    var ref=$('rowPo');
+    if(ref && ref.parentNode) ref.parentNode.insertBefore(box, ref); else return;
+  }
+  if($('tipo').value!=='CLIENTE' || !OPS_CLI.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  var html='<div class="opcTit" style="color:var(--petrol)">OPs de esta auditoría de cliente'+
+    ' <span style="font-weight:400;color:var(--stone)">· el lote y la muestra son del conjunto</span></div>';
+  html+=OPS_CLI.map(function(x,i){
+    var f0=(x.filas||[])[0]||{};
+    var det=esc(unicosDe((x.filas||[]).map(function(r){ return r.grupo; })).join('/')+' · '+
+                unicosDe((x.filas||[]).map(function(r){ return r.estilo; })).join('/'));
+    if(editando) return '<span class="opCliChip"><b>OP '+esc(x.op)+'</b> '+det+'</span>';
+    var ls=lineas.filter(function(l){ return l.op===x.op; });
+    var ped=ls.reduce(function(a,l){ return a+(N(l.pedido)||0); },0);
+    return '<span class="opCliChip"><b>OP '+esc(x.op)+'</b> '+det+
+      ' · '+ls.length+' color'+(ls.length===1?'':'es')+
+      (ped?(' · '+ped.toLocaleString('es-PE')+' prendas'):'')+
+      '<button type="button" class="mini" data-vo="'+i+'">Colores</button>'+
+      '<i data-qo="'+i+'" title="Quitar esta OP">&times;</i></span>';
+  }).join('');
+  var tot = editando ? N($('pedido').value) : totalPedidoCli();
+  html+='<div class="opCliTot">Pedido total: <b>'+(tot?(tot.toLocaleString('es-PE')+' prendas'):'—')+'</b>'+
+    (!editando && OPS_CLI.length>1 ? ' <span>(suma de las '+OPS_CLI.length+' OPs, solo los colores elegidos)</span>' : '')+'</div>';
+  if(!editando) html+='<div class="hint" style="margin:4px 0 0">¿El cliente auditó otra OP en esta misma auditoría? Escríbela en el campo OP y se suma aquí.</div>';
+  box.innerHTML=html;
+  Array.prototype.forEach.call(box.querySelectorAll('[data-qo]'),function(b){
+    b.onclick=function(){ quitarOpCli(+b.dataset.qo); };
+  });
+  Array.prototype.forEach.call(box.querySelectorAll('[data-vo]'),function(b){
+    b.onclick=function(){ var x=OPS_CLI[+b.dataset.vo]; if(x) ofrecerOpciones({filas:x.filas, opCli:x.op}); };
+  });
+}
+function quitarOpCli(i){
+  var x=OPS_CLI[i]; if(!x) return;
+  OPS_CLI.splice(i,1);
+  lineas=lineas.filter(function(l){ return l.op!==x.op; });
+  pintarLineas(); cabeceraCliente();
+  var c=$('opcOps'); if(c){ c.style.display='none'; c.innerHTML=''; }
+  $('prev').classList.remove('on'); prevLote=null; esReaud='';
+}
+function consultarOpCliente(op){
+  if(!op){
+    $('hOp').className='hint';
+    $('hOp').textContent = OPS_CLI.length ? 'Puedes escribir otra OP si el cliente auditó varias.'
+                                          : 'Obligatoria: el resto del pedido sale de la base de OPs';
+    return;
+  }
+  var ya=null; OPS_CLI.forEach(function(x){ if(x.op===op) ya=x; });
+  if(ya){ $('op').value=''; ofrecerOpciones({filas:ya.filas, opCli:op}); return; }
+  $('hOp').className='hint'; $('hOp').textContent='Buscando la OP…';
+  jsonp({accion:'opsclave', op:op}, function(r){
+    if(U($('op').value)!==op) return;
+    if(!r || !r.ok || !r.existe){
+      OP_INEXISTENTE=op;
+      $('hOp').className='hint err';
+      $('hOp').textContent='La OP '+op+' no está en la base de OPs. Revisa el número o avisa a Christian.';
+      return;
+    }
+    var filas=r.filas||[];
+    var cliNuevo=clienteDeGrupo((filas[0]||{}).grupo);
+    var cliAct = OPS_CLI.length ? clienteDeGrupo(((OPS_CLI[0].filas||[])[0]||{}).grupo) : '';
+    if(cliAct && cliNuevo && cliNuevo!==cliAct){
+      $('hOp').className='hint err';
+      $('hOp').textContent='La OP '+op+' es de '+cliNuevo+' y esta auditoría es de '+cliAct+'. Una auditoría de cliente es de un solo cliente.';
+      return;
+    }
+    OPS_CLI.push({op:op, filas:filas});
+    $('op').value=''; OP_RESUELTA='';
+    $('hOp').className='hint ok';
+    $('hOp').textContent='OP '+op+' agregada. Toca abajo los colores que auditó el cliente.';
+    cabeceraCliente();
+    ofrecerOpciones({filas:filas, opCli:op});
+  }, function(){
+    $('hOp').className='hint err'; $('hOp').textContent='Sin conexión: no se pudo consultar la OP.';
+  });
+}
+
 /* Las combinaciones de la OP se muestran completas —color, destino, PO y
    cantidad— y se elige de un clic. Antes eran tres filas de botones separadas
    y había que elegir tres veces lo que en realidad es una sola decisión. */
@@ -1791,6 +1948,8 @@ function ofrecerOpciones(r){
     else return;
   }
   var filas=(r.filas||[]);
+
+  if(r.opCli){ ofrecerOpcionesCliente(cont, filas, r.opCli); return; }
 
   /* Una sola combinación: se pone sin preguntar. */
   if(filas.length===1){
@@ -1827,6 +1986,53 @@ function ofrecerOpciones(r){
   });
 }
 
+function lineaDeFila(f){
+  return {op:U(f.op), color:U(f.color), eCliente:U(f.eCliente), po:T(f.po),
+          destino:T(f.destino), pedido:N(f.pedido)};
+}
+function mismaLinea(a,b){
+  return a.op===b.op && a.color===b.color && U(a.po)===U(b.po) && U(a.destino)===U(b.destino);
+}
+function ofrecerOpcionesCliente(cont, filas, op){
+  if(filas.length===1){
+    var l1=lineaDeFila(filas[0]);
+    if(!lineas.some(function(l){ return mismaLinea(l,l1); })){ lineas.push(l1); pintarLineas(); }
+    cabeceraCliente(); buscarLote();
+    cont.style.display='none'; cont.innerHTML='';
+    return;
+  }
+  if(!filas.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+  function pintar(){
+    cont.innerHTML='<div class="opcTit">La OP '+esc(op)+' tiene '+filas.length+
+      ' opciones — toca las que auditó el cliente (se pueden elegir varias):</div>'+
+      '<button type="button" class="btn sec opcTodas" id="opcTodas">Elegir todas</button>'+
+      filas.slice(0,60).map(function(f,i){
+        var l=lineaDeFila(f), on=lineas.some(function(x){ return mismaLinea(x,l); });
+        return '<button type="button" class="opcItem'+(on?' on':'')+'" data-i="'+i+'">'+
+          '<span class="chk">'+(on?'✓':'')+'</span>'+
+          '<b>'+esc(f.color||'—')+'</b>'+
+          (f.destino?('<span class="sep">·</span>Destino '+esc(f.destino)):'')+
+          (f.po?('<span class="sep">·</span>PO '+esc(f.po)):'')+
+          (f.pedido?('<span class="ped">'+Number(f.pedido).toLocaleString('es-PE')+' prendas</span>'):'')+
+        '</button>';
+      }).join('');
+    cont.style.display='block';
+    $('opcTodas').onclick=function(){
+      filas.forEach(function(f){ var l=lineaDeFila(f); if(!lineas.some(function(x){ return mismaLinea(x,l); })) lineas.push(l); });
+      pintarLineas(); cabeceraCliente(); buscarLote(); pintar();
+    };
+    Array.prototype.forEach.call(cont.querySelectorAll('.opcItem'),function(b){
+      b.onclick=function(){
+        var l=lineaDeFila(filas[+b.dataset.i]);
+        var k=-1; lineas.forEach(function(x,j){ if(mismaLinea(x,l)) k=j; });
+        if(k>=0) lineas.splice(k,1); else lineas.push(l);
+        pintarLineas(); cabeceraCliente(); buscarLote(); pintar();
+      };
+    });
+  }
+  pintar();
+}
+
 /* Pone en el formulario una combinación exacta de la base de OPs (siempre la
    reemplaza: nunca se mezcla con algo escrito antes). En Cliente, cada opción
    tocada se suma como un color auditado. */
@@ -1846,6 +2052,18 @@ function ponerCombinacion(f){
 /* ¿Lo que está en el formulario es exactamente una combinación de la base de OPs?
    Devuelve '' si todo calza, o el mensaje de lo que no calza. */
 function validarContraOps(){
+  if($('tipo').value==='CLIENTE'){
+    for(var i0=0;i0<lineas.length;i0++){
+      var l0=lineas[i0];
+      var fs=filasDeOp(l0.op||'');
+      if(!fs.length) return 'El color '+l0.color+' no tiene OP. Quítalo y elígelo de nuevo en los colores de su OP.';
+      var ok0=fs.some(function(r){ return r.color===U(l0.color) && U(r.po)===U(l0.po) && (!T(l0.destino) || U(r.destino)===U(l0.destino)); });
+      if(!ok0) return 'El color '+l0.color+(l0.po?(' / PO '+l0.po):'')+' no está en la OP '+l0.op+'.';
+    }
+    var clis=unicosDe(OPS_CLI.map(function(x){ return clienteDeGrupo(((x.filas||[])[0]||{}).grupo); }));
+    if(clis.length>1) return 'Las OPs son de clientes distintos ('+clis.join(', ')+'). Una auditoría de cliente es de un solo cliente.';
+    return '';
+  }
   var op=U($('op').value);
   var filas=(OPS_FILAS||[]).filter(function(r){ return U(r.op)===op; });
   if(!filas.length) return 'La OP '+op+' no está en la base de OPs.';
@@ -2288,13 +2506,14 @@ var lineas = [];
 function pintarLineas(){
   $('tagsLineas').innerHTML = lineas.map(function(l,i){
     return '<span class="tagDer" style="background:var(--wl);border-color:var(--warm)">'+
+      (l.op?('<span style="color:var(--stone)">OP '+esc(l.op)+' ·</span>'):'')+
       '<b style="color:var(--petrol)">'+esc(l.color||'—')+'</b>'+
       (l.eCliente?('<span style="color:var(--stone)">· '+esc(l.eCliente)+'</span>'):'')+
       (l.po?('<span style="color:var(--stone)">· PO '+esc(l.po)+'</span>'):'')+
       '<i data-lq="'+i+'" title="Quitar">&times;</i></span>';
   }).join('');
   Array.prototype.forEach.call($('tagsLineas').querySelectorAll('[data-lq]'),function(b){
-    b.onclick=function(){ lineas.splice(+b.dataset.lq,1); pintarLineas(); };
+    b.onclick=function(){ lineas.splice(+b.dataset.lq,1); pintarLineas(); if(typeof cabeceraCliente==='function') cabeceraCliente(); };
   });
 }
 
@@ -2450,7 +2669,20 @@ function validar(){
   /* 22/09: la OP es obligatoria siempre (antes solo en el mes en curso) y todo el
      pedido tiene que ser una combinación exacta de la base de OPs. En una corrección
      el lote viene de la auditoría guardada y no se valida de nuevo. */
-  if(!editando){
+  if(!editando && tv==='CLIENTE'){
+    if(T($('op').value) && !OPS_CLI.some(function(x){ return x.op===U($('op').value); }))
+      return 'La OP '+U($('op').value)+' está escrita pero no se agregó. Sal del campo OP para que se cargue, o bórrala.';
+    if(!OPS_CLI.length) return 'Falta la OP. Es obligatoria: todo el pedido sale de la base de OPs.';
+    if(!OPS_FILAS) return 'Todavía no carga la base de OPs para revisar. Espera unos segundos y vuelve a intentar.';
+    for(var q2=0;q2<OPS_CLI.length;q2++){
+      var opq=OPS_CLI[q2].op;
+      if(!lineas.some(function(l){ return l.op===opq; }))
+        return 'La OP '+opq+' no tiene ningún color elegido. Toca sus colores o quítala.';
+    }
+    var malOpC=validarContraOps();
+    if(malOpC) return malOpC;
+  }
+  else if(!editando){
     if(!T($('op').value)) return 'Falta la OP. Es obligatoria: todo el pedido sale de la base de OPs.';
     if(U($('op').value)===OP_INEXISTENTE) return 'La OP '+OP_INEXISTENTE+' no está en la base de OPs. Sin OP no se puede digitar: revisa el número o avisa a Christian.';
     if(U($('op').value)!==OP_RESUELTA) return 'La OP todavía no se cargó de la base. Sal del campo OP y espera a que se llenen los datos.';
@@ -2540,13 +2772,14 @@ function guardar(){
     })),
     po: U($('po').value),
     servicio: (t==='EMPAQUE') ? 'LIVES' : U($('servicio').value),
-    destinos: JSON.stringify( T($('destino').value)
-        ? [{codigo:U($('destino').value), via:''}] : [] ),
+    destinos: JSON.stringify( t==='CLIENTE'
+        ? unicosDe(lineas.map(function(l){ return l.destino; })).map(function(d){ return {codigo:U(d), via:''}; })
+        : (T($('destino').value) ? [{codigo:U($('destino').value), via:''}] : []) ),
     cajas: N($('cajas').value),
     derivados: ders.filter(function(d){ return d.cantidad>0; })
                    .map(function(d){ return d.nombre+' '+d.cantidad; }).join('-'),
     derivadosDet: JSON.stringify(ders.filter(function(d){ return d.cantidad>0; })),
-    op: OP_RESUELTA,
+    op: t==='CLIENTE' ? opsCliTexto() : OP_RESUELTA,
     codTela: (OPS_ACT && OPS_ACT.codTela) ? OPS_ACT.codTela : '',
     descTela: (OPS_ACT && OPS_ACT.descTela) ? OPS_ACT.descTela : '',
     eCliente: U($('eCliente').value),
@@ -2646,11 +2879,44 @@ function cargarEnvioEnForm(e){
   try{ defs=JSON.parse(e.defectos)||[]; }catch(err){ defs=[]; }
   if(e.tipo==='CLIENTE'){ try{ lineas=JSON.parse(e.colores||'[]')||[]; }catch(err){ lineas=[]; } pintarLineas(); }
   aplicarCliente(); pintarDefs(); pintarDers();
+  /* 24/09: en Cliente se reconstruyen las OPs del grupo (pueden ser varias). */
+  if(e.tipo==='CLIENTE'){
+    OPS_CLI=unicosDe(String(e.op||'').split('+')).map(function(op){ return {op:U(op), filas:filasDeOp(op)}; });
+    $('op').value=''; OP_RESUELTA='';
+    cabeceraCliente();
+  }
 }
 
 /* Devuelve una pendiente al formulario para corregirla y la saca de la lista. */
+/* 24/09: una pendiente de Líneas o Serv. Inspección vuelve a la HOJA, que es donde
+   se digita. Antes se cargaba en el formulario, que en esos tipos está escondido,
+   y parecía que los datos se borraban. */
+function envioAHoja(e){
+  $('tipo').value=e.tipo; aplicarTipo();
+  var dd=[]; try{ dd=JSON.parse(e.defectos||'[]')||[]; }catch(err){ dd=[]; }
+  var fila={op:U(e.op||''), grupo:U(e.grupo||''), estilo:U(e.estilo||''), color:U(e.color||''),
+            lote:e.lote||'', muestra:e.muestra||'', defs:dd, eCliente:U(e.eCliente||''),
+            codTela:e.codTela||'', descTela:e.descTela||''};
+  var ult=hoja[hoja.length-1];
+  var vacia = ult && !T(ult.op) && !T(ult.grupo) && !N(ult.lote) && !N(ult.muestra) && !(ult.defs||[]).length;
+  if(vacia) hoja[hoja.length-1]=fila; else hoja.push(fila);
+  try{ var a=JSON.parse(e.auditores||'[]'); if(a && a[0]) $('auditor').value=a[0]; }catch(err){}
+  if(e.inspector) $('inspector').value=e.inspector;
+  if(e.linea) $('linea').value=e.linea;
+  guardarHoja(); pintarHoja();
+  var fi=hoja.length-1; activarFila(fi);
+  if(fila.op) resolverOpFila(fi); else enfocarCelda(fi,'op');
+  return fi;
+}
 function corregirPend(i){
   var x=pend[i]; if(!x) return;
+  if(VISTA_HOJA[x.envio.tipo]){
+    envioAHoja(x.envio);
+    pend.splice(i,1); guardarPend(); pintarPend();
+    $('hjMsg').className='hint';
+    $('hjMsg').textContent='Volvió a la hoja. Corrígela y pulsa «Agregar bloque a la lista».';
+    return;
+  }
   cargarEnvioEnForm(x.envio);
   pend.splice(i,1); guardarPend(); pintarPend();
   $('hGuardar').className='hint';
@@ -2663,6 +2929,12 @@ function corregirPend(i){
    el color o el estilo y agregarla como una auditoría más. */
 function duplicarPend(i){
   var x=pend[i]; if(!x) return;
+  if(VISTA_HOJA[x.envio.tipo]){
+    envioAHoja(x.envio);
+    $('hjMsg').className='hint';
+    $('hjMsg').textContent='Copiada a la hoja. Cambia lo que corresponda.';
+    return;
+  }
   cargarEnvioEnForm(x.envio);
   $('hGuardar').className='hint';
   $('hGuardar').textContent='Copiada. Cambia lo que corresponda y pulsa Agregar a la lista.';
@@ -2699,19 +2971,29 @@ function enviarTodo(){
    aviso de "sin sesión" del bloque de sesión si algo falla — esto es invisible
    siempre, incluso si falla. */
 function compararParalelo(envio, idReal){
+  /* 24/09: los CINCO tipos mandan su copia (antes solo Final). La copia va a
+     tablas aparte y no toca nada de lo que ve Athina. El cuerpo tiene la misma
+     forma que se probó contra 48 auditorías reales de Líneas, Serv. Inspección,
+     Empaque y Cliente: 48 de 48 coincidieron en todos los datos calculados. */
   try{
-    if (String(envio.tipo || '').toUpperCase() !== 'FINAL') return;
     if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
     window.LIVES_SESION.llave().then(function(tk){
       if (!tk) return;
       try{
         function jparse(v, def){ try{ return JSON.parse(v); }catch(e){ return def; } }
+        var tipo = String(envio.tipo || '').toUpperCase();
+        /* 24/09: los tipos directos ya no se comparan: se guardan en Supabase. */
+        if (tipo !== 'FINAL') return;
         var defs = jparse(envio.defectos, []).map(function(d){
           return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad,
                     cod: d.cod, seccion: d.seccion, categoria: d.categoria, subtipo: d.subtipo, nota: d.nota };
         });
+        var tot = defs.reduce(function(a,d){ return a + (parseFloat(d.cantidad)||0); }, 0);
+        /* La hoja (Líneas, Serv. Inspección) no manda resultado: lo decide la
+           tolerancia cero, igual que el sistema real. */
+        var res = envio.resultado || ((tipo==='LINEAS' || tipo==='SERVINSP') ? (tot>0 ? 'RECHAZADO' : 'APROBADO') : '');
         var body = {
-          tipo: 'FINAL', fecha: envio.fecha, grupo: envio.grupo, estilo: envio.estilo,
+          tipo: tipo, fecha: envio.fecha, grupo: envio.grupo, estilo: envio.estilo,
           nivelAql: String(envio.nivelAql || '1.5'), lote: envio.lote, muestra: envio.muestra,
           captura: 'DIGITADO',
           licencia: envio.licencia === '1', override: envio.override === 'SÍ',
@@ -2720,8 +3002,9 @@ function compararParalelo(envio, idReal){
           pedido: envio.pedido || 0, op: envio.op || '',
           proceso: envio.proceso || '', intExt: envio.intExt || '', servicio: envio.servicio || '',
           auditores: jparse(envio.auditores, []), digitador: envio.digitador || '',
+          inspector: envio.inspector || '', cajas: envio.cajas || null,
           colores: jparse(envio.colores, []), destinos: jparse(envio.destinos, []),
-          defectos: defs, resultado: envio.resultado || '',
+          defectos: defs, resultado: res,
           overrideAutoriza: envio.overrideAutoriza || '', overrideMotivo: envio.overrideMotivo || '',
           eCliente: envio.eCliente || '',
           token: envio.token,
@@ -2732,12 +3015,108 @@ function compararParalelo(envio, idReal){
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
         xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-        /* sin manejo de respuesta a propósito: esto es solo para comparar después con
-           SQL. Ni un error aquí debe tocar lo que Athina ve o hace. */
         xhr.send(JSON.stringify({ payload: body }));
       }catch(e){}
     }).catch(function(){});
   }catch(e){}
+}
+
+/* 24/09: al CORREGIR, la copia se recalcula entera con lo que quedó guardado,
+   leyendo la auditoría ya corregida. Antes solo se copiaban los campos cambiados
+   y el número de auditoría, el resultado AQL o lo computable no se recalculaban:
+   una corrección de lote o muestra dejaba la copia distinta de la real. Se espera
+   un momento para que la corrección llegue a Supabase. Si esa auditoría no tiene
+   copia (es anterior al paralelo), Supabase no hace nada. */
+function paraleloTrasCorregir(id){
+  setTimeout(function(){
+    sbrLeerAud({id:id}).then(function(r){
+      if(!r || !r.ok) return;
+      var g=r.registro||{};
+      if(U(g.TIPO_AUDITORIA)!=='FINAL') return;   /* solo Final tiene copia en paralelo */
+      var body = {
+        tipo: U(g.TIPO_AUDITORIA), fecha: T(g.FECHA), grupo: T(g.GRUPO), estilo: T(g.ESTILO),
+        nivelAql: T(g.NIVEL_AQL) || '1.5', lote: N(g.LOTE), muestra: N(g.MUESTRA),
+        captura: T(g.CAPTURA) || 'DIGITADO',
+        licencia: N(g.LICENCIA)===1, override: U(g.OVERRIDE)==='SÍ',
+        reproceso: N(g.REPROCESO)===1, esReauditoria: N(g.REPETIDO)===1 ? 'SI' : 'NO',
+        reprocesaDe: T(g.REPROCESA_DE), motivoReproceso: T(g.MOTIVO_REPROCESO),
+        pedido: N(g.PEDIDO), op: T(g.OP), proceso: T(g.TIPO_PROCESO), intExt: T(g.INT_EXT),
+        servicio: T(g.SERVICIO), inspector: T(g.INSPECTOR),
+        auditores: (r.auditores||[]),
+        digitador: U($('digitador').value),
+        colores: (r.colores||[]).map(function(c){ return {color:c.COLOR, po:c.PO, eCliente:c.E_CLIENTE}; }),
+        destinos: (r.destinos||[]).map(function(d){ return {codigo:d.CODIGO, via:d.VIA}; }),
+        defectos: (r.defectos||[]).map(function(d){
+          return {nombre: T(d.CATEGORIA)+(T(d.SUBTIPO)?(' '+T(d.SUBTIPO)):''), cantidad: N(d.CANTIDAD)};
+        }),
+        resultado: U(g.RESULTADO), cajas: N(g.CAJAS)||null, eCliente: T(g.E_CLIENTE),
+        overrideAutoriza: T(g.OVERRIDE_AUTORIZA), overrideMotivo: T(g.OVERRIDE_MOTIVO),
+        liquidado: N(g.LIQUIDADO)===1
+      };
+      paraleloXhr('sync_actualizar_auditoria_paralelo', { p_id: id, payload: body });
+    }, function(){});
+  }, 2500);
+}
+
+/* ===== 24/09 · Guardado directo en Supabase =====
+   Tipos que ya no pasan por el Apps Script ni por el Sheet. Si Supabase dijera que
+   un tipo todavía no es directo (el interruptor se apagó), se usa el sistema
+   anterior sin que Athina lo note. */
+var TIPOS_DIRECTOS = { LINEAS:true, SERVINSP:true, EMPAQUE:true, CLIENTE:true };
+
+function rpcDirecto(fn, cuerpo){
+  var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var reloj = setTimeout(function(){ if (control) control.abort(); }, 30000);
+  return fetch(SBR_URL + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: { apikey: SBR_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo), cache: 'no-store',
+      signal: control ? control.signal : undefined
+    })
+    .then(function(r){
+      clearTimeout(reloj);
+      if (!r.ok) return r.text().then(function(t){ throw new Error('Supabase ' + r.status + ' ' + t.slice(0,150)); });
+      return r.json();
+    }, function(e){ clearTimeout(reloj); throw e; });
+}
+
+/* Convierte lo que arma el formulario (o la hoja) en lo que recibe Supabase. */
+function cuerpoDirecto(envio){
+  function jparse(v, def){ try{ return (typeof v==='string') ? JSON.parse(v) : (v||def); }catch(e){ return def; } }
+  var tipo = String(envio.tipo || '').toUpperCase();
+  var defs = jparse(envio.defectos, []).map(function(d){
+    return { cod: d.cod||'', seccion: d.seccion||'', categoria: d.categoria||'', subtipo: d.subtipo||'',
+             nombre: d.nombre || d.categoria || '', cantidad: d.cantidad, nota: d.nota||'' };
+  });
+  var tot = defs.reduce(function(a,d){ return a + (parseFloat(d.cantidad)||0); }, 0);
+  var res = envio.resultado || ((tipo==='LINEAS' || tipo==='SERVINSP') ? (tot>0 ? 'RECHAZADO' : 'APROBADO') : '');
+  return {
+    tipo: tipo, fecha: envio.fecha, grupo: envio.grupo, estilo: envio.estilo,
+    nivelAql: String(envio.nivelAql || '1.5'), lote: envio.lote, muestra: envio.muestra,
+    captura: 'DIGITADO',
+    licencia: envio.licencia === '1', override: envio.override === 'SÍ',
+    overrideAutoriza: envio.overrideAutoriza || '', overrideMotivo: envio.overrideMotivo || '',
+    reproceso: envio.reproceso === '1', esReauditoria: envio.esReauditoria || '',
+    reprocesaDe: envio.reprocesaDe || '', motivoReproceso: envio.motivoReproceso || '',
+    pedido: envio.pedido || '', op: envio.op || '',
+    proceso: envio.proceso || '', intExt: envio.intExt || '', servicio: envio.servicio || '',
+    auditores: jparse(envio.auditores, []), digitador: envio.digitador || '',
+    inspector: envio.inspector || '', linea: envio.linea || '', cajas: envio.cajas || null,
+    codTela: envio.codTela || '', descTela: envio.descTela || '', eCliente: envio.eCliente || '',
+    colores: jparse(envio.colores, []), destinos: jparse(envio.destinos, []),
+    defectos: defs, resultado: res, token: envio.token
+  };
+}
+
+/* Misma forma que jsonp(envio, ok, fallo): así la cola no cambia. */
+function guardarDirecto(envio, ok, fallo){
+  rpcDirecto('registro_guardar_directo', { payload: cuerpoDirecto(envio) }).then(function(r){
+    if (r && r.noDirecto) { jsonpScript(envio, ok, fallo); return; }   /* el interruptor está apagado */
+    if (r && r.reintentar) { fallo && fallo(r.error || 'reintentar'); return; }
+    try { ok(r); } catch(e){ console.error(e); mostrarError('al procesar la respuesta de Supabase', e); }
+  }, function(e){
+    fallo && fallo((e && e.message) || 'sin conexión');
+  });
 }
 
 function procesarCola(){
@@ -2747,7 +3126,10 @@ function procesarCola(){
   if(!it) return;
   (function(it){
     it.enviando=true; it.intentos++;
-    jsonp(it.envio, function(r){
+    /* 24/09: Líneas, Serv. Inspección, Empaque y Cliente se guardan DIRECTO en
+       Supabase. Final sigue por el sistema anterior (Apps Script). */
+    var enviar = TIPOS_DIRECTOS[String(it.envio.tipo||'').toUpperCase()] ? guardarDirecto : jsonp;
+    enviar(it.envio, function(r){
       it.enviando=false;
       if(r && r.ok){
         it.estado='ok';
@@ -2888,6 +3270,7 @@ function limpiarRegistro(exito){
   $('reproceso').checked=false;
   $('licencia').checked=false; $('resultado').value='';
   defs=[]; ders=[]; pintarDers(); lineas=[]; pintarLineas();
+  OPS_CLI=[]; if(typeof pintarOpsCli==='function') pintarOpsCli();
   reprocesaDe=''; motivoRep=''; PEND_ACT=[];
   if($('audTaller')) $('audTaller').value='';
   ['lnColor','lnEcli','lnPo'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
@@ -2945,22 +3328,66 @@ function itemPorId(idAud){
   return null;
 }
 
+var EDIT_R=null;   /* lo que se leyó de la auditoría que se está corrigiendo */
 function editar(idAud){
   if(editando===idAud) return;
   $('hGuardar').className='hint'; $('hGuardar').textContent='Cargando la auditoría…';
   jsonp({accion:'leer', id:idAud}, function(r){
     if(!r||!r.ok){ $('hGuardar').className='hint err'; $('hGuardar').textContent=(r&&r.error)||'No se pudo cargar.'; return; }
-    var g=r.registro;
-    $('tipo').value=T(g.TIPO_AUDITORIA)||'LINEAS';
-    $('wLinea').style.display = $('tipo').value==='LINEAS' ? '' : 'none';
+    var g=r.registro, t=T(g.TIPO_AUDITORIA)||'LINEAS';
+    EDIT_R=r;
+    /* 24/09: se carga TODO lo que tiene la auditoría. Antes solo se cargaban
+       algunos campos: lo que no se cargaba (PO, destino, pedido, taller, resultado,
+       colores de Cliente) quedaba vacío, y al guardar se podía borrar. */
+    editando=null;
+    limpiarRegistro(false);
+    editando=idAud;                         /* antes de aplicarTipo: así se ve el formulario, no la hoja */
+    $('tipo').value=t;
+    aplicarTipo();
+
     $('fecha').value=T(g.FECHA);
-    $('auditor').value=(r.auditores&&r.auditores[0])||T(g.AUDITOR);
+    var la=(r.auditores||[]).map(U).filter(Boolean);
+    if(t==='EMPAQUE'){ auds=la.length?la:(T(g.AUDITOR)?[U(g.AUDITOR)]:[]); $('auditor').value=''; pintarAuds(); }
+    else $('auditor').value=la[0]||T(g.AUDITOR);
     $('inspector').value=T(g.INSPECTOR);
     $('linea').value=T(g.LINEA);
+
     $('grupo').value=T(g.GRUPO); $('estilo').value=T(g.ESTILO); $('color').value=T(g.COLOR);
     $('eCliente').value=T(g.E_CLIENTE);
+    $('po').value=T(g.PO); $('destino').value=T(g.DESTINO);
+    $('pedido').value=N(g.PEDIDO)>0 ? N(g.PEDIDO) : '';
+    $('tela').value=T(g.COD_TELA)+(T(g.DESC_TELA)?(' · '+T(g.DESC_TELA)):'');
+    OPS_ACT = T(g.COD_TELA) ? {codTela:T(g.COD_TELA), descTela:T(g.DESC_TELA)} : null;
     $('lote').value=N(g.LOTE); $('muestra').value=N(g.MUESTRA);
+    $('cajas').value=N(g.CAJAS)>0 ? N(g.CAJAS) : '';
     $('reproceso').checked = N(g.REPROCESO)===1;
+    $('licencia').checked = N(g.LICENCIA)===1 || U(g.TIPO_LIC)==='LICENCIA';
+    var niv=T(g.NIVEL_AQL); if(['1.0','1.5','2.5'].indexOf(niv)>=0) $('nivelAql').value=niv;
+    $('resultado').value = (['APROBADO','RECHAZADO'].indexOf(U(g.RESULTADO))>=0) ? U(g.RESULTADO) : '';
+    if($('ovWho')) $('ovWho').value=T(g.OVERRIDE_AUTORIZA);
+    if($('ovWhy')) $('ovWhy').value=T(g.OVERRIDE_MOTIVO);
+
+    if(t==='FINAL'){
+      var tp=U(g.TIPO_PROCESO), ie=U(g.INT_EXT);
+      $('proceso').value = tp.indexOf('COSTURA')>=0 ? 'COSTURA' : 'ACABADOS';
+      $('intExt').value  = (ie==='INTERNO' || tp.indexOf('INTERNO')>=0) ? 'INTERNO' : 'EXTERNO';
+      reflejarProcesoFinal(); afinarCamposFinal();
+      if(T(g.SERVICIO)) $('servicio').value=T(g.SERVICIO);
+    }
+
+    if(t==='CLIENTE'){
+      lineas=(r.colores||[]).map(function(c){ return {color:U(c.COLOR), eCliente:U(c.E_CLIENTE), po:U(c.PO)}; });
+      /* Si Supabase aún no tiene el detalle de colores, se arma con lo guardado. */
+      if(!lineas.length && T(g.COLOR)){
+        lineas=T(g.COLOR).split('+').map(function(c){ return {color:U(c), eCliente:U(g.E_CLIENTE), po:U(g.PO)}; });
+      }
+      pintarLineas();
+      OPS_CLI=unicosDe(T(g.OP).split('+')).map(function(op){ return {op:U(op), filas:filasDeOp(op)}; });
+      $('op').value=''; OP_RESUELTA='';
+      pintarOpsCli();
+    } else {
+      $('op').value=T(g.OP); OP_RESUELTA=U(g.OP);
+    }
     aplicarCliente();
 
     /* Los defectos se recargan de verdad. Si no se recargaran y ella guardara,
@@ -2974,19 +3401,24 @@ function editar(idAud){
       return {cod:T(d.COD), seccion:T(d.SECCION), categoria:T(d.CATEGORIA),
               subtipo:T(d.SUBTIPO), nombre:nom, cantidad:N(d.CANTIDAD)};
     });
-    pintarDefs(); pintarChips();
+    pintarDefs(); pintarChips(); veredicto();
 
-    editando=idAud;
+    /* Aviso si lo que se cargó no cuadra con lo guardado: así no se guarda a ciegas. */
+    var aviso = (N(g.DEFECTUOSAS)>0 && totalDef()!==N(g.DEFECTUOSAS))
+      ? ' <span style="color:#B42318">Ojo: la auditoría dice '+N(g.DEFECTUOSAS)+' defectuosa(s) y aquí se cargaron '+totalDef()+'. Revísalo antes de guardar.</span>'
+      : '';
+
     var e=$('edicion');
     e.className='edicion on';
     e.innerHTML='<b>Corrigiendo una auditoría ya guardada.</b> '+
-      '<span>Al guardar se reemplaza, no se crea una nueva.</span>'+
+      '<span>Al guardar se reemplaza, no se crea una nueva.</span>'+aviso+
       '<button class="mini" type="button" id="btnCancelarEd">Cancelar corrección</button>';
     $('btnCancelarEd').onclick=cancelarEdicion;
     $('btnGuardar').innerHTML='Guardar cambios <span class="kbd">F2</span>';
     $('prev').classList.remove('on');
-    $('hGuardar').textContent='';
-    $('grupo').focus();
+    $('hGuardar').className='hint';
+    $('hGuardar').textContent='Cargada. Los datos del pedido salen de la OP y no se cambian aquí.';
+    $('lote').focus();
   }, function(){ $('hGuardar').className='hint err'; $('hGuardar').textContent='Sin conexión.'; });
 }
 
@@ -2995,10 +3427,62 @@ function cancelarEdicion(){
   $('edicion').className='edicion';
   $('btnGuardar').innerHTML='Guardar <span class="kbd">F2</span>';
   limpiarRegistro(false);
+  /* Si era de Líneas o Serv. Inspección, se vuelve a la hoja. */
+  if(typeof verVista==='function') verVista();
+}
+
+/* 24/09: corrección de un tipo directo: Supabase recalcula resultado, AQL y lo
+   computable con lo que quedó en el formulario. */
+function corregirDirecto(id, cuerpo, alTerminar){
+  rpcDirecto('registro_corregir_directo', { p_id: id, payload: cuerpo }).then(function(r){
+    alTerminar(r || {ok:false, error:'sin respuesta'});
+  }, function(e){ alTerminar({ok:false, error: 'Sin conexión: '+((e&&e.message)||'')}); });
+}
+function cuerpoCorreccionFormulario(){
+  var t=$('tipo').value;
+  var auditoresF = !PIDE_AUDITOR[t] ? []
+      : (t==='EMPAQUE'
+          ? auds.concat(T($('auditor').value)?[U($('auditor').value)]:[]).filter(function(x,i,a){ return x && a.indexOf(x)===i; })
+          : (T($('auditor').value) ? [U($('auditor').value)] : []));
+  var destinosR = ((EDIT_R && EDIT_R.destinos) || []).map(function(d){ return {codigo:d.CODIGO, via:d.VIA}; });
+  return {
+    fecha: $('fecha').value, grupo: U($('grupo').value), estilo: U($('estilo').value),
+    lote: N($('lote').value), muestra: N($('muestra').value),
+    nivelAql: nivelAqlActual(), licencia: $('licencia').checked,
+    override: !!($('wOverride') && $('wOverride').style.display!=='none'),
+    overrideAutoriza: $('ovWho') ? $('ovWho').value.trim() : '', overrideMotivo: $('ovWhy') ? $('ovWhy').value.trim() : '',
+    resultado: resultadoActual(), auditores: auditoresF,
+    inspector: U($('inspector').value), linea: t==='LINEAS' ? $('linea').value : '',
+    servicio: t==='EMPAQUE' ? 'LIVES' : U($('servicio').value),
+    cajas: N($('cajas').value) || null, pedido: N($('pedido').value) || '',
+    colores: (t==='CLIENTE' && lineas.length) ? lineas.map(function(l){ return {color:l.color, po:l.po, eCliente:l.eCliente}; })
+                                               : [{color:U($('color').value), po:U($('po').value), eCliente:U($('eCliente').value)}],
+    destinos: destinosR,
+    defectos: defs.map(function(d){ return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo, nombre:d.nombre, cantidad:d.cantidad}; }),
+    usuario: U($('digitador').value)
+  };
 }
 
 function guardarEdicion(){
   var id=editando;
+  if(TIPOS_DIRECTOS[$('tipo').value]){
+    var cuerpo=cuerpoCorreccionFormulario();
+    var etqD=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value);
+    cancelarEdicion();
+    $('hGuardar').className='hint'; $('hGuardar').textContent='Guardando la corrección…';
+    corregirDirecto(id, cuerpo, function(r){
+      var it=itemPorId(id);
+      if(r.ok){
+        if(it){ it.etiqueta=etqD; it.msg='Corregida'; it.estado='ok'; }
+        $('hGuardar').className='hint ok'; $('hGuardar').textContent='Corregida: '+etqD+' · '+(r.resultado||'');
+      } else {
+        if(it){ it.estado='err'; it.msg=r.error||'no se pudo corregir'; }
+        $('hGuardar').className='hint err'; $('hGuardar').textContent='No se pudo corregir: '+(r.error||'');
+      }
+      pintarLog();
+    });
+    return;
+  }
   var cambios={
     FECHA:$('fecha').value, TIPO_AUDITORIA:$('tipo').value,
     GRUPO:U($('grupo').value), ESTILO:U($('estilo').value), COLOR:U($('color').value),
@@ -3010,6 +3494,8 @@ function guardarEdicion(){
     RESULTADO: resultadoActual(),
     REPROCESO: $('reproceso').checked ? 1 : 0
   };
+  /* 24/09: en Final el taller se puede corregir desde el formulario. */
+  if($('tipo').value==='FINAL' && T($('servicio').value)) cambios.SERVICIO=U($('servicio').value);
   /* Faltaba declarar el tipo: al no existir «t» aquí, el navegador cortaba la
      ejecución al leer el archivo y nunca llegaba a cargar los catálogos. Por eso
      los campos de auditora y cliente quedaban vacíos sin ningún aviso. */
@@ -3037,7 +3523,7 @@ function guardarEdicion(){
     var it=itemPorId(id);
     if(r&&r.ok){
       if(it){ it.etiqueta=etq; it.msg='Corregida'; it.estado='ok'; }
-      compararParaleloEditar(id, cambios, envio.auditores, envio.defectos);
+      paraleloTrasCorregir(id);
     }
     else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo corregir'; }
     pintarLog();
@@ -3065,7 +3551,16 @@ function confirmarAnular(motivo){
   if(motivo.length<3){ $('anulErr').textContent='Elige un motivo o escríbelo.'; return; }
   var it=itemPorId(idAud);
   m.style.display='none';
-  jsonp({accion:'anular', clave:CLAVE, id:idAud, motivo:motivo, usuario:U($('digitador').value)},
+  /* 24/09: los tipos directos se anulan en Supabase; si Supabase dice que no es
+     directo (Final), se anula por el sistema anterior como siempre. */
+  var anularViejo = function(params, ok, fallo){ jsonpScript(params, ok, fallo); };
+  var anularNuevo = function(params, ok, fallo){
+    rpcDirecto('registro_anular_directo', {p_id:params.id, p_motivo:params.motivo, p_usuario:params.usuario}).then(function(r){
+      if(r && r.noDirecto){ anularViejo(params, ok, fallo); return; }
+      ok(r);
+    }, function(){ anularViejo(params, ok, fallo); });
+  };
+  anularNuevo({accion:'anular', clave:CLAVE, id:idAud, motivo:motivo, usuario:U($('digitador').value)},
     function(r){
       if(r&&r.ok){
         if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; guardados=Math.max(0,guardados-1); }
@@ -3098,8 +3593,101 @@ var hoja = leerLocal('lives_hoja_aud') || [];
 var filaAct = -1;
 
 function guardarHoja(){ try{ guardarLocal('lives_hoja_aud', hoja); }catch(e){} }
-function filaNueva(){ return {grupo:'',color:'',estilo:'',lote:'',muestra:'',defs:[]}; }
+function filaNueva(){ return {op:'',grupo:'',color:'',estilo:'',lote:'',muestra:'',defs:[]}; }
+
+/* ===== 24/09 · La hoja también sale de la OP =====
+   Antes Athina escribía grupo, color y estilo, y al guardar salía «no está en la
+   base de OPs» cuando algo no calzaba. Ahora escribe la OP (con la lista de la
+   base mientras escribe): grupo y estilo se llenan solos, y si la OP tiene varios
+   colores se elige de una lista. Nada del pedido se escribe a mano. */
+function filasDeOp(op){
+  op=U(op); if(!op || !OPS_FILAS) return [];
+  return OPS_FILAS.filter(function(r){ return U(r.op)===op; }).map(function(r){
+    var ped=parseFloat(String(r.pedido==null?'':r.pedido).replace(/,/g,''));
+    return { op:U(r.op), grupo:U(r.grupo), estilo:U(r.estilo), eCliente:U(r.e_cliente),
+             color:U(r.color), po:T(r.po), codTela:T(r.cod_tela), descTela:T(r.desc_tela),
+             destino:T(r.destino), pedido:isFinite(ped)?ped:0 };
+  });
+}
+function combosHoja(op){
+  var vistos={}, out=[];
+  filasDeOp(op).forEach(function(r){
+    var k=r.grupo+'|'+r.estilo+'|'+r.color;
+    if(!vistos[k]){ vistos[k]=1; out.push(r); }
+  });
+  return out;
+}
+function unicosDe(arr){
+  var s={}, o=[];
+  (arr||[]).forEach(function(v){ v=T(v); if(v && !s[U(v)]){ s[U(v)]=1; o.push(v); } });
+  return o;
+}
+function ponerComboEnFila(f,c){
+  f.grupo=c.grupo; f.estilo=c.estilo; f.color=c.color;
+  f.eCliente=c.eCliente; f.codTela=c.codTela; f.descTela=c.descTela;
+}
+function enfocarCelda(i,c){
+  var e=$('hjBody').querySelector('tr[data-f="'+i+'"] [data-c="'+c+'"]');
+  if(e){ e.focus(); if(e.select) e.select(); }
+}
+function resolverOpFila(i){
+  var f=hoja[i]; if(!f) return;
+  var op=U(f.op); f.op=op;
+  if(!op){ f.grupo=''; f.estilo=''; f.color=''; f.opResuelta=''; guardarHoja(); pintarHoja(); return; }
+  if(!OPS_FILAS){
+    $('hjMsg').className='hint'; $('hjMsg').textContent='Cargando la base de OPs…';
+    cargarOpsFilas().then(function(){ $('hjMsg').textContent=''; resolverOpFila(i); },
+      function(){ $('hjMsg').className='hint err'; $('hjMsg').textContent='No se pudo cargar la base de OPs. Revisa la conexión.'; });
+    return;
+  }
+  var cs=combosHoja(op);
+  f.opResuelta=op;
+  if(!cs.length){
+    f.grupo=''; f.estilo=''; f.color='';
+    guardarHoja(); pintarHoja(); activarFila(i);
+    $('hjMsg').className='hint err';
+    $('hjMsg').textContent='Fila '+(i+1)+': la OP '+op+' no está en la base de OPs. Revisa el número o avisa a Christian.';
+    enfocarCelda(i,'op');
+    return;
+  }
+  var actual=null;
+  if(cs.length===1) actual=cs[0];
+  else cs.forEach(function(c){ if(c.grupo===U(f.grupo) && c.estilo===U(f.estilo) && c.color===U(f.color)) actual=c; });
+  if(actual) ponerComboEnFila(f,actual);
+  else {
+    var gs=unicosDe(cs.map(function(c){ return c.grupo; })), es=unicosDe(cs.map(function(c){ return c.estilo; }));
+    f.grupo = gs.length===1 ? gs[0] : ''; f.estilo = es.length===1 ? es[0] : '';
+    f.color=''; f.eCliente=''; f.codTela=cs[0].codTela; f.descTela=cs[0].descTela;
+  }
+  guardarHoja(); pintarHoja(); activarFila(i);
+  $('hjMsg').className='hint'; $('hjMsg').textContent = actual ? '' : ('Fila '+(i+1)+': la OP '+op+' tiene '+cs.length+' colores — elige el de esta auditoría.');
+  enfocarCelda(i, actual ? 'lote' : 'color');
+}
+function elegirComboFila(i, k){
+  var f=hoja[i]; if(!f) return;
+  var c = (k===''||k==null) ? null : combosHoja(f.op)[+k];
+  if(!c){ f.color=''; guardarHoja(); return; }
+  ponerComboEnFila(f,c);
+  guardarHoja(); pintarHoja(); activarFila(i);
+  $('hjMsg').className='hint'; $('hjMsg').textContent='';
+  enfocarCelda(i,'lote');
+}
 function totalFila(f){ return (f.defs||[]).reduce(function(a,d){ return a+(d.cantidad||0); },0); }
+
+/* La celda de color: si la OP tiene varios colores se elige de una lista; si tiene
+   uno, se muestra fijo. Nunca se escribe a mano. */
+function celdaColor(f,i){
+  var cs = f.op ? combosHoja(f.op) : [];
+  if(cs.length>1){
+    var dif = unicosDe(cs.map(function(c){ return c.grupo+' '+c.estilo; })).length>1;
+    return '<select data-c="color" data-f="'+i+'"><option value="">Elegir color…</option>'+
+      cs.map(function(c,k){
+        var sel = (c.color===U(f.color) && c.estilo===U(f.estilo) && c.grupo===U(f.grupo)) ? ' selected' : '';
+        return '<option value="'+k+'"'+sel+'>'+esc(c.color+(dif?(' · '+c.estilo):''))+'</option>';
+      }).join('')+'</select>';
+  }
+  return '<input data-c="color" data-f="'+i+'" value="'+esc(f.color)+'" class="ro" readonly tabindex="-1">';
+}
 
 function pintarHoja(){
   if(!hoja.length) hoja.push(filaNueva());
@@ -3116,9 +3704,10 @@ function pintarHoja(){
     }).join('');
     return '<tr data-f="'+i+'" class="'+(i===filaAct?'act':'')+'">'+
       '<td class="nu">'+(i+1)+'</td>'+
-      '<td><input data-c="grupo"  data-f="'+i+'" value="'+esc(f.grupo)+'"></td>'+
-      '<td><input data-c="color"  data-f="'+i+'" value="'+esc(f.color)+'"></td>'+
-      '<td><input data-c="estilo" data-f="'+i+'" value="'+esc(f.estilo)+'"></td>'+
+      '<td><input data-c="op" data-f="'+i+'" value="'+esc(f.op||'')+'" placeholder="OP" autocomplete="off"></td>'+
+      '<td><input data-c="grupo"  data-f="'+i+'" value="'+esc(f.grupo)+'" class="ro" readonly tabindex="-1"></td>'+
+      '<td>'+celdaColor(f,i)+'</td>'+
+      '<td><input data-c="estilo" data-f="'+i+'" value="'+esc(f.estilo)+'" class="ro" readonly tabindex="-1"></td>'+
       '<td><input class="nu" data-c="lote"    data-f="'+i+'" value="'+esc(f.lote)+'" inputmode="numeric"></td>'+
       '<td><input class="nu" data-c="muestra" data-f="'+i+'" value="'+esc(f.muestra)+'" inputmode="numeric"></td>'+
       '<td class="hjCel">'+tags+
@@ -3129,7 +3718,14 @@ function pintarHoja(){
       '<td><button class="del" type="button" data-qf="'+i+'">&times;</button></td></tr>';
   }).join('');
 
+  Array.prototype.forEach.call($('hjBody').querySelectorAll('select[data-c="color"]'),function(sl){
+    sl.onfocus=function(){ activarFila(+sl.dataset.f); };
+    sl.onchange=function(){ elegirComboFila(+sl.dataset.f, sl.value); };
+    sl.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); elegirComboFila(+sl.dataset.f, sl.value); } };
+  });
   Array.prototype.forEach.call($('hjBody').querySelectorAll('input'),function(inp){
+    /* 24/09: grupo, estilo y un color único salen de la OP: no se editan. */
+    if(inp.readOnly){ inp.onfocus=function(){ activarFila(+inp.dataset.f); }; return; }
     inp.oninput=function(){ hoja[+inp.dataset.f][inp.dataset.c]=inp.value; guardarHoja(); refrescarTotales(); };
     inp.onchange=function(){
       /* Solo las celdas de datos tienen «data-c». El campo «+ defecto» de la
@@ -3137,6 +3733,11 @@ function pintarHoja(){
          a media digitación. */
       var campo = inp.dataset.c;
       if(!campo) return;
+      if(campo==='op'){
+        var fi=+inp.dataset.f;
+        if(U(inp.value)!==U(hoja[fi].opResuelta||'')) resolverOpFila(fi);
+        return;
+      }
       recordar(campo.toUpperCase(), inp.value);
       if(inp.dataset.c==='grupo' && U(inp.value).length>=3 && !clienteDeGrupo(inp.value)){
         $('hjMsg').className='hint err';
@@ -3149,7 +3750,7 @@ function pintarHoja(){
       forzarMayusculas(inp);
       /* Sugerencias de lo ya digitado: sin esto hay que reescribir el grupo
          entero en cada fila aunque se haya usado hace dos renglones. */
-      if(['grupo','estilo','color'].indexOf(inp.dataset.c)>=0) sugerirEnCelda(inp);
+      if(['op','grupo','estilo','color'].indexOf(inp.dataset.c)>=0) sugerirEnCelda(inp);
     }
     /* Enter avanza a la celda de al lado, como en Excel. Solo al llegar al
        final de la fila baja a la siguiente, creándola si hace falta. Antes
@@ -3158,19 +3759,23 @@ function pintarHoja(){
     inp.onkeydown=function(e){
       if(e.key!=='Enter') return;
       e.preventDefault();
-      var orden=['grupo','color','estilo','lote','muestra'];
+      var orden=['op','color','lote','muestra'];
       var i=+inp.dataset.f, k=orden.indexOf(inp.dataset.c);
+      /* Enter en la OP: se busca en la base y el cursor va a donde corresponde. */
+      if(inp.dataset.c==='op'){ hoja[i].op=inp.value; resolverOpFila(i); return; }
 
       if(k>=0 && k<orden.length-1){
-        var lado=$('hjBody').querySelector('tr[data-f="'+i+'"] input[data-c="'+orden[k+1]+'"]');
-        if(lado){ lado.focus(); lado.select(); return; }
+        for(var z=k+1; z<orden.length; z++){
+          var lado=$('hjBody').querySelector('tr[data-f="'+i+'"] [data-c="'+orden[z]+'"]');
+          if(lado && !lado.readOnly){ lado.focus(); if(lado.select) lado.select(); return; }
+        }
       }
       /* Última celda: se pasa a los defectos de esa fila, que es lo que sigue. */
       var add=$('hjBody').querySelector('input.hjAdd[data-af="'+i+'"]');
       if(add && k===orden.length-1){ activarFila(i); add.focus(); return; }
 
       if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
-      var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
+      var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="op"]');
       if(sig) sig.focus();
     };
   });
@@ -3221,8 +3826,8 @@ function refrescarTotales(){
     var tr=$('hjBody').querySelector('tr[data-f="'+i+'"]');
     if(!tr) return;
     var tds=tr.querySelectorAll('td'), tot=totalFila(f);
-    tds[7].innerHTML='<b>'+(tot||'')+'</b>';
-    tds[8].innerHTML = f.muestra ? ('<span class="hjRes '+(tot>0?'no':'ok')+'">'+(tot>0?'RECHAZADO':'APROBADO')+'</span>') : '';
+    tds[8].innerHTML='<b>'+(tot||'')+'</b>';
+    tds[9].innerHTML = f.muestra ? ('<span class="hjRes '+(tot>0?'no':'ok')+'">'+(tot>0?'RECHAZADO':'APROBADO')+'</span>') : '';
   });
 }
 
@@ -3265,7 +3870,7 @@ function sugerirEnCelda(inp){
   function buscar(){
     sgInp=inp;
     var q=U(inp.value);
-    var base=SUG[campo]||[];
+    var base = campo==='OP' ? indiceOps().map(function(o){ return o.texto; }) : (SUG[campo]||[]);
     sgOpts=[];
     for(var i=0;i<base.length && sgOpts.length<12;i++){
       if(!q || base[i].indexOf(q)===0) sgOpts.push(base[i]);
@@ -3283,12 +3888,13 @@ function sugerirEnCelda(inp){
     var d=$('hjSug');
     if(!sgOpts.length){ d.style.display='none'; return; }
     d.innerHTML=sgOpts.map(function(o,i){
+      var tg = campo==='OP' ? (OPS_TAG[o]||'') : '';
       return '<div class="opt'+(i===sgSel?' sel':'')+'" data-i="'+i+'">'+
-             '<span class="nm">'+esc(o)+'</span></div>';
+             '<span class="nm">'+esc(o)+'</span>'+(tg?('<span class="tag">'+esc(tg)+'</span>'):'')+'</div>';
     }).join('');
     var r=inp.getBoundingClientRect();
     d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px';
-    d.style.width=Math.max(r.width,150)+'px';
+    d.style.width=Math.max(r.width, campo==='OP'?260:150)+'px';
     d.style.display='block'; d.classList.add('on');
     Array.prototype.forEach.call(d.querySelectorAll('.opt'),function(el){
       el.onmousedown=function(e){ e.preventDefault(); elegirSug(sgOpts[+el.dataset.i]); };
@@ -3298,8 +3904,9 @@ function sugerirEnCelda(inp){
     inp.value=v;
     hoja[+inp.dataset.f][inp.dataset.c]=v;
     guardarHoja(); cerrarSug();
+    if(inp.dataset.c==='op'){ resolverOpFila(+inp.dataset.f); return; }
     /* pasa a la celda de al lado, igual que Enter */
-    var orden=['grupo','color','estilo','lote','muestra'];
+    var orden=['op','color','lote','muestra'];
     var k=orden.indexOf(inp.dataset.c);
     var sig = k>=0 ? $('hjBody').querySelector('tr[data-f="'+inp.dataset.f+'"] input[data-c="'+orden[k+1]+'"]') : null;
     if(sig){ sig.focus(); sig.select(); }
@@ -3358,14 +3965,14 @@ function pintarDropFila(q, inp){
 function tecleoDefFila(e, inp){
   if(e.key==='ArrowDown'){ e.preventDefault(); if(dfOpts.length){ dfSel=(dfSel+1)%dfOpts.length; pintarDropFila(inp.value,inp); } }
   else if(e.key==='ArrowUp'){ e.preventDefault(); if(dfOpts.length){ dfSel=(dfSel-1+dfOpts.length)%dfOpts.length; pintarDropFila(inp.value,inp); } }
-  else if(e.key==='Enter'){ e.preventDefault(); if(dfSel>=0&&dfOpts[dfSel]) elegirDefFila(dfOpts[dfSel], inp); }
+  else if(e.key==='Enter' && T(inp.value)){ e.preventDefault(); if(dfSel>=0&&dfOpts[dfSel]) elegirDefFila(dfOpts[dfSel], inp); }
   else if(e.key==='Escape'){ cerrarDropFila(); inp.value=''; }
   else if(e.key==='Enter' && !T(inp.value)){
     /* Enter en el «+ defecto» vacío: la fila está lista, se baja a la siguiente. */
     e.preventDefault();
     var i=+inp.dataset.af;
     if(i===hoja.length-1){ hoja.push(filaNueva()); guardarHoja(); pintarHoja(); }
-    var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="grupo"]');
+    var sig=$('hjBody').querySelector('tr[data-f="'+(i+1)+'"] input[data-c="op"]');
     if(sig) sig.focus();
   }
 }
@@ -3477,17 +4084,21 @@ if($('hjMas')) $('hjMas').onclick=function(){
 function bloqueDeHoja(){
   var t=$('tipo').value, listas=[], errores=[], faltaCli='';
   hoja.forEach(function(f,i){
-    if(!T(f.grupo)&&!T(f.estilo)&&!N(f.lote)&&!N(f.muestra)) return;
+    if(!T(f.op)&&!T(f.grupo)&&!T(f.estilo)&&!N(f.lote)&&!N(f.muestra)&&!(f.defs||[]).length) return;
+    /* 24/09: la fila sale de la OP. */
+    if(!OPS_FILAS){ errores.push('Todavía no carga la base de OPs. Espera unos segundos y vuelve a intentar.'); return; }
+    if(!T(f.op)){ errores.push('Fila '+(i+1)+': falta la OP.'); return; }
+    var csF=combosHoja(f.op);
+    if(!csF.length){ errores.push('Fila '+(i+1)+': la OP '+U(f.op)+' no está en la base de OPs.'); return; }
+    if(!csF.some(function(c){ return c.grupo===U(f.grupo) && c.estilo===U(f.estilo) && c.color===U(f.color); })){
+      errores.push('Fila '+(i+1)+': elige el color de la OP '+U(f.op)+'.'); return;
+    }
     var cli=clienteDeGrupo(f.grupo);
     if(!cli){
       errores.push('Fila '+(i+1)+': «'+U(f.grupo).substring(0,3)+'» no está en la base de clientes.');
       faltaCli = faltaCli || U(f.grupo).substring(0,3);
       return;
     }
-    /* 22/09: grupo, estilo y color tienen que existir juntos en la base de OPs. */
-    if(!OPS_FILAS){ errores.push('Todavía no carga la base de OPs. Espera unos segundos y vuelve a intentar.'); return; }
-    var enOps=OPS_FILAS.some(function(r){ return U(r.grupo)===U(f.grupo) && U(r.estilo)===U(f.estilo) && U(r.color)===U(f.color); });
-    if(!enOps){ errores.push('Fila '+(i+1)+': '+U(f.grupo)+' · '+U(f.estilo)+' · '+U(f.color)+' no está en la base de OPs.'); return; }
     if(N(f.muestra)<=0){ errores.push('Fila '+(i+1)+': falta la muestra.'); return; }
     if(N(f.lote)>0 && N(f.muestra)>N(f.lote)){ errores.push('Fila '+(i+1)+': la muestra es mayor que el lote.'); return; }
     if(totalFila(f)>N(f.muestra)){ errores.push('Fila '+(i+1)+': hay más defectuosas que la muestra.'); return; }
@@ -3513,6 +4124,7 @@ function bloqueDeHoja(){
       linea: t==='LINEAS' ? $('linea').value : '',
       colores:JSON.stringify([{color:U(f.color),po:''}]),
       defectos:JSON.stringify(f.defs||[]),
+      op:U(f.op||''), codTela:f.codTela||'', descTela:f.descTela||'', eCliente:U(f.eCliente||''),
       reproceso:'0', captura:'DIGITADO', digitador:U($('digitador').value),
       token:'T'+Date.now()+'-'+Math.random().toString(36).slice(2,9)+'-'+Math.floor(Math.random()*1000)
     };
@@ -3520,7 +4132,7 @@ function bloqueDeHoja(){
       tipo:NOMBRE_TIPO[t],
       resultado: tot>0 ? 'RECHAZADO' : 'APROBADO',
       defectuosas: tot,
-      etiqueta:U(f.grupo)+' · '+U(f.estilo)+' · lote '+N(f.lote)+
+      etiqueta:'OP '+U(f.op)+' · '+U(f.grupo)+' · '+U(f.estilo)+' · '+U(f.color)+' · lote '+N(f.lote)+
                ' · '+U($('auditor').value) };
   });
 }
@@ -3567,7 +4179,10 @@ if($('hjEnviar')) $('hjEnviar').onclick=function(){
 var VISTA_HOJA = { LINEAS:true, SERVINSP:true, EMPAQUE:false, CLIENTE:false, FINAL:false };
 
 function verVista(){
-  var esHoja = !!VISTA_HOJA[$('tipo').value];
+  /* 24/09: al corregir una auditoría ya guardada se usa SIEMPRE el formulario,
+     aunque sea de Líneas o Serv. Inspección: la hoja no sabe cargar una guardada,
+     y antes los datos se cargaban en un formulario escondido. */
+  var esHoja = !!VISTA_HOJA[$('tipo').value] && !editando;
   Array.prototype.forEach.call(document.querySelectorAll('.cap'),function(e){
     e.style.display = esHoja ? 'none' : '';
   });
@@ -3656,7 +4271,7 @@ function bqBuscar(){
     }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
 }
 
-var corrId='';
+var corrId='', CORR_TIPO='';
 /* El proceso con el MISMO texto con que se guarda en el Sheet.
 
    El desplegable interno vale 'COSTURA' o 'ACABADOS', pero en la tabla figura
@@ -3706,7 +4321,7 @@ function ajustarCamposCorreccion(tipo){
 }
 
 function abrirCorreccion(r){
-  corrId=r.id;
+  corrId=r.id; CORR_TIPO=U(r.tipo||'');
   ajustarCamposCorreccion(r.tipo);
   $('corrTit').textContent=r.grupo+' · '+r.estilo+' · '+(r.color||'')+' · '+r.fecha;
   $('cFecha').value=r.fecha; $('cGrupo').value=r.grupo; $('cEstilo').value=r.estilo;
@@ -3730,18 +4345,54 @@ if($('corrGuardar')) $('corrGuardar').onclick=function(){
   };
   $('modalCorr').style.display='none';
   $('bqMsg').className='hint'; $('bqMsg').textContent='Guardando corrección…';
+  if(TIPOS_DIRECTOS[CORR_TIPO]){ corregirRapidoDirecto(corrId, cambios); return; }
   jsonp({accion:'editar', clave:CLAVE, id:corrId, usuario:U($('digitador').value),
          cambios:JSON.stringify(cambios),
          auditores:JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[])},
     function(r){
       if(r&&r.ok){
         $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.';
-        compararParaleloEditar(corrId, cambios, JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[]));
+        paraleloTrasCorregir(corrId);
         bqBuscar();
       }
       else { $('bqMsg').className='hint err'; $('bqMsg').textContent=(r&&r.error)||'No se pudo corregir.'; }
     }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
 };
+
+/* 24/09: la corrección rápida de un tipo directo parte de lo guardado en Supabase
+   y le aplica lo cambiado en la ventana; Supabase recalcula todo. */
+function corregirRapidoDirecto(id, c){
+  sbrLeerAud({id:id}).then(function(r){
+    if(!r || !r.ok){ $('bqMsg').className='hint err'; $('bqMsg').textContent=(r&&r.error)||'No se pudo leer la auditoría.'; return; }
+    var g=r.registro||{}, t=U(g.TIPO_AUDITORIA);
+    var cols=(r.colores||[]).map(function(x){ return {color:x.COLOR, po:x.PO, eCliente:x.E_CLIENTE}; });
+    if(t!=='CLIENTE'){
+      cols=[{color: c.COLOR || T(g.COLOR), po: (c.PO!==undefined ? c.PO : T(g.PO)), eCliente: T(g.E_CLIENTE)}];
+    }
+    var auds = T(c.AUDITOR) ? [c.AUDITOR] : (r.auditores||[]);
+    var cuerpo = {
+      fecha: c.FECHA || T(g.FECHA), grupo: c.GRUPO || T(g.GRUPO), estilo: c.ESTILO || T(g.ESTILO),
+      lote: c.LOTE, muestra: c.MUESTRA, nivelAql: T(g.NIVEL_AQL) || '1.5',
+      licencia: N(g.LICENCIA)===1, override: U(g.OVERRIDE)==='SÍ',
+      overrideAutoriza: T(g.OVERRIDE_AUTORIZA), overrideMotivo: T(g.OVERRIDE_MOTIVO),
+      resultado: c.RESULTADO || U(g.RESULTADO), auditores: auds,
+      inspector: (c.INSPECTOR!==undefined && T(c.INSPECTOR)) ? c.INSPECTOR : T(g.INSPECTOR),
+      linea: T(g.LINEA), servicio: c.SERVICIO || T(g.SERVICIO),
+      cajas: N(g.CAJAS) || null, pedido: c.PEDIDO || N(g.PEDIDO) || '',
+      colores: cols,
+      destinos: (r.destinos||[]).map(function(d){ return {codigo:d.CODIGO, via:d.VIA}; }),
+      defectos: (r.defectos||[]).map(function(d){
+        return {cod:T(d.COD), seccion:T(d.SECCION), categoria:T(d.CATEGORIA), subtipo:T(d.SUBTIPO),
+                nombre: T(d.CATEGORIA)+(T(d.SUBTIPO)?(' '+T(d.SUBTIPO)):''), cantidad:N(d.CANTIDAD)};
+      }),
+      usuario: U($('digitador').value)
+    };
+    corregirDirecto(id, cuerpo, function(res){
+      if(res.ok){ $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.'; bqBuscar(); }
+      else { $('bqMsg').className='hint err'; $('bqMsg').textContent=res.error||'No se pudo corregir.'; }
+    });
+  }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });
+}
 
 /* Para cambiar defectos hace falta el formulario completo: acá solo se corrigen
    los datos de cabecera, que es lo que se equivoca al digitar. */
@@ -3931,7 +4582,7 @@ $('estilo').addEventListener('blur', consultarOps);
 $('op').addEventListener('blur', consultarOps);
 $('fecha').addEventListener('change', aplicarTipo);
 
-autocompletar('op','dOp', function(){ return (SUG.OP||[]).map(function(v){ return {texto:v}; }); }, consultarOps);
+autocompletar('op','dOp', indiceOps, consultarOps, {sinNuevo:true, vacio:'No está en la base de OPs'});
 $('lote').addEventListener('blur', buscarLote);
 $('color').addEventListener('blur', function(){ buscarLote(); });
 $('po').addEventListener('blur', buscarLote);

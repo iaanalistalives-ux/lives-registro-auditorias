@@ -2724,7 +2724,8 @@ function compararParalelo(envio, idReal){
           defectos: defs, resultado: envio.resultado || '',
           overrideAutoriza: envio.overrideAutoriza || '', overrideMotivo: envio.overrideMotivo || '',
           eCliente: envio.eCliente || '',
-          token: envio.token
+          token: envio.token,
+          idReal: idReal || ''   /* 24/09 (SQL 44): enlaza la copia con la auditoría real */
         };
         var xhr = new XMLHttpRequest();
         xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
@@ -2752,7 +2753,10 @@ function procesarCola(){
         it.estado='ok';
         it.msg = r.repetido ? 'Ya estaba guardada, no se duplicó.' : (r.mensaje||'Guardado.');
         it.nAud=r.nAuditoria; it.idAud=r.id;
-        if (!r.repetido) compararParalelo(it.envio, r.id);
+        /* 24/09: también cuando el servidor dice "ya estaba guardada" (la primera respuesta
+           se perdió por lentitud): antes esa auditoría se quedaba sin copia. Mismo token:
+           si la copia ya existía, Supabase no la duplica. */
+        compararParalelo(it.envio, r.id);
       }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; }
       pintarLog(); procesarCola();

@@ -3063,6 +3063,23 @@ function paraleloTrasCorregir(id){
    un tipo todavía no es directo (el interruptor se apagó), se usa el sistema
    anterior sin que Athina lo note. */
 var TIPOS_DIRECTOS = { LINEAS:true, SERVINSP:true, EMPAQUE:true, CLIENTE:true };
+/* 28/09: Auditoría Final pasa a directo el día del corte. Supabase lo dice (es_tipo_directo)
+   y se vuelve a preguntar cada 5 minutos: no hay que cambiar este archivo ese día. Mientras
+   diga que no, Final sigue por el Apps Script como siempre. */
+var FINAL_DIRECTO = false;
+function consultarFinalDirecto(){
+  fetch(SBR_URL + '/rest/v1/rpc/es_tipo_directo', { method:'POST',
+    headers:{ apikey: SBR_KEY, 'Content-Type':'application/json' }, body: JSON.stringify({ p_tipo:'FINAL' }) })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(v){ if (v === true || v === false) FINAL_DIRECTO = v; })
+    .catch(function(){});
+}
+consultarFinalDirecto();
+setInterval(consultarFinalDirecto, 5*60000);
+function esDirecto(t){
+  t = String(t||'').toUpperCase();
+  return !!TIPOS_DIRECTOS[t] || (t === 'FINAL' && FINAL_DIRECTO);
+}
 
 function rpcDirecto(fn, cuerpo){
   var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -3104,7 +3121,13 @@ function cuerpoDirecto(envio){
     inspector: envio.inspector || '', linea: envio.linea || '', cajas: envio.cajas || null,
     codTela: envio.codTela || '', descTela: envio.descTela || '', eCliente: envio.eCliente || '',
     colores: jparse(envio.colores, []), destinos: jparse(envio.destinos, []),
-    defectos: defs, resultado: res, token: envio.token
+    defectos: defs, resultado: res, token: envio.token,
+    /* 28/09: Final lleva derivados (del lote completo) aparte de los defectos. */
+    derivados: jparse(envio.derivadosDet, []).map(function(d){
+      return { cod: d.cod||'', categoria: d.categoria||d.nombre||'', subtipo: d.subtipo||'',
+               nombre: d.nombre||d.categoria||'', cantidad: d.cantidad, nota: d.nota||'' };
+    }),
+    audTaller: envio.audTaller || '', liquidado: envio.liquidado === '1' || envio.liquidado === 'SÍ'
   };
 }
 
@@ -3113,6 +3136,7 @@ function guardarDirecto(envio, ok, fallo){
   rpcDirecto('registro_guardar_directo', { payload: cuerpoDirecto(envio) }).then(function(r){
     if (r && r.noDirecto) { jsonpScript(envio, ok, fallo); return; }   /* el interruptor está apagado */
     if (r && r.reintentar) { fallo && fallo(r.error || 'reintentar'); return; }
+    if (r && r.ok) r.via = 'supabase';
     try { ok(r); } catch(e){ console.error(e); mostrarError('al procesar la respuesta de Supabase', e); }
   }, function(e){
     fallo && fallo((e && e.message) || 'sin conexión');
@@ -3128,7 +3152,7 @@ function procesarCola(){
     it.enviando=true; it.intentos++;
     /* 24/09: Líneas, Serv. Inspección, Empaque y Cliente se guardan DIRECTO en
        Supabase. Final sigue por el sistema anterior (Apps Script). */
-    var enviar = TIPOS_DIRECTOS[String(it.envio.tipo||'').toUpperCase()] ? guardarDirecto : jsonp;
+    var enviar = esDirecto(it.envio.tipo) ? guardarDirecto : jsonp;
     enviar(it.envio, function(r){
       it.enviando=false;
       if(r && r.ok){
@@ -3138,7 +3162,7 @@ function procesarCola(){
         /* 24/09: también cuando el servidor dice "ya estaba guardada" (la primera respuesta
            se perdió por lentitud): antes esa auditoría se quedaba sin copia. Mismo token:
            si la copia ya existía, Supabase no la duplica. */
-        compararParalelo(it.envio, r.id);
+        if (!(r && r.via === 'supabase')) compararParalelo(it.envio, r.id);
       }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; }
       pintarLog(); procesarCola();
@@ -3465,7 +3489,7 @@ function cuerpoCorreccionFormulario(){
 
 function guardarEdicion(){
   var id=editando;
-  if(TIPOS_DIRECTOS[$('tipo').value]){
+  if(esDirecto($('tipo').value)){
     var cuerpo=cuerpoCorreccionFormulario();
     var etqD=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value);
     cancelarEdicion();
@@ -4345,7 +4369,7 @@ if($('corrGuardar')) $('corrGuardar').onclick=function(){
   };
   $('modalCorr').style.display='none';
   $('bqMsg').className='hint'; $('bqMsg').textContent='Guardando corrección…';
-  if(TIPOS_DIRECTOS[CORR_TIPO]){ corregirRapidoDirecto(corrId, cambios); return; }
+  if(esDirecto(CORR_TIPO)){ corregirRapidoDirecto(corrId, cambios); return; }
   jsonp({accion:'editar', clave:CLAVE, id:corrId, usuario:U($('digitador').value),
          cambios:JSON.stringify(cambios),
          auditores:JSON.stringify(T($('cAuditor').value)?[U($('cAuditor').value)]:[])},

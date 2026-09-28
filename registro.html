@@ -4114,6 +4114,13 @@ function bloqueDeHoja(){
     listas.push({f:f});
   });
   if(PIDE_AUDITOR[t] && !T($('auditor').value)) errores.unshift('Falta la auditora en la franja de arriba.');
+  /* 28/09: la hoja también exige nombres del catálogo de personal. Sin esto entraron
+     "MARLENE ASTUDILLOO", "RENEE OSORES" y otras formas mal escritas del mismo nombre,
+     que después salen repetidas en los filtros de los dashboards. */
+  var malAudH = PIDE_AUDITOR[t] ? nombreFueraDelCatalogo($('auditor').value) : '';
+  if(malAudH) errores.unshift('Auditora: '+malAudH);
+  var malInsH = visible('wInspector') ? nombreFueraDelCatalogo($('inspector').value) : '';
+  if(malInsH) errores.unshift('Inspectora: '+malInsH);
   if(errores.length){
     $('hjMsg').className='hint err';
     $('hjMsg').textContent=errores[0]+(errores.length>1?(' (y '+(errores.length-1)+' más)'):'')+

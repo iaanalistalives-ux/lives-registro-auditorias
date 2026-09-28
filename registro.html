@@ -983,8 +983,9 @@
    Backend: Apps Script del Sheet maestro (una sola URL).
    ===================================================================== */
 
-var API   = 'https://script.google.com/macros/s/AKfycbxxsHnX2eIxr5T2mNtUVLe8YlXT2VxSjbWOAaSeOtK4lAUT3_OMNmPYX_ayIc2rMGOZCA/exec';
-var CLAVE = 'livessac';
+/* 28/09/2026: el Apps Script quedó archivado; su dirección y su clave ya no están aquí.
+   CLAVE queda vacía solo porque algunos envíos todavía llevan ese campo. */
+var CLAVE = '';
 
 /* Cualquier error se muestra en pantalla. Antes un fallo temprano cortaba la
    carga de catálogos en silencio y los campos quedaban vacíos sin decir por qué. */
@@ -1526,41 +1527,25 @@ var SBR_ACCIONES = { catalogos: sbrCatalogos, opsclave: sbrOpsClave, opssugerir:
                      sugerir: sbrSugerir, recientes: sbrRecientes, buscar: sbrBuscarLote,
                      buscaraud: sbrBuscarAud, leer: sbrLeerAud };
 function jsonp(params, ok, fallo){
+  /* 28/09: todo sale de Supabase. Si no responde, un reintento a los 2 s; si tampoco,
+     se avisa. Ya no hay respaldo al Apps Script (archivado). */
   var local = SBR_ACCIONES[params && params.accion];
   if (!local) return jsonpScript(params, ok, fallo);
   local(params).then(function(r){ ok(r); }, function(e){
-    console.warn('Supabase no respondió para ' + params.accion + ', se usa el Apps Script:', e);
-    jsonpScript(params, ok, fallo);
+    console.warn('Supabase no respondió para ' + params.accion + ', se reintenta:', e);
+    setTimeout(function(){
+      local(params).then(function(r){ ok(r); }, function(e2){
+        fallo && fallo('Sin conexión con la base de datos: ' + ((e2 && e2.message) || ''));
+      });
+    }, 2000);
   });
 }
 
-var jn=0;
+/* Lo que no tiene equivalente en Supabase ya no se puede hacer: se avisa en vez de
+   escribir en un Sheet que nadie lee. No debería ocurrir nunca. */
 function jsonpScript(params, ok, fallo){
-  var cb='cb'+(++jn)+'_'+Date.now();
-  var s=document.createElement('script');
-  var t=setTimeout(function(){
-    limpiar();
-    /* Si la respuesta llega después, encuentra dónde caer y no rompe la página.
-       La cola ya la reintentó con el mismo identificador, así que no se duplica. */
-    window[cb]=function(){ try{ delete window[cb]; }catch(e){ window[cb]=undefined; } };
-    fallo && fallo('tiempo agotado');
-  }, 60000);
-  function limpiar(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb]=undefined; }
-    if(s.parentNode) s.parentNode.removeChild(s); }
-  /* Lo que se hace con la respuesta corre aquí dentro con try/catch: si fallara,
-     el navegador lo taparía como "Script error." (la respuesta viene de otra
-     dirección) y no se sabría qué pasó. Así se muestra el error real. (18/09) */
-  window[cb]=function(r){
-    limpiar();
-    try { ok(r); }
-    catch (e) { console.error(e); mostrarError('al procesar la respuesta del servidor', e); }
-  };
-  s.onerror=function(){ limpiar(); fallo && fallo('sin conexión'); };
-  var qs=[];
-  for(var k in params){ if(params[k]!==undefined && params[k]!==null) qs.push(k+'='+encodeURIComponent(params[k])); }
-  qs.push('callback='+cb);
-  s.src=API+'?'+qs.join('&');
-  document.body.appendChild(s);
+  console.warn('Acción sin equivalente en Supabase:', params && params.accion);
+  setTimeout(function(){ fallo && fallo('Esta acción ya no está disponible (' + ((params && params.accion) || '?') + '). Avisa a Christian.'); }, 0);
 }
 
 /* ---------------- catálogos ---------------- */
@@ -3066,7 +3051,7 @@ var TIPOS_DIRECTOS = { LINEAS:true, SERVINSP:true, EMPAQUE:true, CLIENTE:true };
 /* 28/09: Auditoría Final pasa a directo el día del corte. Supabase lo dice (es_tipo_directo)
    y se vuelve a preguntar cada 5 minutos: no hay que cambiar este archivo ese día. Mientras
    diga que no, Final sigue por el Apps Script como siempre. */
-var FINAL_DIRECTO = false;
+var FINAL_DIRECTO = true;   /* desde el corte del 28/09 */
 function consultarFinalDirecto(){
   fetch(SBR_URL + '/rest/v1/rpc/es_tipo_directo', { method:'POST',
     headers:{ apikey: SBR_KEY, 'Content-Type':'application/json' }, body: JSON.stringify({ p_tipo:'FINAL' }) })

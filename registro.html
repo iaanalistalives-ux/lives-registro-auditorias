@@ -2197,7 +2197,8 @@ function buscarLote(){
           : ('<span class="pendTit">Ninguna quedó sin corregir. '+
              'Esta sería la <b>'+(r.siguienteParcial||1)+'.ª tanda</b> del pedido.</span>'+
              '<button type="button" class="mini" id="btnNoRea">Continuar</button>'))+
-        '<button type="button" class="mini" id="btnRepSuelto">Es reproceso, pero el rechazo no está en el sistema</button>'+
+        '<div id="otrosRech"></div>'+
+        '<button type="button" class="mini" id="btnRepSuelto">Es reproceso de un papel cuyo rechazo nunca se registró</button>'+
         '<span id="decMsg"></span></div>';
     p.classList.add('on');
     PEND_ACT = pend;
@@ -2206,8 +2207,43 @@ function buscarLote(){
     });
     if($('btnNoRea')) $('btnNoRea').onclick=function(){ marcarTandaNueva(r.siguienteParcial||1); };
     if($('btnRepSuelto')) $('btnRepSuelto').onclick=reprocesoSinOrigen;
+    ofrecerOtrosRechazos(pend);
   });
 }
+
+/* 30/09: el rechazo que Athina va a corregir puede no salir arriba porque se
+   registró con otra PO, otro destino u otro proceso, o porque el sistema lo dio por
+   atendido al ver un reproceso posterior. En vez de dejarla sin salida (o empujarla a
+   "no está en el sistema", que guardaría el reproceso sin vínculo), se le muestran
+   TODOS los rechazos de ese grupo + estilo + color para que elija el suyo. */
+function ofrecerOtrosRechazos(pend){
+  var box=$('otrosRech'); if(!box) return;
+  var g=U($('grupo').value), e=U($('estilo').value), c=U($('color').value), t=$('tipo').value;
+  if(!g || !e) { box.innerHTML=''; return; }
+  var ya={}; (pend||[]).forEach(function(x){ ya[String(x.id)]=true; });
+  jsonp({accion:'buscaraud', tipo:t, grupo:g, estilo:e, color:c, resultado:'RECHAZADO', n:30}, function(r){
+    if(!r || !r.ok) return;
+    var otros=(r.filas||[]).filter(function(x){
+      return !ya[String(x.id)] && U(x.grupo)===g && U(x.estilo)===e && (!c || U(x.color)===c);
+    });
+    if(!otros.length){ box.innerHTML=''; return; }
+    OTROS_RECH=otros;
+    box.innerHTML='<div class="pendTit" style="margin-top:8px">¿El rechazo que corriges no está arriba? '+
+      'Estos son todos los rechazos de '+esc(g)+' · '+esc(e)+(c?(' · '+esc(c)):'')+' — toca el tuyo:</div>'+
+      otros.map(function(x,i){
+        return '<button type="button" class="mini rep" data-otro="'+i+'">Corrige la del '+esc(x.fecha)+
+          (x.auditor?(' · '+esc(x.auditor)):'')+
+          (x.servicio?(' · '+esc(x.servicio)):'')+
+          (x.lote?(' · lote '+x.lote):'')+
+          (x.defectuosas?(' · '+x.defectuosas+' def.'):'')+
+          (x.po?(' · PO '+esc(x.po)):'')+'</button>';
+      }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('[data-otro]'), function(b){
+      b.onclick=function(){ elegirReproceso(OTROS_RECH[+b.dataset.otro]); };
+    });
+  }, function(){});
+}
+var OTROS_RECH=[];
 
 /* Marcado como reproceso, el registro es la misma auditoría revisada de nuevo:
    los datos de identificación ya están en la anterior. Se ocultan para que solo

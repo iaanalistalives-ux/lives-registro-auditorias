@@ -2931,6 +2931,11 @@ var pend = leerLocal('lives_pend_aud') || [];
 function guardarPend(){ try{ guardarLocal('lives_pend_aud', pend); }catch(e){} }
 
 function guardar(){
+  /* 07/10: en Auditoría Final el proceso que vale es el que se ve (procFinal). Los campos
+     internos Origen y Proceso están ocultos y "limpiarOcultos" los vaciaba: si Athina dejaba
+     la primera opción (Costura taller) sin tocarla, se guardaba sin proceso. Se copian aquí,
+     justo antes de guardar, para nuevo y para corrección. */
+  if($('tipo').value==='FINAL') sincronizarProcesoFinal();
   if(!editando && !OPS_FILAS){
     $('hGuardar').className='hint'; $('hGuardar').textContent='Cargando la base de OPs…';
     cargarOpsFilas().then(function(){ guardar(); }, function(){

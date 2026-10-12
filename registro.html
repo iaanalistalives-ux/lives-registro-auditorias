@@ -1759,7 +1759,7 @@ function cargarCatalogos(){
     if(!CAT.personal.length){
       $('hAud').className='hint err';
       $('hAud').textContent='La lista de personas llegó vacía del servidor. '+
-        'Revisa la pestaña CAT_PERSONAL del Sheet y vuelve a cargar la página.';
+        'Revisa el catálogo de personal y vuelve a cargar la página.';
     }
     if(r.hoy && !$('fecha').value) $('fecha').value=r.hoy;
    }catch(e){ mostrarError('procesar los catálogos', e); }

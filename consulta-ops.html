@@ -490,6 +490,7 @@ td.fec{white-space:nowrap;}
 
 .mas{text-align:center;margin-top:14px;}
 .nota{font-size:12px;color:var(--stone);margin-top:8px;}
+.lsTope500{font-size:12px;color:#5F726C;text-align:center;padding:8px 0}
 .aviso{display:none;background:#FCEBEB;border-left:4px solid var(--rose);border-radius:0 8px 8px 0;
   padding:12px 16px;color:#7F1D1D;font-size:13.5px;margin-bottom:14px;}
 .aviso .btn{margin-left:10px;}
@@ -1219,7 +1220,9 @@ function pintar(){
     h += '<th data-c="'+k.c+'" class="'+(k.num?'num ':'')+(ORD.c===k.c?'ord':'')+'" title="Ordenar">'+esc(k.t)+marca+'</th>';
   });
   h += '</tr></thead><tbody>';
-  var hasta = Math.min(mostrar, FILTRADAS.length);
+  /* Regla 500 (12/10/2026): sin filtros se dibujan solo 500 filas; con cualquier filtro, todas. */
+  var sinFiltro = !Object.keys(F).some(function(c){ return F[c]; });
+  var hasta = sinFiltro ? Math.min(500, FILTRADAS.length) : FILTRADAS.length;
   for(var i=0;i<hasta;i++){
     var d = FILTRADAS[i];
     h += '<tr>'; COLS.forEach(function(k){ h += celda(k,d); }); h += '</tr>';
@@ -1238,11 +1241,9 @@ function pintar(){
     s.onclick = function(){ fijar(s.dataset.c, s.dataset.v); };
   });
 
-  var resto = FILTRADAS.length - hasta;
-  $('mas').innerHTML = resto > 0
-    ? '<div class="nota">Se muestran '+fmtN(hasta)+' de '+fmtN(FILTRADAS.length)+' filas.</div><button class="btn" type="button" id="btnMas">Mostrar '+fmtN(Math.min(PAGINA,resto))+' más</button>'
-    : (FILTRADAS.length > PAGINA ? '<div class="nota">Se muestran las '+fmtN(FILTRADAS.length)+' filas.</div>' : '');
-  var b = $('btnMas'); if(b) b.onclick = function(){ mostrar += PAGINA; pintar(); };
+  $('mas').innerHTML = FILTRADAS.length > hasta
+    ? '<div class="lsTope500">Se muestran '+((ORD.c==='fecha'&&ORD.dir===-1)?'los 500 registros más recientes':'500 registros')+' de '+FILTRADAS.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>'
+    : '';
 }
 
 /* ---------- Excel: exactamente lo filtrado ---------- */

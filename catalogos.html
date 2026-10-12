@@ -578,6 +578,7 @@ body.soloLectura .sw{pointer-events:none;opacity:.55}
 .avisoLectura{margin:12px 16px 0;padding:10px 14px;border-radius:10px;background:#eef6f2;border-left:4px solid #0F7A5A;
   font-family:Calibri,Arial,sans-serif;font-size:14px;color:#0E3B36}
 </style>
+<style id="lsLimp2Css">/* lives-limpieza v2 · sin notas, veredictos ni paneles de título arriba */.wrap>.note{display:none!important}</style>
 </head>
 <body>
 
@@ -1690,5 +1691,6 @@ button.lsBtn:disabled{opacity:.5;cursor:not-allowed}
   window.__lsBa={arreglar:arreglar,MOV:MOV,F:function(){return F;},bf:barraFiltros};
 }catch(e){}})();</script>
 <!-- ===== fin lives-franja v6.1 ===== -->
+<script id="lsLimp2Js">(function(){try{if(window.top!==window.self)document.documentElement.classList.add("lsEnPortal");}catch(e){document.documentElement.classList.add("lsEnPortal");}var re=/^\s*¿\s*(C[oó]mo|Qu[eé] (hace|pasa))/i,p=0;function f(){p=0;var d=document.querySelectorAll("details");for(var i=0;i<d.length;i++){var s=d[i].querySelector("summary");if(s&&re.test(s.textContent))d[i].style.display="none";}}f();document.addEventListener("DOMContentLoaded",f);try{new MutationObserver(function(){if(!p){p=1;setTimeout(f,60);}}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}})();</script>
 </body>
 </html>

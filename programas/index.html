@@ -649,6 +649,7 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
 }
 </style>
 <style id="lsLimp2Css">/* lives-limpieza v2 · sin notas, veredictos ni paneles de título arriba */#verdict{display:none!important}</style>
+<style id="lsSinActCss">/* 12/10/2026: sin botón Actualizar propio; se usa el actualizar del portal */#btnRefresh{display:none!important}</style>
 </head>
 <body>
 
@@ -729,7 +730,7 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
     la celda traía un error de fórmula. No se rellena ni se estima nada.</p>
     <p><b>Datos al…</b> Arriba a la derecha se indica de cuándo es el programa que estás viendo.
     Si dice "copia de este equipo", no hubo conexión y estás viendo lo último que se descargó aquí:
-    vuelve a pulsar Actualizar cuando tengas señal.</p>
+    vuelve a actualiza la pantalla desde el portal cuando tengas señal.</p>
     <p><b>Se entra por el portal.</b> Esta pantalla no tiene usuario ni clave propios. Si aparece
     "Abre esto desde el portal", entra al portal LIVES y vuelve a abrirla desde ahí.</p>
     <p><b>Frescura.</b> Arriba se indica de qué fecha es el programa y quién lo subió. Si lleva más de
@@ -984,7 +985,7 @@ function arrancar(forzar){
       }
       document.getElementById('vt').textContent = 'No se pudo cargar el programa';
       document.getElementById('vd').textContent = String(err && err.message ? err.message : err) +
-        '. Vuelve a intentar con el botón Actualizar; si sigue igual, avisa a Sistemas.';
+        '. Para volver a intentar, actualiza la pantalla desde el portal; si sigue igual, avisa a Sistemas.';
       document.getElementById('tblwrap').innerHTML = '<div class="vacio">Sin datos.</div>';
       document.getElementById('cards').innerHTML = '<div class="vacio">Sin datos.</div>';
       document.getElementById('hstate').textContent = 'Sin conexión';

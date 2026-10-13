@@ -1680,7 +1680,9 @@ function sbrHoyLima(){
   return p.year + '-' + p.month + '-' + p.day;
 }
 function sbrCatalogos(){
-  return Promise.all([sbrDefectos(), sbrPersonal(), sbrTalleres(), sbrClientes(), sbrLineas(), sbrDestinos()])
+  /* 13/10: nombres de antes (ELI PUMACAYO, ZULLY FARRO…) → nombre de Sistemas. Si no carga, sigue sin ellos. */
+  var alias = sbrLeer('publico_alias_personal', 'antes,oficial,orden').catch(function(){ return []; });
+  return Promise.all([sbrDefectos(), sbrPersonal(), sbrTalleres(), sbrClientes(), sbrLineas(), sbrDestinos(), alias])
     .then(function(r){
       return {
         ok: true,
@@ -1690,6 +1692,7 @@ function sbrCatalogos(){
         clientes: sbrActivos(r[3], ['prefijo', 'cliente']),
         lineas:   sbrActivos(r[4], ['nombre']),
         destinos: sbrActivos(r[5], ['codigo', 'destino']),
+        alias:    (r[6] || []).map(function(x){ return [sbrU(x.antes), sbrU(x.oficial)]; }),
         vias: [['AIR', 'Aéreo'], ['SEA', 'Marítimo']],
         multiAuditor: { LINEAS: false, SERVINSP: false, EMPAQUE: true, CLIENTE: true, FINAL: false },
         toleranciaCero: { LINEAS: true, SERVINSP: true, EMPAQUE: false, CLIENTE: false, FINAL: false },
@@ -1853,7 +1856,7 @@ function cargarCatalogos(){
        auditora e inspectora quedaban vacíos sin ningún aviso. */
     CAT={defectos:r.defectos||[], personal:r.personal||[], clientes:r.clientes||[],
          lineas:r.lineas||[], talleres:r.talleres||[], destinos:r.destinos||[],
-         vias:r.vias||[]};
+         vias:r.vias||[], alias:r.alias||[]};
     try{ mayusCatalogos(); }catch(e){ console.warn('mayusCatalogos',e); }
     guardarLocal('lives_cat_aud', CAT);
     try{ pintarCatalogos(); }catch(e){ console.warn('pintarCatalogos',e); }
@@ -1925,7 +1928,11 @@ function autocompletar(inputId, dropId, fuente, alElegir, extra){
     if(inp.readOnly){ cerrar(); return; }   /* 22/09: los datos del pedido no se eligen a mano */
     var q=inp.value, base=fuente();
     opts=[];
-    for(var i=0;i<base.length && opts.length<30;i++) if(coincide(base[i].texto,q)) opts.push(base[i]);
+    var vistos={};
+    for(var i=0;i<base.length && opts.length<30;i++){
+      var b=base[i];
+      if((coincide(b.texto,q) || (b.alias && coincide(b.alias,q))) && !vistos[b.texto]){ vistos[b.texto]=1; opts.push(b); }
+    }
     /* Si nada empieza igual, se acepta lo que contenga el texto: «ASTU» debe
        encontrar a MARLENE ASTUDILLO aunque no empiece por ahí. */
     if(!opts.length && T(q)){
@@ -2789,6 +2796,7 @@ function pintarAuds(){
 function agregarAud(){
   var v=U($('auditor').value);
   if(!v) return;
+  v = oficialDeAlias(v) || v;          /* 13/10: nombre de antes → el de Sistemas */
   if(auds.indexOf(v)<0) auds.push(v);
   $('auditor').value=''; pintarAuds(); $('auditor').focus();
 }
@@ -4769,9 +4777,22 @@ function visible(id){
   return !!(e && getComputedStyle(e).display!=='none');
 }
 
+/* 13/10: si escriben el nombre de antes (el del papel), se cambia solo al de Sistemas. */
+function oficialDeAlias(valor){
+  var k = norm(T(valor)); if(!k) return '';
+  var a = CAT.alias || [];
+  for(var i=0;i<a.length;i++){ if(norm(a[i][0]||'') === k) return a[i][1]; }
+  return '';
+}
+function corregirAlias(id){
+  var e=$(id); if(!e) return;
+  var o=oficialDeAlias(e.value);
+  if(o && U(e.value)!==o) e.value=o;
+}
 function nombreFueraDelCatalogo(valor){
   var v = T(valor);
   if(!v) return '';
+  if(oficialDeAlias(v)) return '';      /* nombre de antes: se guarda con el de Sistemas */
   var lista = CAT.personal || [];
   if(!lista.length) return '';          /* catálogo sin cargar: no bloquear */
   var buscado = norm(v);
@@ -4790,10 +4811,21 @@ function personalPara(rol){
     var r=U(p[1]||'');
     (r.indexOf(rol)>=0 ? coincide : resto).push({texto:p[0], tag:p[1]||''});
   });
-  return coincide.concat(resto);
+  /* 13/10: también se encuentra por el nombre de antes; al elegir queda el de Sistemas. */
+  var extra=[];
+  (CAT.alias||[]).forEach(function(a){
+    var p=null; for(var i=0;i<todos.length;i++){ if(norm(todos[i][0]||'')===norm(a[1]||'')){ p=todos[i]; break; } }
+    if(p) extra.push({texto:p[0], tag:'antes '+a[0], alias:a[0]});
+  });
+  return coincide.concat(resto, extra);
 }
 autocompletar('auditor','dAuditor', function(){ return personalPara('AUDITORA'); });
 autocompletar('inspector','dInspector', function(){ return personalPara('INSPECTORA'); });
+['auditor','inspector','audTaller'].forEach(function(id){
+  var e=$(id); if(!e) return;
+  e.addEventListener('change', function(){ corregirAlias(id); });
+  e.addEventListener('blur',   function(){ setTimeout(function(){ corregirAlias(id); }, 160); });
+});
 autocompletar('grupo','dGrupo', function(){
   var q=U($('grupo').value), of=(OFIC.GRUPO||[]);
   var lista=of.map(function(v){ return {texto:v, tag:'del sistema'}; });

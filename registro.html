@@ -2166,6 +2166,8 @@ function limpiarTela(){ $('tela').value=''; }
    una OP que no está en la base, no se puede agregar la auditoría. En una
    corrección los datos vienen de la auditoría guardada y no se tocan. */
 var OP_RESUELTA = '';
+/* 14/10: "Cambiar OP" dentro de una corrección (se eligió mal la OP o su color). */
+var CAMBIO_OP = false, PEDIDO_ANTES = '';
 var OP_INEXISTENTE = '';   /* última OP que se buscó y no estaba en la base */
 var OPS_FILAS = null;          /* base de OPs completa, para validar al guardar */
 function cargarOpsFilas(){
@@ -2208,7 +2210,7 @@ function limpiarLoteOP(){
   prevLote=null; esReaud='';
 }
 function consultarOps(){
-  if(editando) return;
+  if(editando && !CAMBIO_OP) return;
   if($('tipo').value==='CLIENTE'){ consultarOpCliente(U($('op')?$('op').value:'')); return; }
   var op=U($('op')?$('op').value:'');
   if(!op){
@@ -2557,6 +2559,7 @@ function vueltaSiguienteSuelta(){
 function txtVuelta(v){ return v + '.ª' + (v > 1 ? ' reproceso' : ''); }
 
 function buscarLote(){
+  if(editando) return;   /* en una corrección no se pregunta por auditorías previas del lote */
   var g=U($('grupo').value), e=U($('estilo').value), c=U($('color').value), l=N($('lote').value);
   var t=$('tipo').value;
   /* En Empaque y Cliente lo que identifica el despacho es el PO, no el lote. */
@@ -3142,7 +3145,7 @@ function validar(){
     var malOpC=validarContraOps();
     if(malOpC) return malOpC;
   }
-  else if(!editando){
+  else if(!editando || CAMBIO_OP){
     if(!T($('op').value)) return 'Falta la OP. Es obligatoria: todo el pedido sale de la base de OPs.';
     if(U($('op').value)===OP_INEXISTENTE) return 'La OP '+OP_INEXISTENTE+' no está en la base de OPs. Sin OP no se puede digitar: revisa el número o avisa a Christian.';
     if(U($('op').value)!==OP_RESUELTA) return 'La OP todavía no se cargó de la base. Sal del campo OP y espera a que se llenen los datos.';
@@ -3876,7 +3879,9 @@ function editar(idAud){
       pintarOpsCli();
     } else {
       $('op').value=T(g.OP); OP_RESUELTA=U(g.OP);
+      $('op').readOnly=true; $('op').classList.add('ro');
     }
+    CAMBIO_OP=false; PEDIDO_ANTES='';
     aplicarCliente();
 
     /* Los defectos se recargan de verdad. Si no se recargaran y ella guardara,
@@ -3901,18 +3906,46 @@ function editar(idAud){
     e.className='edicion on';
     e.innerHTML='<b>Corrigiendo una auditoría ya guardada.</b> '+
       '<span>Al guardar se reemplaza, no se crea una nueva.</span>'+aviso+
-      '<button class="mini" type="button" id="btnCancelarEd">Cancelar corrección</button>';
+      ((esDirecto(t) && t!=='CLIENTE') ? '<button class="mini" type="button" id="btnCambiarOP">🔄 Cambiar OP</button>' : '')+
+      '<button class="mini" type="button" id="btnCancelarEd">Cancelar corrección</button>'+
+      '<div id="cambioOpAviso" style="display:none;flex-basis:100%"></div>';
     $('btnCancelarEd').onclick=cancelarEdicion;
+    if($('btnCambiarOP')) $('btnCambiarOP').onclick=function(){ iniciarCambioOP(r.vinculoReproceso===true); };
     $('btnGuardar').innerHTML='Guardar cambios <span class="kbd">F2</span>';
     $('prev').classList.remove('on');
     $('hGuardar').className='hint';
-    $('hGuardar').textContent='Cargada. Los datos del pedido salen de la OP y no se cambian aquí.';
+    $('hGuardar').textContent='Cargada. Los datos del pedido salen de la OP'+($('btnCambiarOP')?': si la OP o el color están mal, usa Cambiar OP.':' y no se cambian aquí.');
     $('lote').focus();
   }, function(){ $('hGuardar').className='hint err'; $('hGuardar').textContent='Sin conexión.'; });
 }
 
+function descPedidoActual(){
+  return 'OP '+(U($('op').value)||'—')+' · '+(U($('color').value)||'—')+
+         (T($('destino').value)?(' · '+U($('destino').value)):'')+(T($('po').value)?(' · PO '+T($('po').value)):'');
+}
+function iniciarCambioOP(vinculada){
+  if(!editando) return;
+  if(vinculada){
+    $('hGuardar').className='hint err';
+    $('hGuardar').textContent='Esta auditoría está vinculada a un reproceso: no se puede cambiar su OP. Avisa a Christian.';
+    return;
+  }
+  PEDIDO_ANTES=descPedidoActual();
+  CAMBIO_OP=true;
+  $('op').readOnly=false; $('op').classList.remove('ro');
+  $('op').value=''; OP_RESUELTA=''; OP_INEXISTENTE='';
+  limpiarLoteOP(); OPS_ACT=null;
+  $('hOp').className='hint'; $('hOp').textContent='Escribe la OP correcta y elige su color: el pedido sale de la base de OPs.';
+  var a=$('cambioOpAviso');
+  if(a){ a.style.display='block'; a.innerHTML='🔄 <b>Cambiando el pedido.</b> Antes: '+esc(PEDIDO_ANTES)+'.'; }
+  var b=$('btnCambiarOP'); if(b) b.style.display='none';
+  $('hGuardar').className='hint'; $('hGuardar').textContent='Escribe la OP correcta y elige su opción.';
+  $('op').focus();
+}
 function cancelarEdicion(){
   editando=null;
+  CAMBIO_OP=false; PEDIDO_ANTES='';
+  if($('op')){ $('op').readOnly=false; $('op').classList.remove('ro'); }
   $('edicion').className='edicion';
   $('btnGuardar').innerHTML='Guardar <span class="kbd">F2</span>';
   limpiarRegistro(false);
@@ -3934,6 +3967,8 @@ function cuerpoCorreccionFormulario(){
           ? auds.concat(T($('auditor').value)?[U($('auditor').value)]:[]).filter(function(x,i,a){ return x && a.indexOf(x)===i; })
           : (T($('auditor').value) ? [U($('auditor').value)] : []));
   var destinosR = ((EDIT_R && EDIT_R.destinos) || []).map(function(d){ return {codigo:d.CODIGO, via:d.VIA}; });
+  /* 14/10: si se cambió la OP, el destino es el de la opción nueva. */
+  if(CAMBIO_OP && T($('destino').value)) destinosR=[{codigo:U($('destino').value), via:''}];
   return {
     fecha: $('fecha').value, grupo: U($('grupo').value), estilo: U($('estilo').value),
     lote: N($('lote').value), muestra: N($('muestra').value),
@@ -3948,13 +3983,18 @@ function cuerpoCorreccionFormulario(){
                                                : [{color:U($('color').value), po:U($('po').value), eCliente:U($('eCliente').value)}],
     destinos: destinosR,
     defectos: defs.map(function(d){ return {cod:d.cod, seccion:d.seccion, categoria:d.categoria, subtipo:d.subtipo, nombre:d.nombre, cantidad:d.cantidad}; }),
-    usuario: U($('digitador').value)
+    usuario: U($('digitador').value),
+    op: CAMBIO_OP ? OP_RESUELTA : '',
+    codTela: (CAMBIO_OP && OPS_ACT && OPS_ACT.codTela) ? OPS_ACT.codTela : '',
+    descTela: (CAMBIO_OP && OPS_ACT && OPS_ACT.descTela) ? OPS_ACT.descTela : '',
+    cambioPedido: CAMBIO_OP
   };
 }
 
 function guardarEdicion(){
   var id=editando;
   if(esDirecto($('tipo').value)){
+    if(CAMBIO_OP && !confirm('¿Cambiar el pedido de esta auditoría?\n\nAntes: '+PEDIDO_ANTES+'\nAhora: '+descPedidoActual())) return;
     var cuerpo=cuerpoCorreccionFormulario();
     var etqD=U($('grupo').value)+' · '+U($('estilo').value)+' · lote '+N($('lote').value);
     cancelarEdicion();

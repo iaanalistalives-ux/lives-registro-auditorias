@@ -913,8 +913,34 @@ function subir(){
      por partes de siempre. */
   $('msgSube').textContent='Enviando las '+FILAS.length.toLocaleString('es-PE')+' filas…';
   $('barraI').style.width='30%';
-  subirDeUnaVez().then(function(r){
+  enviarCarga(false);
+}
+
+/* 14/10 (BD01): la base rechaza un archivo que no trae OPs que hoy están cargadas
+   (archivo equivocado o recortado). Se muestra cuántas y cuáles, y solo si se
+   confirma de forma explícita se vuelve a enviar con p_forzar. */
+function enviarCarga(forzar){
+  subirDeUnaVez(forzar).then(function(r){
     if(r && r.ok){ terminarCarga(r); return; }
+    if(r && r.faltan && !forzar){
+      var ej=(r.ejemplos||[]).slice(0,15).join(', ')+(r.faltan>15?'…':'');
+      $('msgSube').className='hint err'; $('btnSubir').disabled=false; $('barra').className='barra';
+      $('msgSube').textContent=('No se cargó nada y la base de OPs quedó como estaba: el archivo no trae '+r.faltan.toLocaleString('es-PE')+
+            ' OP(s) que hoy están en la base ('+(r.ops_hoy||0).toLocaleString('es-PE')+
+            ' OPs hoy; el archivo trae '+(r.ops_archivo||0).toLocaleString('es-PE')+'). Faltan, por ejemplo: '+ej+
+            '. Revisa que el Excel no tenga filtros y venga completo.');
+      if(confirm('El archivo no trae '+r.faltan+' OP(s) que hoy están en la base.\n\n'+
+                 'Ejemplos: '+ej+'\n\n'+
+                 'Si las cargas así, esas OPs desaparecen y no se podrán registrar auditorías con ellas.\n'+
+                 'Normalmente esto significa que el archivo está incompleto o filtrado.\n\n'+
+                 '¿Cargar de todas formas?')){
+        $('btnSubir').disabled=true;
+        $('barra').className='barra on';
+        $('msgSube').className='hint'; $('msgSube').textContent='Enviando de todas formas…';
+        enviarCarga(true);
+      }
+      return;
+    }
     falla((r && r.error) || 'Supabase no confirmó la carga. La tabla quedó como estaba; vuelve a intentar.');
   }).catch(function(e){
     falla('Sin conexión con la base de datos. La tabla quedó como estaba; vuelve a intentar.');
@@ -925,7 +951,7 @@ function subir(){
    por el Sheet ni por Apps Script. sync_ops_reemplazar borra la tabla y la
    vuelve a llenar en una sola transacción: si algo falla a mitad de camino,
    Postgres deshace todo solo y la tabla queda como estaba, nunca a medias. */
-function subirDeUnaVez(){
+function subirDeUnaVez(forzar){
   var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
   var filas = FILAS.map(function(f){
@@ -933,7 +959,7 @@ function subirDeUnaVez(){
   });
   return fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_ops_reemplazar', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ p_filas: filas, p_usuario: U($('usuario').value) }),
+    body: JSON.stringify({ p_filas: filas, p_usuario: U($('usuario').value), p_forzar: !!forzar }),
     signal: control ? control.signal : undefined
   }).then(function(r){
     clearTimeout(reloj);

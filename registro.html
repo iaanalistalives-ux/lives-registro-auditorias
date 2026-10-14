@@ -1996,6 +1996,48 @@ function pintarCatalogos(){ pintarChips(); }
 
 function nombreDefecto(d){ return U(d[3] ? (d[2]+' '+d[3]) : d[2]); }
 
+/* 14/10: defectos PARECIDOS a lo que se escribe, aunque cambie el orden de las palabras
+   o haya una falta ("MAL APARIENCIA CUELLO" → APARIENCIA DE CUELLO; "PESTANA DISPERZA" →
+   PESTAÑA DISPAREJA). Así Athina ve si ya existe antes de escribir uno fuera de la lista. */
+var DEF_VACIAS={DE:1,DEL:1,LA:1,EL:1,LOS:1,LAS:1,EN:1,Y:1,CON:1,A:1,AL:1,POR:1};
+function defPalabras(x){ return norm(x).split(' ').filter(function(w){ return w && !DEF_VACIAS[w] && !/^\d+$/.test(w); }); }
+function defDistancia(a,b){
+  if(Math.abs(a.length-b.length)>2) return 9;
+  var prev=[],cur,i,j; for(j=0;j<=b.length;j++) prev[j]=j;
+  for(i=1;i<=a.length;i++){ cur=[i];
+    for(j=1;j<=b.length;j++) cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev=cur; }
+  return prev[b.length];
+}
+function defPalabraIgual(a,b){
+  if(a===b) return true;
+  var m=Math.min(a.length,b.length);
+  if(m>=4 && (a.indexOf(b)===0 || b.indexOf(a)===0)) return true;
+  var d=defDistancia(a,b);
+  return (m>=4 && d<=1) || (m>=7 && d<=2);
+}
+function defParecido(q, nombre){
+  var p=defPalabras(q), n=defPalabras(nombre);
+  if(!p.length || !n.length) return 0;
+  var okP=0, usadas={};
+  p.forEach(function(w){
+    for(var j=0;j<n.length;j++){ if(!usadas[j] && defPalabraIgual(w,n[j])){ usadas[j]=1; okP++; break; } }
+  });
+  if(!okP) return 0;
+  return (okP/p.length + okP/n.length)/2;
+}
+/* Agrega a "opts" hasta "max" parecidos (puntaje ≥ 0.5) que no estén ya; los marca en "marca". */
+function sumarParecidos(q, base, opts, marca, max){
+  if(norm(q).length<3) return;
+  var ya={}; opts.forEach(function(o){ ya[nombreDefecto(o)]=1; });
+  var cand=[];
+  base.forEach(function(d){ var nm=nombreDefecto(d); if(ya[nm]) return;
+    var sc=defParecido(q,nm); if(sc>=0.5) cand.push({d:d,sc:sc}); });
+  cand.sort(function(a,b){ return b.sc-a.sc; });
+  cand.slice(0,max||4).forEach(function(c){ opts.push(c.d); marca[nombreDefecto(c.d)]=1; });
+}
+
+
 /* Ordena el catálogo poniendo primero los frecuentes del tipo activo. */
 function catalogoOrdenado(){
   var t=$('tipo').value, fr=FRECUENTES[t]||[];
@@ -2707,9 +2749,17 @@ function fijarReaud(v, n){
 }
 
 /* ---------------- defectos ---------------- */
+/* 14/10: dos defectos son el mismo si tienen el mismo código de catálogo, o el mismo
+   nombre. Los defectos nuevos (fuera del catálogo) llegan todos con código "NUEVO" o
+   vacío: compararlos solo por código sumaba "CAMBIO DE TALLA" a "MAL APARIENCIA CUELLO". */
+function mismoDefecto(x, d){
+  var cod=d[0];
+  if(cod && cod!=='NUEVO' && x.cod===cod) return true;
+  return U(x.nombre||'')===U(nombreDefecto(d));
+}
 function agregarDef(d){
   var cod=d[0], ya=-1;
-  for(var i=0;i<defs.length;i++) if(defs[i].cod===cod) ya=i;
+  for(var i=0;i<defs.length;i++) if(mismoDefecto(defs[i], d)) ya=i;
   if(ya>=0) defs[ya].cantidad+=1;
   else { defs.push({cod:cod, seccion:d[1], categoria:d[2], subtipo:d[3],
                     nombre:nombreDefecto(d), cantidad:1}); ya=defs.length-1; }
@@ -2987,7 +3037,7 @@ function agregarDer(d){
 }
 
 (function(){
-  var inp=$('qder'), dr=$('dDer'), opts=[], sel=-1;
+  var inp=$('qder'), dr=$('dDer'), opts=[], sel=-1, par={};
   if(!inp) return;
   function buscar(){
     var q=inp.value; opts=[];
@@ -2999,8 +3049,10 @@ function agregarDer(d){
       var da=U(a[1])==='DERIVADOS'?0:1, db=U(b[1])==='DERIVADOS'?0:1;
       return da-db;
     });
+    par={};
     for(var i=0;i<base.length && opts.length<25;i++)
       if(coincide(nombreDefecto(base[i]),q)) opts.push(base[i]);
+    sumarParecidos(q, base, opts, par, 4);
     if(norm(q).length>=3 && !opts.some(function(o){ return norm(nombreDefecto(o))===norm(q); }))
       opts.push(['__NUEVO__','Derivados',U(norm(q)),'']);
     sel=opts.length?0:-1; pintar(q);
@@ -3008,9 +3060,10 @@ function agregarDer(d){
   function pintar(q){
     if(!opts.length){ dr.classList.remove('on'); dr.innerHTML=''; return; }
     dr.innerHTML=opts.map(function(o,i){
-      var nuevo=o[0]==='__NUEVO__';
+      var nuevo=o[0]==='__NUEVO__', pa=!nuevo && par[nombreDefecto(o)];
       return '<div class="opt'+(i===sel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
-        '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
+        '<span class="nm">'+(nuevo?'No está en la lista: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span>'+
+        (pa?'<span class="tag">parecido</span>':'')+'</div>';
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
@@ -4280,7 +4333,7 @@ function agregarDefHoja(d){
   if(filaAct<0){ $('hjMsg').className='hint err'; $('hjMsg').textContent='Elige primero una fila.'; return; }
   var f=hoja[filaAct]; f.defs=f.defs||[];
   var ya=-1;
-  for(var k=0;k<f.defs.length;k++) if(f.defs[k].cod===d[0]) ya=k;
+  for(var k=0;k<f.defs.length;k++) if(mismoDefecto(f.defs[k], d)) ya=k;
   if(ya>=0){ /* ya estaba: no suma solo, se corrige el número a mano */ }
   else f.defs.push({cod:d[0],seccion:d[1],categoria:d[2],subtipo:d[3],
                     nombre:nombreDefecto(d),cantidad:1});
@@ -4366,13 +4419,15 @@ var dfOpts=[], dfSel=-1, dfInp=null;
 
 function cerrarDropFila(){ $('hjFloat').style.display='none'; dfOpts=[]; dfSel=-1; }
 
+var dfPar={};
 function buscarDefFila(inp){
   dfInp=inp;
   var q=inp.value; dfOpts=[];
   if(!T(q)){ cerrarDropFila(); return; }
-  var base=catalogoOrdenado();
+  var base=catalogoOrdenado(); dfPar={};
   for(var i=0;i<base.length && dfOpts.length<20;i++)
     if(coincide(nombreDefecto(base[i]),q)) dfOpts.push(base[i]);
+  sumarParecidos(q, base, dfOpts, dfPar, 4);
   /* Igual que en el formulario: se ofrece registrar siempre que no haya una
      coincidencia exacta, no solo cuando no hay ninguna sugerencia. */
   if(norm(q).length>=3 && !dfOpts.some(function(o){ return norm(nombreDefecto(o))===norm(q); }))
@@ -4385,9 +4440,10 @@ function pintarDropFila(q, inp){
   var d=$('hjFloat');
   if(!dfOpts.length){ cerrarDropFila(); return; }
   d.innerHTML=dfOpts.map(function(o,i){
-    var nuevo=o[0]==='__NUEVO__';
+    var nuevo=o[0]==='__NUEVO__', pa=!nuevo && dfPar[nombreDefecto(o)];
     return '<div class="opt'+(i===dfSel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
-      '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
+      '<span class="nm">'+(nuevo?'No está en la lista: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span>'+
+      (pa?'<span class="tag">parecido</span>':'')+'</div>';
   }).join('');
   var r=inp.getBoundingClientRect();
   d.style.left=r.left+'px'; d.style.top=(r.bottom+2)+'px';
@@ -4478,21 +4534,23 @@ function pintarChipsHoja(){
 }
 
 (function(){
-  var inp=$('hjQ'), dr=$('hjDrop'), opts=[], sel=-1;
+  var inp=$('hjQ'), dr=$('hjDrop'), opts=[], sel=-1, par={};
   if(!inp) return;
   function buscar(){
     var q=inp.value; opts=[];
     if(!T(q)){ dr.classList.remove('on'); return; }
-    var base=catalogoOrdenado();
+    var base=catalogoOrdenado(); par={};
     for(var i=0;i<base.length && opts.length<25;i++)
       if(coincide(nombreDefecto(base[i]),q)) opts.push(base[i]);
+    sumarParecidos(q, base, opts, par, 4);
     sel=opts.length?0:-1; pintar(q);
   }
   function pintar(q){
     if(!opts.length){ dr.classList.remove('on'); dr.innerHTML=''; return; }
     dr.innerHTML=opts.map(function(o,i){
       return '<div class="opt'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
-        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span></div>';
+        '<span class="nm">'+resaltar(nombreDefecto(o),q)+'</span>'+
+        (par[nombreDefecto(o)]?'<span class="tag">parecido</span>':'')+'</div>';
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){
@@ -4982,12 +5040,13 @@ cargarSugerencias();
 
 /* buscador de defectos */
 (function(){
-  var inp=$('qdef'), dr=$('dDef'), opts=[], sel=-1;
+  var inp=$('qdef'), dr=$('dDef'), opts=[], sel=-1, par={};
   function buscar(){
     var q=inp.value, base=catalogoOrdenado();
-    opts=[];
+    opts=[]; par={};
     for(var i=0;i<base.length && opts.length<30;i++)
       if(coincide(nombreDefecto(base[i]), q)) opts.push(base[i]);
+    sumarParecidos(q, base, opts, par, 4);
     /* La opción de registrar aparece siempre que no haya una coincidencia exacta,
        no solo cuando la lista queda vacía: si ella escribe «STICKER DESCENTRADO»
        y el buscador le muestra «STICKER SIN DESGLOSAR», el defecto que quiere
@@ -5002,9 +5061,10 @@ cargarSugerencias();
       /* Sin la etiqueta de sección al costado: el nombre del defecto ya dice
          qué es, y la sección solo agregaba ruido en pantallas chicas.
          La sección se sigue guardando en el Sheet, no se pierde el dato. */
-      var nuevo=o[0]==='__NUEVO__';
+      var nuevo=o[0]==='__NUEVO__', pa=!nuevo && par[nombreDefecto(o)];
       return '<div class="opt'+(i===sel?' sel':'')+(nuevo?' nuevo':'')+'" data-i="'+i+'">'+
-        '<span class="nm">'+(nuevo?'Registrar nuevo: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span></div>';
+        '<span class="nm">'+(nuevo?'No está en la lista: ':'')+resaltar(nombreDefecto(o),nuevo?'':q)+'</span>'+
+        (pa?'<span class="tag">parecido</span>':'')+'</div>';
     }).join('');
     dr.classList.add('on');
     Array.prototype.forEach.call(dr.querySelectorAll('.opt'),function(el){

@@ -3427,105 +3427,6 @@ function enviarTodo(){
 /* Se manda de uno en uno. Antes salían todos a la vez y Apps Script los ponía
    en fila esperando el mismo candado: los últimos se quedaban sin tiempo y
    fallaban aunque no hubiera nada mal. */
-/* ===== PARALELO — solo comparación, NUNCA afecta lo que ve Athina (21/09) =====
-   Solo para AUDITORÍA FINAL, que es el tipo que comparte con el formulario de
-   auditoras. Los demás tipos (LINEAS, SERVINSP, EMPAQUE, CLIENTE) siguen solo
-   por Apps Script; esto no los toca.
-   Manda los mismos datos a sync_guardar_auditoria_paralelo en Supabase, que
-   escribe en tablas APARTE (auditorias_paralelo), nunca en la tabla real que
-   ya alimenta los dashboards. Usa el mismo token que ya lleva el envío, para
-   poder comparar después con SQL.
-   Va por XMLHttpRequest a propósito, no por window.fetch: así nunca dispara el
-   aviso de "sin sesión" del bloque de sesión si algo falla — esto es invisible
-   siempre, incluso si falla. */
-function compararParalelo(envio, idReal){
-  /* 24/09: los CINCO tipos mandan su copia (antes solo Final). La copia va a
-     tablas aparte y no toca nada de lo que ve Athina. El cuerpo tiene la misma
-     forma que se probó contra 48 auditorías reales de Líneas, Serv. Inspección,
-     Empaque y Cliente: 48 de 48 coincidieron en todos los datos calculados. */
-  try{
-    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
-    window.LIVES_SESION.llave().then(function(tk){
-      if (!tk) return;
-      try{
-        function jparse(v, def){ try{ return JSON.parse(v); }catch(e){ return def; } }
-        var tipo = String(envio.tipo || '').toUpperCase();
-        /* 24/09: los tipos directos ya no se comparan: se guardan en Supabase. */
-        if (tipo !== 'FINAL') return;
-        var defs = jparse(envio.defectos, []).map(function(d){
-          return { nombre: d.nombre || d.categoria || '', cantidad: d.cantidad,
-                    cod: d.cod, seccion: d.seccion, categoria: d.categoria, subtipo: d.subtipo, nota: d.nota };
-        });
-        var tot = defs.reduce(function(a,d){ return a + (parseFloat(d.cantidad)||0); }, 0);
-        /* La hoja (Líneas, Serv. Inspección) no manda resultado: lo decide la
-           tolerancia cero, igual que el sistema real. */
-        var res = envio.resultado || ((tipo==='LINEAS' || tipo==='SERVINSP') ? (tot>0 ? 'RECHAZADO' : 'APROBADO') : '');
-        var body = {
-          tipo: tipo, fecha: envio.fecha, grupo: envio.grupo, estilo: envio.estilo,
-          nivelAql: String(envio.nivelAql || '1.5'), lote: envio.lote, muestra: envio.muestra,
-          captura: 'DIGITADO',
-          licencia: envio.licencia === '1', override: envio.override === 'SÍ',
-          reproceso: envio.reproceso === '1', esReauditoria: envio.esReauditoria || '',
-          reprocesaDe: envio.reprocesaDe || '', motivoReproceso: envio.motivoReproceso || '',
-          pedido: envio.pedido || 0, op: envio.op || '',
-          proceso: envio.proceso || '', intExt: envio.intExt || '', servicio: envio.servicio || '',
-          auditores: jparse(envio.auditores, []), digitador: envio.digitador || '',
-          inspector: envio.inspector || '', cajas: envio.cajas || null,
-          colores: jparse(envio.colores, []), destinos: jparse(envio.destinos, []),
-          defectos: defs, resultado: res,
-          overrideAutoriza: envio.overrideAutoriza || '', overrideMotivo: envio.overrideMotivo || '',
-          eCliente: envio.eCliente || '',
-          token: envio.token,
-          idReal: idReal || ''   /* 24/09 (SQL 44): enlaza la copia con la auditoría real */
-        };
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_guardar_auditoria_paralelo', true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
-        xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-        xhr.send(JSON.stringify({ payload: body }));
-      }catch(e){}
-    }).catch(function(){});
-  }catch(e){}
-}
-
-/* 24/09: al CORREGIR, la copia se recalcula entera con lo que quedó guardado,
-   leyendo la auditoría ya corregida. Antes solo se copiaban los campos cambiados
-   y el número de auditoría, el resultado AQL o lo computable no se recalculaban:
-   una corrección de lote o muestra dejaba la copia distinta de la real. Se espera
-   un momento para que la corrección llegue a Supabase. Si esa auditoría no tiene
-   copia (es anterior al paralelo), Supabase no hace nada. */
-function paraleloTrasCorregir(id){
-  setTimeout(function(){
-    sbrLeerAud({id:id}).then(function(r){
-      if(!r || !r.ok) return;
-      var g=r.registro||{};
-      if(U(g.TIPO_AUDITORIA)!=='FINAL') return;   /* solo Final tiene copia en paralelo */
-      var body = {
-        tipo: U(g.TIPO_AUDITORIA), fecha: T(g.FECHA), grupo: T(g.GRUPO), estilo: T(g.ESTILO),
-        nivelAql: T(g.NIVEL_AQL) || '1.5', lote: N(g.LOTE), muestra: N(g.MUESTRA),
-        captura: T(g.CAPTURA) || 'DIGITADO',
-        licencia: N(g.LICENCIA)===1, override: U(g.OVERRIDE)==='SÍ',
-        reproceso: N(g.REPROCESO)===1, esReauditoria: N(g.REPETIDO)===1 ? 'SI' : 'NO',
-        reprocesaDe: T(g.REPROCESA_DE), motivoReproceso: T(g.MOTIVO_REPROCESO),
-        pedido: N(g.PEDIDO), op: T(g.OP), proceso: T(g.TIPO_PROCESO), intExt: T(g.INT_EXT),
-        servicio: T(g.SERVICIO), inspector: T(g.INSPECTOR),
-        auditores: (r.auditores||[]),
-        digitador: U($('digitador').value),
-        colores: (r.colores||[]).map(function(c){ return {color:c.COLOR, po:c.PO, eCliente:c.E_CLIENTE}; }),
-        destinos: (r.destinos||[]).map(function(d){ return {codigo:d.CODIGO, via:d.VIA}; }),
-        defectos: (r.defectos||[]).map(function(d){
-          return {nombre: T(d.CATEGORIA)+(T(d.SUBTIPO)?(' '+T(d.SUBTIPO)):''), cantidad: N(d.CANTIDAD)};
-        }),
-        resultado: U(g.RESULTADO), cajas: N(g.CAJAS)||null, eCliente: T(g.E_CLIENTE),
-        overrideAutoriza: T(g.OVERRIDE_AUTORIZA), overrideMotivo: T(g.OVERRIDE_MOTIVO),
-        liquidado: N(g.LIQUIDADO)===1
-      };
-      paraleloXhr('sync_actualizar_auditoria_paralelo', { p_id: id, payload: body });
-    }, function(){});
-  }, 2500);
-}
-
 /* ===== 24/09 · Guardado directo en Supabase =====
    Tipos que ya no pasan por el Apps Script ni por el Sheet. Si Supabase dijera que
    un tipo todavía no es directo (el interruptor se apagó), se usa el sistema
@@ -3627,10 +3528,6 @@ function procesarCola(){
         it.estado='ok';
         it.msg = r.repetido ? 'Ya estaba guardada, no se duplicó.' : (r.mensaje||'Guardado.');
         it.nAud=r.nAuditoria; it.idAud=r.id;
-        /* 24/09: también cuando el servidor dice "ya estaba guardada" (la primera respuesta
-           se perdió por lentitud): antes esa auditoría se quedaba sin copia. Mismo token:
-           si la copia ya existía, Supabase no la duplica. */
-        if (!(r && r.via === 'supabase')) compararParalelo(it.envio, r.id);
       }
       else { it.estado='err'; it.msg=(r&&r.error)||'error del servidor'; }
       pintarLog(); procesarCola();
@@ -3784,36 +3681,6 @@ function limpiarRegistro(exito){
 }
 
 /* ---------------- editar y anular ---------------- */
-
-/* ===== PARALELO — editar/anular, invisible, nunca afecta a Athina (22/09) =====
-   Mismo patrón del resto: XHR directo, nunca pide sesión, nunca lanza error
-   hacia el flujo real. Si la auditoría no es de tipo Final, o nunca se guardó
-   en paralelo (los demás tipos no se guardan en paralelo todavía), la función
-   del lado de Supabase simplemente no encuentra nada y no hace nada — no hace
-   falta filtrar por tipo aquí. */
-function paraleloXhr(fnNombre, body){
-  try{
-    if (!window.LIVES_SESION || typeof window.LIVES_SESION.llave !== 'function') return;
-    window.LIVES_SESION.llave().then(function(tk){
-      if (!tk) return;
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', 'https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/' + fnNombre, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('apikey', 'sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ');
-      xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-      xhr.send(JSON.stringify(body));
-    }).catch(function(){});
-  }catch(e){}
-}
-function compararParaleloEditar(id, cambios, auditoresJson, defectosJson){
-  var body = { payload: { id: id, cambios: cambios } };
-  if (auditoresJson !== undefined){ try{ body.payload.auditores = JSON.parse(auditoresJson); }catch(e){} }
-  if (defectosJson !== undefined){ try{ body.payload.defectos = JSON.parse(defectosJson); }catch(e){} }
-  paraleloXhr('sync_editar_auditoria_paralelo', body);
-}
-function compararParaleloAnular(id, motivo, usuario){
-  paraleloXhr('sync_anular_auditoria_paralelo', { p_id: id, p_motivo: motivo, p_usuario: usuario });
-}
 
 function itemPorId(idAud){
   for(var i=0;i<cola.length;i++) if(cola[i].idAud===idAud) return cola[i];
@@ -4052,7 +3919,6 @@ function guardarEdicion(){
     var it=itemPorId(id);
     if(r&&r.ok){
       if(it){ it.etiqueta=etq; it.msg='Corregida'; it.estado='ok'; }
-      paraleloTrasCorregir(id);
     }
     else if(it){ it.estado='err'; it.msg=(r&&r.error)||'no se pudo corregir'; }
     pintarLog();
@@ -4093,7 +3959,6 @@ function confirmarAnular(motivo){
     function(r){
       if(r&&r.ok){
         if(it){ it.estado='anul'; it.msg='Anulada: '+motivo; guardados=Math.max(0,guardados-1); }
-        compararParaleloAnular(idAud, motivo, U($('digitador').value));
         /* Si venía de la búsqueda por OP, marcarla ahí también: sin esto la fila
            sigue viéndose normal y da la impresión de que la anulación no funcionó. */
         if(ANUL_BQ){ ANUL_BQ.estado='ANULADO'; ANUL_BQ=null; bqPintar(); }
@@ -4893,7 +4758,6 @@ if($('corrGuardar')) $('corrGuardar').onclick=function(){
     function(r){
       if(r&&r.ok){
         $('bqMsg').className='hint ok'; $('bqMsg').textContent='Corregida.';
-        paraleloTrasCorregir(corrId);
         bqBuscar();
       }
       else { $('bqMsg').className='hint err'; $('bqMsg').textContent=(r&&r.error)||'No se pudo corregir.'; }

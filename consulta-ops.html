@@ -694,6 +694,9 @@ td.fec{white-space:nowrap;}
 .vacio{color:#B7C4C0;}
 
 .mas{text-align:center;margin-top:14px;}
+#masSensor{height:1px;}
+.mas .btn{min-width:200px;}
+@media(max-width:600px){.mas .btn{width:100%;}}
 .nota{font-size:12px;color:var(--stone);margin-top:8px;}
 .lsTope500{font-size:12px;color:#5F726C;text-align:center;padding:8px 0}
 .aviso{display:none;background:#FCEBEB;border-left:4px solid var(--rose);border-radius:0 8px 8px 0;
@@ -738,12 +741,15 @@ details.help p{color:var(--stone);margin:8px 0 0;max-width:130ch;}
   td:last-child{border-bottom:none;}
   td::before{content:attr(data-l);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);padding-top:1px;}
   td.tela{max-width:none;}
+  /* El navegador no arma las tarjetas que no se ven: dibujar una tanda pasó de ~1 s a ~0.2 s. */
+  tbody tr{content-visibility:auto;contain-intrinsic-size:auto 620px;}
   td.op .v{font-size:16px;}
 }
 @media print{
   @page{size:A4 landscape;margin:9mm;}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
   .bar,.no-print,details.help,.mas{display:none!important;}
+  tbody tr{content-visibility:visible!important;}
   body{background:#fff!important;}
   .wrap{padding:0;}
   .panel,.verdict{box-shadow:none;border:1px solid var(--warm);}
@@ -1109,6 +1115,11 @@ function hoyISO(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMo
 function isoAdd(iso, dias){ var d = new Date(iso+'T12:00:00'); d.setDate(d.getDate()+dias); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function isoMeses(iso, m){ var d = new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+m); d.setDate(d.getDate()+1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmtN(n){ return Number(n||0).toLocaleString('es-PE',{maximumFractionDigits:2}); }
+/* Un solo comparador para todo: crear uno por comparación hacía lento el ordenar. */
+var CMP = (function(){
+  try{ return new Intl.Collator('es',{numeric:true}).compare; }
+  catch(e){ return function(a,b){ return String(a).localeCompare(String(b),'es',{numeric:true}); }; }
+})();
 
 /* ---------- lectura con un reintento; nunca deja la pantalla bloqueada ---------- */
 function traer(url){
@@ -1130,19 +1141,30 @@ function traer(url){
   });
 }
 
+/* Se piden varias páginas a la vez (antes iban una tras otra y en el celular
+   eso eran cuatro viajes seguidos a la base). */
 function cargarTodo(conFecha){
-  var tam = 1000, filas = [];
-  function pagina(off){
-    var url = SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido' + (conFecha ? ',fecha_creacion' : '')
+  var tam = 1000, ALA_VEZ = 4, filas = [];
+  function url(off){
+    return SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido' + (conFecha ? ',fecha_creacion' : '')
       + '&order=op.desc,grupo.asc,estilo.asc,color.asc,po.asc,destino.asc,cod_tela.asc,pedido.asc'
       + '&limit=' + tam + '&offset=' + off;
-    return traer(url).then(function(lote){
-      filas = filas.concat(lote || []);
-      if(lote && lote.length === tam) return pagina(off + tam);
+  }
+  function tanda(desde){
+    var pide = [];
+    for(var i=0;i<ALA_VEZ;i++) pide.push(traer(url(desde + i*tam)));
+    return Promise.all(pide).then(function(lotes){
+      var completa = true;
+      for(var i=0;i<lotes.length;i++){
+        var l = lotes[i] || [];
+        filas = filas.concat(l);
+        if(l.length < tam){ completa = false; break; }
+      }
+      if(completa) return tanda(desde + ALA_VEZ*tam);
       return filas;
     });
   }
-  return pagina(0);
+  return tanda(0);
 }
 
 function cargarFecha(){
@@ -1179,9 +1201,6 @@ function iniciar(){
         cliente: (g.indexOf('-')>0 ? g.split('-')[0] : g).trim(),
         fecha: fe
       };
-    });
-    DATOS.forEach(function(d){
-      d._todo = [d.op,fTxt(d.fecha),d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
     });
     FMAX = DATOS.reduce(function(a,d){ return d.fecha>a ? d.fecha : a; }, '');
     if(SINFECHA){
@@ -1261,31 +1280,71 @@ function existe(c, v){
   if(!EXISTE[c]){ EXISTE[c] = {}; DATOS.forEach(function(d){ EXISTE[c][d[c]] = 1; }); }
   return !!EXISTE[c][v];
 }
+/* Un filtro, una fila. Separado de pasa() para poder contar las listas en una sola vuelta. */
+function pasaUno(d, c){
+  if(c==='desde') return !!d.fecha && d.fecha >= F.desde;
+  if(c==='hasta') return !!d.fecha && d.fecha <= F.hasta;
+  var v = norm(F[c]);
+  if(c==='q'){
+    /* Se arma a la primera búsqueda: hacerlo al cargar costaba una vuelta entera a la base. */
+    if(d._todo === undefined)
+      d._todo = [d.op,fTxt(d.fecha),d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
+    var partes = v.split(/\s+/);
+    for(var i=0;i<partes.length;i++) if(d._todo.indexOf(partes[i])<0) return false;
+    return true;
+  }
+  if(existe(c, v)) return d[c]===v;
+  return String(d[c]).indexOf(v) >= 0;
+}
+function activos(){
+  var a = [];
+  for(var c in F){ if(F[c]) a.push(c); }
+  return a;
+}
 function pasa(d, saltar){
   for(var c in F){
     if(c===saltar || !F[c]) continue;
-    if(c==='desde'){ if(!d.fecha || d.fecha < F.desde) return false; continue; }
-    if(c==='hasta'){ if(!d.fecha || d.fecha > F.hasta) return false; continue; }
-    var v = norm(F[c]);
-    if(c==='q'){
-      var partes = v.split(/\s+/);
-      for(var i=0;i<partes.length;i++) if(d._todo.indexOf(partes[i])<0) return false;
-      continue;
-    }
-    if(existe(c, v)){ if(d[c]!==v) return false; }
-    else if(String(d[c]).indexOf(v)<0) return false;
+    if(!pasaUno(d, c)) return false;
   }
   return true;
 }
 
+/* Recorrer todas las filas ocho veces (una por filtro) tomaba más de un segundo en
+   el celular y frenaba cada tecla. Ahora se hace cuando la pantalla ya está
+   dibujada y queda libre, y se descarta si el usuario siguió filtrando. */
+var vezListas = 0, pendListas = null;
+function listasLuego(){
+  var mia = ++vezListas;
+  if(pendListas){ clearTimeout(pendListas); pendListas = null; }
+  var correr = function(){ if(mia === vezListas) actualizarListas(); };
+  if(window.requestIdleCallback) requestIdleCallback(correr, {timeout:1200});
+  else pendListas = setTimeout(correr, 250);
+}
 function actualizarListas(){
+  /* Una sola vuelta: cada fila se mide contra los filtros activos y, según cuántos
+     falle, entra en todas las listas (ninguno), en una sola (falla ese) o en ninguna
+     (falla dos o más). Antes se recorrían todas las filas una vez por cada casilla. */
+  var act = activos(), cols = [], cuentas = {};
+  COLS.forEach(function(k){ if(k.f){ cols.push(k.c); cuentas[k.c] = {}; } });
+  for(var i=0;i<DATOS.length;i++){
+    var d = DATOS[i], nf = 0, falla = null;
+    for(var j=0;j<act.length;j++){
+      if(!pasaUno(d, act[j])){ nf++; falla = act[j]; if(nf>1) break; }
+    }
+    if(nf>1) continue;
+    for(var m=0;m<cols.length;m++){
+      var c = cols[m];
+      if(nf===1 && falla!==c) continue;
+      var v = d[c]; if(v!=='') cuentas[c][v] = (cuentas[c][v]||0)+1;
+    }
+  }
   COLS.forEach(function(k){
     if(!k.f) return;
-    var cuenta = {};
-    DATOS.forEach(function(d){ if(pasa(d, k.c) && d[k.c]!=='') cuenta[d[k.c]] = (cuenta[d[k.c]]||0)+1; });
+    if(document.activeElement === $('f_'+k.c)) return;   /* no se toca la casilla que está usando */
+    var cuenta = cuentas[k.c];
     var vals = Object.keys(cuenta).sort(function(a,b){
       if(k.c==='op') return Number(b)-Number(a) || (a<b?1:-1);
-      return a.localeCompare(b,'es',{numeric:true});
+      return CMP(a,b);
     });
     var el = $('f_'+k.c);
     if(k.f==='sel'){
@@ -1356,35 +1415,47 @@ function leerHash(){
 
 /* ---------- aplicar ---------- */
 function aplicar(){
-  FILTRADAS = DATOS.filter(function(d){ return pasa(d, null); });
   ordenar();
-  actualizarListas();
+  FILTRADAS = DATOS.filter(function(d){ return pasa(d, null); });
   chips();
   escribirHash();
   resumen();
   pintar();
+  listasLuego();
 }
 
-function ordenar(){
-  var c = ORD.c, dir = ORD.dir;
+/* Se ordena la base completa y las filtradas salen ya ordenadas: así no se reordena
+   en cada tecla, solo cuando se cambia la columna de orden. */
+var ordenHecho = '';
+function ordenar(forzar){
+  var c = ORD.c, dir = ORD.dir, clave = c + dir;
+  if(!forzar && ordenHecho === clave) return;
   var num = (c==='op' || c==='pedido');
-  FILTRADAS.sort(function(a,b){
+  DATOS.sort(function(a,b){
     var x = a[c], y = b[c], r;
-    if(num){ r = (Number(x)||0) - (Number(y)||0); if(!r) r = String(x).localeCompare(String(y)); }
-    else r = String(x).localeCompare(String(y),'es',{numeric:true});
+    if(num){ r = (Number(x)||0) - (Number(y)||0); if(!r) r = CMP(String(x),String(y)); }
+    else r = CMP(String(x),String(y));
     if(!r && c!=='op') r = (Number(b.op)||0) - (Number(a.op)||0);
     return r*dir;
   });
+  ordenHecho = clave;
 }
-
-function unicos(lista, c){ var o={}; lista.forEach(function(d){ if(d[c]!=='') o[d[c]]=1; }); return Object.keys(o).length; }
 
 function resumen(){
   var total = DATOS.length, n = FILTRADAS.length;
   var hayFiltro = Object.keys(F).some(function(c){ return F[c]; });
-  var ops = unicos(FILTRADAS,'op'), grupos = unicos(FILTRADAS,'grupo'), estilos = unicos(FILTRADAS,'estilo'), pos = unicos(FILTRADAS,'po');
-  var sumaPed = 0, conPed = 0;
-  FILTRADAS.forEach(function(d){ if(d.pedido!=null && isFinite(d.pedido)){ sumaPed += d.pedido; conPed++; } });
+  /* Una sola vuelta a las filas: antes se recorrían cinco veces. */
+  var vOp = {}, vGr = {}, vEs = {}, vPo = {}, sumaPed = 0, conPed = 0;
+  for(var i=0;i<n;i++){
+    var d = FILTRADAS[i];
+    if(d.op!=='') vOp[d.op]=1;
+    if(d.grupo!=='') vGr[d.grupo]=1;
+    if(d.estilo!=='') vEs[d.estilo]=1;
+    if(d.po!=='') vPo[d.po]=1;
+    if(d.pedido!=null && isFinite(d.pedido)){ sumaPed += d.pedido; conPed++; }
+  }
+  var ops = Object.keys(vOp).length, grupos = Object.keys(vGr).length,
+      estilos = Object.keys(vEs).length, pos = Object.keys(vPo).length;
 
   var v = $('verdict'); v.style.display='flex';
   v.className = 'verdict ' + (n ? (hayFiltro ? 'ok' : '') : 'bad');
@@ -1416,40 +1487,89 @@ function celda(k, d){
   return '<td class="'+cls+'" data-l="'+esc(k.t)+'">'+txt+'</td>';
 }
 
+/* La tabla se arma por tandas: antes, una búsqueda que traía miles de filas las
+   dibujaba todas de golpe y el celular se quedaba colgado. Siguen estando todas:
+   se van agregando solas al bajar. */
+var TANDA = 0, DIBUJADAS = 0, TOPE = 0, mirador = null;
+var AUTO_TOPE = 1000;      /* hasta aquí se agregan solas al bajar; de ahí en más, con el botón */
+var TANDA_BOTON = 1000;    /* lo que agrega el botón, que es una decisión de la persona */
+function tandaFilas(){ return (window.innerWidth <= 600) ? 120 : 300; }
+function filasHTML(desde, hasta){
+  var h = '';
+  for(var i=desde;i<hasta;i++){
+    var d = FILTRADAS[i];
+    h += '<tr>';
+    for(var j=0;j<COLS.length;j++) h += celda(COLS[j], d);
+    h += '</tr>';
+  }
+  return h;
+}
 function pintar(){
+  if(mirador){ try{ mirador.disconnect(); }catch(e){} mirador = null; }
   if(!FILTRADAS.length){ $('tabla').innerHTML=''; $('mas').innerHTML=''; $('panel').style.display='none'; return; }
   $('panel').style.display='';
+  /* Regla 500: sin filtros se dibujan solo 500 filas; con cualquier filtro, todas. */
+  var sinFiltro = !Object.keys(F).some(function(c){ return F[c]; });
+  TOPE = sinFiltro ? Math.min(500, FILTRADAS.length) : FILTRADAS.length;
+  TANDA = tandaFilas();
+  DIBUJADAS = Math.min(TANDA, TOPE);
+
   var h = '<table><thead><tr>';
   COLS.forEach(function(k){
     var marca = ORD.c===k.c ? (ORD.dir>0?' ▲':' ▼') : '';
     h += '<th data-c="'+k.c+'" class="'+(k.num?'num ':'')+(ORD.c===k.c?'ord':'')+'" title="Ordenar">'+esc(k.t)+marca+'</th>';
   });
-  h += '</tr></thead><tbody>';
-  /* Regla 500 (12/10/2026): sin filtros se dibujan solo 500 filas; con cualquier filtro, todas. */
-  var sinFiltro = !Object.keys(F).some(function(c){ return F[c]; });
-  var hasta = sinFiltro ? Math.min(500, FILTRADAS.length) : FILTRADAS.length;
-  for(var i=0;i<hasta;i++){
-    var d = FILTRADAS[i];
-    h += '<tr>'; COLS.forEach(function(k){ h += celda(k,d); }); h += '</tr>';
-  }
-  h += '</tbody></table>';
+  h += '</tr></thead><tbody>' + filasHTML(0, DIBUJADAS) + '</tbody></table>';
   $('tabla').innerHTML = h;
-
-  [].forEach.call($('tabla').querySelectorAll('th'), function(th){
-    th.onclick = function(){
-      var c = th.dataset.c;
-      if(ORD.c===c) ORD.dir = -ORD.dir; else { ORD.c = c; ORD.dir = (c==='op'||c==='pedido'||c==='fecha') ? -1 : 1; }
-      ordenar(); pintar();
-    };
-  });
-  [].forEach.call($('tabla').querySelectorAll('.v'), function(s){
-    s.onclick = function(){ fijar(s.dataset.c, s.dataset.v); };
-  });
-
-  $('mas').innerHTML = FILTRADAS.length > hasta
-    ? '<div class="lsTope500">Se muestran '+((ORD.c==='fecha'&&ORD.dir===-1)?'los 500 registros más recientes':'500 registros')+' de '+FILTRADAS.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>'
-    : '';
+  /* Al cambiar lo que se ve, se vuelve arriba: si no, quedarse abajo hace que la
+     tabla se siga estirando sola. */
+  try{ if(window.pageYOffset > 10) window.scrollTo(0,0); }catch(e){}
+  pieTabla();
 }
+function pintarMas(grande){
+  if(DIBUJADAS >= TOPE) return;
+  var tb = $('tabla').querySelector('tbody'); if(!tb) return;
+  var hasta = Math.min(DIBUJADAS + (grande ? TANDA_BOTON : TANDA), TOPE);
+  tb.insertAdjacentHTML('beforeend', filasHTML(DIBUJADAS, hasta));
+  DIBUJADAS = hasta;
+  pieTabla();
+}
+function pieTabla(){
+  var h = '';
+  if(DIBUJADAS < TOPE){
+    h = (DIBUJADAS < AUTO_TOPE ? '<div id="masSensor"></div>' : '')
+      + '<button class="btn" type="button" id="btnMas">Mostrar más ('
+      + (TOPE - DIBUJADAS).toLocaleString('es-PE') + ')</button>';
+  } else if(FILTRADAS.length > TOPE){
+    h = '<div class="lsTope500">Se muestran '+((ORD.c==='fecha'&&ORD.dir===-1)?'los 500 registros más recientes':'500 registros')
+      + ' de '+FILTRADAS.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>';
+  }
+  $('mas').innerHTML = h;
+  var b = $('btnMas'); if(b) b.onclick = function(){ pintarMas(true); };
+  if(mirador){ try{ mirador.disconnect(); }catch(e){} mirador = null; }
+  var s = $('masSensor');
+  if(s && window.IntersectionObserver){
+    mirador = new IntersectionObserver(function(ent){
+      if(ent[0] && ent[0].isIntersecting) pintarMas(false);
+    }, {rootMargin:'800px'});
+    mirador.observe(s);
+  }
+}
+/* Un solo escuchador para toda la tabla: antes se colgaba uno por cada valor
+   dibujado (decenas de miles con una búsqueda amplia). */
+$('tabla').addEventListener('click', function(ev){
+  var th = ev.target.closest ? ev.target.closest('th[data-c]') : null;
+  if(th){
+    var c = th.getAttribute('data-c');
+    if(ORD.c===c) ORD.dir = -ORD.dir; else { ORD.c = c; ORD.dir = (c==='op'||c==='pedido'||c==='fecha') ? -1 : 1; }
+    ordenar(true);
+    FILTRADAS = DATOS.filter(function(d){ return pasa(d, null); });
+    pintar();
+    return;
+  }
+  var s = ev.target.closest ? ev.target.closest('span.v') : null;
+  if(s) fijar(s.getAttribute('data-c'), s.getAttribute('data-v'));
+});
 
 /* ---------- Excel: exactamente lo filtrado ---------- */
 function descripcionFiltros(){

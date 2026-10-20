@@ -832,15 +832,14 @@ var DEF = {
       ['SAL1_FIN','FIN SALIDA COSTURA',1,'fec'],
       ['SAL2_INI','INIC SALIDA COSTURA',2,'fec'],
       ['SAL2_FIN','FIN SALIDA COSTURA',2,'fec'],
-      ['AVIOS','AVIOS',1,'txt'],
-      ['HILOS','HILOS',1,'txt'],
-      ['ETIQ','ETIQ',1,'txt']
+      ['AVIOS','AVIOS',1,'txt',true],
+      ['OBSERVACION','OBSERVACIONES',1,'txt',true]
     ],
     colTaller: 'TALLER',
     orden: ['RESPONSABLE','TALLER','SERVICIO','CLIENTE','GRUPO','ESTILO','OP','COLOR','REQ',
             'INICIO_CORTE','FIN_CORTE','CUOT_DIA','SAL1_INI','SAL1_FIN','SAL2_INI','SAL2_FIN',
-            'AVIOS','HILOS','ETIQ'],
-    prev: ['RESPONSABLE','TALLER','SERVICIO','CLIENTE','GRUPO','ESTILO','OP','COLOR','REQ','INICIO_CORTE','SAL2_INI','SAL2_FIN','AVIOS']
+            'AVIOS','OBSERVACION'],
+    prev: ['RESPONSABLE','TALLER','SERVICIO','CLIENTE','GRUPO','ESTILO','OP','COLOR','REQ','INICIO_CORTE','SAL2_INI','SAL2_FIN','AVIOS','OBSERVACION']
   },
   ACABADO: {
     hoja: 'SERVICIOS',
@@ -854,14 +853,14 @@ var DEF = {
       ['COLOR','COLOR',1,'txt'],
       ['DESTINO','DESTINO',1,'txt'],
       ['REQ','REQ',1,'num'],
-      ['AVIOS','AVIOS',1,'txt'],
+      ['AVIOS','AVIOS',1,'txt',true],
       ['INI_ABAST','INICIO DE ABAST',1,'fec'],
       ['FIN_ABAST','FIN DE ABAST',1,'fec'],
       ['CUOT_DIA','CUOT/DIA',1,'num'],
       ['INI_SALIDA','INICIO DE SALIDA',1,'fec'],
       ['FIN_SALIDA','FIN DE SALIDA',1,'fec'],
-      ['OBSERVACION','OBSERVACION',1,'txt'],
-      ['AVIOS_PEND','AVIOS PENDIENTES',1,'txt']
+      ['OBSERVACION','OBSERVACION',1,'txt',true],
+      ['AVIOS_PEND','AVIOS PENDIENTES',1,'txt',true]
     ],
     colTaller: 'PROVEEDOR',
     orden: ['PROVEEDOR','RESPONSABLE','CLIENTE','FECHA_DESPACHO','GRUPO','ESTILO','OP','PO',
@@ -958,10 +957,17 @@ function leerPrograma(wb, tipo){
     vistos[k] = (vistos[k] || 0) + 1;
     idx[k + '#' + vistos[k]] = c2;
   }
-  var mapa = {}, faltan = [];
+  /* Las columnas marcadas como opcionales (quinto dato en true) NO detienen la publicacion:
+     si PCP las quita, el programa entra igual con ese dato vacio y se avisa en pantalla.
+     Las columnas clave (taller, grupo, estilo, OP, color, cantidad, fechas) si detienen:
+     sin ellas el programa no sirve para programar auditorias. */
+  var mapa = {}, faltan = [], faltanOpc = [];
   for(var i = 0; i < def.campos.length; i++){
     var cp = def.campos[i], clave = cp[1] + '#' + cp[2];
-    if(idx[clave] === undefined) faltan.push(cp[1] + (cp[2] > 1 ? ' (2da vez)' : ''));
+    var nomCol = cp[1] + (cp[2] > 1 ? ' (2da vez)' : '');
+    if(idx[clave] === undefined){
+      if(cp[4]) faltanOpc.push(nomCol); else faltan.push(nomCol);
+    }
     else mapa[cp[0]] = {col: idx[clave], tipo: cp[3]};
   }
   if(faltan.length) throw new Error('En la pestaña ' + def.hoja + ' faltan estas columnas: ' + faltan.join(', ') +
@@ -1037,7 +1043,7 @@ function leerPrograma(wb, tipo){
 
   return {
     tipo: tipo, filas: filas, errores: errores, sinResponsable: sinResponsable,
-    fechaArchivo: fechaArchivo, hoja: def.hoja
+    opcionales: faltanOpc, fechaArchivo: fechaArchivo, hoja: def.hoja
   };
 }
 
@@ -1263,6 +1269,11 @@ function pintarResumen(tipo){
   if(out.fechaSospechosa){
     avisos.push(['', 'El encabezado del Excel trae la fecha ' + isoADMY(out.fechaSospechosa),
       'Está lejos de hoy, así que no se usó. Confirma abajo la fecha real del programa.']);
+  }
+  if(out.opcionales && out.opcionales.length){
+    avisos.push(['', 'Este Excel ya no trae la columna ' + out.opcionales.join(', '),
+      'No detiene la publicación: ese dato entra vacío. Si PCP la quitó a propósito está bien; ' +
+      'si no, conviene avisarle.']);
   }
   if(out.sinResponsable){
     avisos.push(['', out.sinResponsable + ' filas sin título de bloque',

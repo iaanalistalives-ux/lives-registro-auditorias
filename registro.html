@@ -2613,22 +2613,20 @@ function buscarLote(){
         : '<b>Este lote tiene un rechazo registrado con la PO o el destino escritos distinto.</b>')+
       '<div class="decid">'+
         (pend.length
-          ? ('<div class="pendTit">Hay '+pend.length+' rechazo(s) pendiente(s) de reproceso. '+
-             '¿Esta auditoría es el reproceso de alguno?</div>'+
+          ? ('<div class="pendTit">¿Es un reproceso? Hay '+pend.length+' rechazo(s) de este lote esperando reproceso:</div>'+
              pend.map(function(x,i){
-               return '<button type="button" class="mini rep" data-rep="'+i+'">Reproceso de la del '+
+               return '<button type="button" class="mini rep" data-rep="'+i+'">Sí, es el reproceso del rechazo del '+
                  esc(x.fecha)+(x.auditor?(' · '+esc(x.auditor)):'')+
                  (x.defectuosas?(' · '+x.defectuosas+' def.'):'')+
                  (x.lote?(' · lote '+x.lote):'')+
                  (x.otraPO?(' · ⚠ PO/destino escritos distinto: '+esc(x.po||'')+(x.destino?(' · '+esc(x.destino)):'')):'')+
                  '</button>';
              }).join('')+
-             '<button type="button" class="mini" id="btnNoRea">No, es otra tanda del pedido</button>')
-          : ('<span class="pendTit">Ningún rechazo está pendiente de reproceso. '+
-             'Esta sería la <b>'+(r.siguienteParcial||1)+'.ª tanda</b> del pedido.</span>'+
-             '<button type="button" class="mini" id="btnNoRea">Continuar</button>'))+
+             '<button type="button" class="mini" id="btnNoRea">No, es una auditoría nueva</button>')
+          : ('<span class="pendTit">No hay rechazos de este lote esperando reproceso.</span>'+
+             '<button type="button" class="mini" id="btnNoRea">Seguir: es una auditoría nueva</button>'))+
         '<div id="otrosRech"></div>'+
-        '<button type="button" class="mini" id="btnRepSuelto">Es reproceso de un papel cuyo rechazo nunca se registró</button>'+
+        '<button type="button" class="mini" id="btnRepSuelto">Es reproceso, pero su rechazo no está registrado</button>'+
         '<span id="decMsg"></span></div>';
     p.classList.add('on');
     PEND_ACT = pend;
@@ -2653,16 +2651,23 @@ function ofrecerOtrosRechazos(pend){
   var ya={}; (pend||[]).forEach(function(x){ ya[String(x.id)]=true; });
   jsonp({accion:'buscaraud', tipo:t, grupo:g, estilo:e, color:c, resultado:'RECHAZADO', n:30}, function(r){
     if(!r || !r.ok) return;
+    /* Mismo grupo y estilo; el color igual va primero, pero un color escrito distinto
+       ya no deja a la digitadora sin su rechazo. */
     var otros=(r.filas||[]).filter(function(x){
-      return !ya[String(x.id)] && U(x.grupo)===g && U(x.estilo)===e && (!c || U(x.color)===c);
+      return !ya[String(x.id)] && U(x.grupo)===g && U(x.estilo)===e;
     });
+    otros.sort(function(a,b){
+      var ca=(!c || U(a.color)===c)?0:1, cb=(!c || U(b.color)===c)?0:1;
+      return ca-cb;
+    });
+    otros=otros.slice(0,8);
     if(!otros.length){ box.innerHTML=''; return; }
     OTROS_RECH=otros;
-    box.innerHTML='<div class="pendTit" style="margin-top:8px">¿El rechazo que estás reprocesando no está arriba? '+
-      'Estos son todos los rechazos de '+esc(g)+' · '+esc(e)+(c?(' · '+esc(c)):'')+' — toca el tuyo:</div>'+
+    box.innerHTML='<div class="pendTit" style="margin-top:8px">¿Es el reproceso de otro rechazo de '+esc(g)+' · '+esc(e)+'? Toca el suyo:</div>'+
       otros.map(function(x,i){
-        return '<button type="button" class="mini rep" data-otro="'+i+'">Reproceso de la del '+esc(x.fecha)+
+        return '<button type="button" class="mini rep" data-otro="'+i+'">Sí, es el reproceso del rechazo del '+esc(x.fecha)+
           (x.auditor?(' · '+esc(x.auditor)):'')+
+          (x.color?(' · '+esc(x.color)):'')+
           (x.servicio?(' · '+esc(x.servicio)):'')+
           (x.lote?(' · lote '+x.lote):'')+
           (x.defectuosas?(' · '+x.defectuosas+' def.'):'')+

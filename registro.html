@@ -2613,10 +2613,10 @@ function buscarLote(){
         : '<b>Este lote tiene un rechazo registrado con la PO o el destino escritos distinto.</b>')+
       '<div class="decid">'+
         (pend.length
-          ? ('<div class="pendTit">Hay '+pend.length+' rechazo(s) sin corregir. '+
-             '¿Esta auditoría corrige alguno?</div>'+
+          ? ('<div class="pendTit">Hay '+pend.length+' rechazo(s) pendiente(s) de reproceso. '+
+             '¿Esta auditoría es el reproceso de alguno?</div>'+
              pend.map(function(x,i){
-               return '<button type="button" class="mini rep" data-rep="'+i+'">Corrige la del '+
+               return '<button type="button" class="mini rep" data-rep="'+i+'">Reproceso de la del '+
                  esc(x.fecha)+(x.auditor?(' · '+esc(x.auditor)):'')+
                  (x.defectuosas?(' · '+x.defectuosas+' def.'):'')+
                  (x.lote?(' · lote '+x.lote):'')+
@@ -2624,7 +2624,7 @@ function buscarLote(){
                  '</button>';
              }).join('')+
              '<button type="button" class="mini" id="btnNoRea">No, es otra tanda del pedido</button>')
-          : ('<span class="pendTit">Ninguna quedó sin corregir. '+
+          : ('<span class="pendTit">Ningún rechazo está pendiente de reproceso. '+
              'Esta sería la <b>'+(r.siguienteParcial||1)+'.ª tanda</b> del pedido.</span>'+
              '<button type="button" class="mini" id="btnNoRea">Continuar</button>'))+
         '<div id="otrosRech"></div>'+
@@ -2658,10 +2658,10 @@ function ofrecerOtrosRechazos(pend){
     });
     if(!otros.length){ box.innerHTML=''; return; }
     OTROS_RECH=otros;
-    box.innerHTML='<div class="pendTit" style="margin-top:8px">¿El rechazo que corriges no está arriba? '+
+    box.innerHTML='<div class="pendTit" style="margin-top:8px">¿El rechazo que estás reprocesando no está arriba? '+
       'Estos son todos los rechazos de '+esc(g)+' · '+esc(e)+(c?(' · '+esc(c)):'')+' — toca el tuyo:</div>'+
       otros.map(function(x,i){
-        return '<button type="button" class="mini rep" data-otro="'+i+'">Corrige la del '+esc(x.fecha)+
+        return '<button type="button" class="mini rep" data-otro="'+i+'">Reproceso de la del '+esc(x.fecha)+
           (x.auditor?(' · '+esc(x.auditor)):'')+
           (x.servicio?(' · '+esc(x.servicio)):'')+
           (x.lote?(' · lote '+x.lote):'')+
@@ -2709,7 +2709,7 @@ var PEND_ACT=[], reprocesaDe='', motivoRep='';
 /* Reprocesar un rechazo concreto: queda el vínculo, no una casilla suelta. */
 function elegirReproceso(x){
   if(!x) return;
-  var m=prompt('¿Por qué se reprocesó?\n\nCorrige la auditoría del '+x.fecha+
+  var m=prompt('¿Por qué se reprocesó?\n\nReproceso de la auditoría del '+x.fecha+
                (x.auditor?(' ('+x.auditor+')'):'')+'.');
   if(m===null) return;
   if(!T(m)){ $('decMsg').innerHTML='<b style="color:#DC2626">Falta el motivo.</b>'; return; }
@@ -3187,7 +3187,7 @@ function validar(){
      exigirlas impediría digitar los papeles atrasados. Así la regla deja de
      depender de que alguien se acuerde. */
   if(prevLote && (prevLote.existe || (prevLote.rechazosOtraPO||[]).length) && !esReaud)
-    return 'Ese lote ya tiene auditorías o un rechazo sin corregir: indica arriba si esta es re-auditoría o una auditoría distinta.';
+    return 'Ese lote ya tiene auditorías o un rechazo pendiente de reproceso: indica arriba si esta es re-auditoría o una auditoría distinta.';
   if(totalDef()>N($('muestra').value)) return 'Hay más prendas defectuosas que la muestra.';
   for(var i=0;i<defs.length;i++) if(defs[i].cantidad<=0) return 'Hay un defecto con cantidad en cero.';
   return '';

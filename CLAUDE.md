@@ -11,6 +11,7 @@ Calidad Manufactura registra aquí sus auditorías. Además, este repo mantiene 
 - `catalogos.html` — **mantenimiento** de las listas: personal, talleres, destinos, clientes, líneas y defectos.
 - `ops.html` — **carga** del Excel de OPs exportado del sistema de producción (columnas `Cod_GrupoPro`, `Est_Prop`, `OP`, `fec_creacion_op`…). Reemplaza entera la tabla `ops`. Si faltan OPs que hoy están en la base, pide confirmación.
 - `consulta-ops.html` — **consulta** "Base de OPs", con Excel.
+- `partidas.html` — **carga** de la base de partidas (desde el 23/10/2026): primera pestaña del Excel "Partidas" del sistema ("Desagrupado por OP y OC"). Columnas con los nombres de la fila 1 (PARTIDA, CODIGO DE TELA, NOMBRE DE TELA, CODIGO DE COLOR, NOMBRE DE COLOR, GRUPO, PESO PROGRAMADO, OP, OC); acepta también los del sistema de la fila 2 (`cod_ordprov`, `cod_tela`, `des_tela`, `cod_color`, `des_color`, `cod_grupotex`, `Peso_Progr`, `OP`, `Orden_Corte`) y salta esa segunda fila si viene. Reemplaza entera la tabla `partidas`; si faltan partidas que hoy están en la base, pide confirmación. Sirve para cruzar con otras bases por OP (el grupo es el textil y puede no ser el de la OP, ej. `RES-THY`).
 - `prendas-por-pedido.html` — **análisis** de prendas promedio por pedido según cliente, tipo de pedido, grupo, estilo, etc. Tiene Excel.
 - `programas/subir.html` — **carga** de los programas de PCP:
   - Costura: archivo .xlsm, pestaña DESTINO.
@@ -30,6 +31,7 @@ Calidad Manufactura registra aquí sus auditorías. Además, este repo mantiene 
   - `ops.html` usa `sync_ops_reemplazar`, que reemplaza la tabla `ops`.
   - Las consultas leen `publico_ref_ops` y la fecha de la última copia en `publico_estado_copia` (de `sync_estado`).
   - La tabla `ops` la usan también Auditoría Final, Captura de Auditorías de Taller y otras.
+- Partidas: `partidas.html` usa `sync_partidas_reemplazar` (security definer, carga libre para pruebas firmando con el nombre; supervisión no guarda), que reemplaza la tabla `partidas` y anota la carga en `sync_estado` (fila `partidas`). Lectura libre. Registro: `BD02 base de partidas`.
 - Programas:
   - `prog_validar_ops` y `prog_publicar` escriben en `programas_filas`, `programas_filas_ant`, `programas_cols`, `programas_publicaciones` y `sync_estado`.
   - Las consultas leen las vistas `publico_programas` y `publico_programas_estado`.
@@ -40,6 +42,7 @@ Según las entradas por el portal de los últimos 30 días al 21/10/2026: 13 per
 
 ## Quién puede guardar
 - Catálogos y carga de OPs: solo el área de Datos e IA (`es_superusuario()` en la base).
+- Carga de partidas: libre mientras se prueba (cualquiera, escribiendo su nombre). En SQL Server, Sistemas exige usuario.
 - Publicar programas: lo decide la función de permiso `prog_puede_subir`, con la tabla `permisos`.
 - Registrar auditorías: la OP tiene que existir en la base y la auditora tiene que estar en el catálogo de personal.
 - A Sistemas: `prog_puede_subir` y `es_superusuario` son las piezas que reemplazan con su seguridad, junto con su control de roles (ver o registrar).

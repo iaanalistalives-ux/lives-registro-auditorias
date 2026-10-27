@@ -698,8 +698,8 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 <div class="wrap">
 
   <div class="aviso">
-    <b>Esta tabla se reemplaza entera cada vez.</b> No se acumula: lo que subas pasa a ser
-    la única lista de órdenes de producción. Es una foto del sistema, no un histórico.
+    <b>Las OPs que vienen en el archivo se reemplazan; las que no vienen se mantienen.</b> Una OP que ya estaba en la base nunca se borra por no venir en el Excel. Lo que subas pasa a ser
+    la versión vigente de esas OPs.
     Las auditorías ya guardadas no se tocan. Destino: tabla <b>ops</b>, directo en Supabase
     (ya no en el Sheet). Si la carga se corta a la mitad, la tabla queda como estaba: el
     reemplazo ocurre entero o no ocurre — nunca a medias.
@@ -712,7 +712,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
       por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
       (<i>Cod_GrupoPro, Est_Prop, des_present, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
       Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.
-      La fecha de creaci&oacute;n es obligatoria: la tabla se reemplaza entera, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas.</div>
+      La fecha de creaci&oacute;n es obligatoria: las OPs que vienen en el archivo se reemplazan, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas de esas OPs.</div>
 
     <div class="drop" id="zona">
       <div class="ic">📄</div>
@@ -901,8 +901,8 @@ function mostrar(nombre, hojaUsada){
 function subir(){
   if(!T($('usuario').value)){
     $('msgSube').className='hint err'; $('msgSube').textContent='Escribe tu nombre.'; return; }
-  if(!confirm('Se va a reemplazar la tabla completa por estas '+FILAS.length+' filas.\n\n'+
-              'Lo que había antes se pierde. ¿Continuar?')) return;
+  if(!confirm('Se van a cargar estas '+FILAS.length+' filas.\n\n'+
+              'Las OPs que vienen en el archivo se reemplazan; las que no vienen se mantienen. ¿Continuar?')) return;
 
   $('btnSubir').disabled=true;
   $('barra').className='barra on';

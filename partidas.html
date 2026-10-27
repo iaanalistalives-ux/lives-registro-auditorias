@@ -887,8 +887,8 @@ function mostrar(nombre, hoja, salto, filtradas){
 function subir(){
   if(!T($('usuario').value)){
     $('msgSube').className='hint err'; $('msgSube').textContent='Escribe tu nombre.'; return; }
-  if(!confirm('Se va a reemplazar la tabla de partidas completa por estas '+FILAS.length+' filas.\n\n'+
-              'Lo que había antes se pierde. ¿Continuar?')) return;
+  if(!confirm('Se van a cargar estas '+FILAS.length+' filas.\n\n'+
+              'Las partidas que vienen en el archivo se reemplazan; las que no vienen se mantienen. ¿Continuar?')) return;
   $('btnSubir').disabled=true;
   $('barra').className='barra on';
   $('msgSube').className='hint';

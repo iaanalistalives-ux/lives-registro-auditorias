@@ -972,12 +972,15 @@ function subirDeUnaVez(forzar){
 function terminarCarga(r){
   $('barraI').style.width='100%';
   var t=(r&&r.total)||FILAS.length;
-  $('msgSube').className = (t===FILAS.length) ? 'hint ok' : 'hint err';
-  $('msgSube').textContent = (t===FILAS.length)
-    ? ('Listo. La tabla quedó con '+t.toLocaleString('es-PE')+' filas.')
+  var c=(r&&r.cargadas!=null)?r.cargadas:FILAS.length;
+  var m=(r&&r.mantenidas)||0;
+  var bien=(c===FILAS.length);
+  $('msgSube').className = bien ? 'hint ok' : 'hint err';
+  $('msgSube').textContent = bien
+    ? ('Listo. Se cargaron '+c.toLocaleString('es-PE')+' filas del archivo. La tabla tiene '+t.toLocaleString('es-PE')+' filas en total'+
+       (m?(' (incluye '+m.toLocaleString('es-PE')+' OP(s) que el archivo no traía y se mantuvieron).'):'.'))
     : ('Atención: se leyeron '+FILAS.length.toLocaleString('es-PE')+
-       ' filas pero la tabla quedó con '+t.toLocaleString('es-PE')+
-       '. Vuelve a subir el archivo.');
+       ' filas pero se cargaron '+c.toLocaleString('es-PE')+'. Vuelve a subir el archivo.');
   $('pill').className='pill ok';
   $('pill').textContent=t+' filas cargadas';
   $('btnSubir').disabled=false;

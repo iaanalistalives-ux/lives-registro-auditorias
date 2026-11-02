@@ -1088,6 +1088,7 @@ var PAGINA = 200;
 /* Columnas de la tabla, en orden. f = filtro propio en la barra. */
 var COLS = [
   {c:'op',        t:'OP',            f:'op'},
+  {c:'cotizacion',t:'Cotización',    f:'txt'},
   {c:'fecha',     t:'Fecha creación',f:null, fecha:true},
   {c:'cliente',   t:'Cliente',       f:'sel'},
   {c:'grupo',     t:'Grupo',         f:'txt'},
@@ -1146,7 +1147,7 @@ function traer(url){
 function cargarTodo(conFecha){
   var tam = 1000, ALA_VEZ = 4, filas = [];
   function url(off){
-    return SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido' + (conFecha ? ',fecha_creacion' : '')
+    return SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,desc_tela,destino,pedido,cotizacion' + (conFecha ? ',fecha_creacion' : '')
       + '&order=op.desc,grupo.asc,estilo.asc,color.asc,po.asc,destino.asc,cod_tela.asc,pedido.asc'
       + '&limit=' + tam + '&offset=' + off;
   }
@@ -1194,7 +1195,7 @@ function iniciar(){
       var g = norm(r.grupo);
       var fe = r.fecha_creacion ? String(r.fecha_creacion).slice(0,10) : '';
       return {
-        op: norm(r.op), grupo: g, estilo: norm(r.estilo), e_cliente: norm(r.e_cliente),
+        op: norm(r.op), cotizacion: norm(r.cotizacion), grupo: g, estilo: norm(r.estilo), e_cliente: norm(r.e_cliente),
         color: norm(r.color), po: norm(r.po), cod_tela: norm(r.cod_tela),
         desc_tela: String(r.desc_tela==null?'':r.desc_tela).trim(),
         destino: norm(r.destino), pedido: (r.pedido===null||r.pedido===''||r.pedido===undefined)?null:Number(r.pedido),
@@ -1288,7 +1289,7 @@ function pasaUno(d, c){
   if(c==='q'){
     /* Se arma a la primera búsqueda: hacerlo al cargar costaba una vuelta entera a la base. */
     if(d._todo === undefined)
-      d._todo = [d.op,fTxt(d.fecha),d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
+      d._todo = [d.op,d.cotizacion,fTxt(d.fecha),d.grupo,d.estilo,d.e_cliente,d.color,d.po,d.cod_tela,d.desc_tela.toUpperCase(),d.destino,d.cliente].join(' | ');
     var partes = v.split(/\s+/);
     for(var i=0;i<partes.length;i++) if(d._todo.indexOf(partes[i])<0) return false;
     return true;

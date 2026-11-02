@@ -708,9 +708,9 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
   <div class="card">
     <h2>1 · Elige el archivo</h2>
     <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
-      COLOR · OP · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
+      COLOR · OP · COTIZACIÓN · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
       por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
-      (<i>Cod_GrupoPro, Est_Prop, des_present, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
+      (<i>Cod_GrupoPro, Est_Prop, Cotizacion, des_present, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
       Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.
       La fecha de creaci&oacute;n es obligatoria: las OPs que vienen en el archivo se reemplazan, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas de esas OPs.</div>
 
@@ -731,7 +731,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
     <div class="tbl">
       <table>
-        <thead><tr><th>OP</th><th>F. creación</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
+        <thead><tr><th>OP</th><th>Cotiz.</th><th>F. creación</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
           <th>PO</th><th>Cód. tela</th><th>Destino</th><th>Pedido</th></tr></thead>
         <tbody id="prev"></tbody>
       </table>
@@ -789,6 +789,7 @@ var COLS = {
   destino:['DESTINO','CODDESTINO','CODIGODESTINO','DESTINOFINAL'],
   pedido:['PEDIDO','REQUERIDAS','REQUERIDA','CANTREQUERIDA','CANTIDADREQUERIDA','CANTIDAD','CANT'],
   fechaCreacion:['FECHACREACION','FECCREACIONOP','FECHACREACIONOP','FECCREACION','FECHADECREACION','FECHADECREACIONOP','FECCREAOP','FECHAOP'],
+  cotizacion:['COTIZACION','COTIZ','NUMCOTIZACION','NROCOTIZACION','CODCOTIZACION'],
   eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI']
 };
 
@@ -845,7 +846,7 @@ function leerArchivo(file){
 
       FILAS = crudo.map(function(r){
         return { op:U(r[mapa.op]), grupo:U(r[mapa.grupo]), estilo:U(r[mapa.estilo]),
-                 eCliente:U(r[mapa.eCliente]),
+                 eCliente:U(r[mapa.eCliente]), cotizacion:U(r[mapa.cotizacion]),
                  color:U(r[mapa.color]), po:U(r[mapa.po]), codTela:U(r[mapa.codTela]),
                  descTela:T(r[mapa.descTela]), destino:U(r[mapa.destino]),
                  pedido:num(r[mapa.pedido]),
@@ -887,7 +888,7 @@ function mostrar(nombre, hojaUsada){
     (sinFecha?('<div class="kpi bad"><div class="v">'+sinFecha+'</div><div class="l">Sin fecha de creación legible</div></div>'):'');
 
   $('prev').innerHTML=FILAS.slice(0,60).map(function(f){
-    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
+    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.cotizacion)+'</td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
       '<td>'+esc(f.eCliente)+'</td><td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td>'+
       '<td>'+esc(f.codTela)+'</td><td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
   }).join('');
@@ -955,7 +956,7 @@ function subirDeUnaVez(forzar){
   var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
   var filas = FILAS.map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente,f.fechaCreacion||null];
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente,f.fechaCreacion||null,f.cotizacion];
   });
   return fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_ops_reemplazar', {
     method:'POST', headers:{'Content-Type':'application/json'},

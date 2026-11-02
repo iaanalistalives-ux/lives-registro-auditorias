@@ -1200,6 +1200,7 @@ var DIMS = [
   {c:'estilo',    t:'Estilo',         pl:'estilos'},
   {c:'e_cliente', t:'Estilo cliente', pl:'estilos cliente'},
   {c:'op',        t:'OP',             pl:'OPs'},
+  {c:'cotizacion',t:'Cotización',     pl:'cotizaciones'},
   {c:'po',        t:'PO',             pl:'POs'},
   {c:'color',     t:'Color',          pl:'colores'},
   {c:'cod_tela',  t:'Tela (código)',  pl:'telas'}
@@ -1261,11 +1262,11 @@ function norm(s){ return String(s==null?'':s).trim().toUpperCase(); }
 function n0(v){ return Number(v||0).toLocaleString('es-PE',{maximumFractionDigits:0}); }
 function n1(v){ return Number(v||0).toLocaleString('es-PE',{minimumFractionDigits:0,maximumFractionDigits:1}); }
 function p1(v){ return Number(v||0).toLocaleString('es-PE',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'; }
-var REALES = ['cliente','tipo','grupo','estilo','e_cliente','op','po','color','cod_tela'];
+var REALES = ['cliente','tipo','grupo','estilo','e_cliente','op','cotizacion','po','color','cod_tela'];
 var TODOS = function(){ return ST.dim==='todos'; };
 function dimT(c){ return DIMS.filter(function(d){return d.c===c;})[0].t; }
 function minus(s){ return /^(OP|PO)s?$/.test(s) ? s : s.toLowerCase(); }
-function fem(){ return ST.dim==='op' || ST.dim==='po' || ST.dim==='todos'; }
+function fem(){ return ST.dim==='op' || ST.dim==='cotizacion' || ST.dim==='po' || ST.dim==='todos'; }
 function dimP(c){ return DIMS.filter(function(d){return d.c===c;})[0].pl; }
 
 Chart.defaults.font.family="Calibri, Arial, sans-serif";
@@ -1316,7 +1317,7 @@ function traer(url){
 function cargarTodo(){
   var tam = 1000, filas = [];
   function pagina(off){
-    var url = SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,pedido,fecha_creacion'
+    var url = SB + '/rest/v1/publico_ref_ops?select=op,grupo,estilo,e_cliente,color,po,cod_tela,pedido,cotizacion,fecha_creacion'
       + '&order=op.desc,grupo.asc,estilo.asc,color.asc,po.asc,cod_tela.asc,pedido.asc'
       + '&limit=' + tam + '&offset=' + off;
     return traer(url).then(function(lote){
@@ -1340,7 +1341,7 @@ function iniciar(){
     DATOS = filas.map(function(r, i){
       var o = {
         i: i,
-        op: norm(r.op), grupo: norm(r.grupo), estilo: norm(r.estilo), e_cliente: norm(r.e_cliente),
+        op: norm(r.op), grupo: norm(r.grupo), estilo: norm(r.estilo), e_cliente: norm(r.e_cliente), cotizacion: norm(r.cotizacion),
         color: norm(r.color), po: norm(r.po), cod_tela: norm(r.cod_tela),
         fecha: r.fecha_creacion ? String(r.fecha_creacion).slice(0,10) : '',
         pedido: (r.pedido===null||r.pedido===''||r.pedido===undefined||!isFinite(Number(r.pedido))) ? null : Number(r.pedido)
@@ -1920,7 +1921,7 @@ $('excel').onclick = function(){
     columnas: (todos
       ? [{campo:'a_cliente',titulo:'Cliente',tipo:'alfanumerico'},{campo:'a_tipo',titulo:'Tipo de pedido',tipo:'texto'},{campo:'a_grupo',titulo:'Grupo',tipo:'alfanumerico'},
          {campo:'a_estilo',titulo:'Estilo',tipo:'alfanumerico'},{campo:'a_e_cliente',titulo:'Estilo cliente',tipo:'alfanumerico'},
-         {campo:'a_op',titulo:'OP',tipo:'alfanumerico'},{campo:'a_po',titulo:'PO',tipo:'alfanumerico'},
+         {campo:'a_op',titulo:'OP',tipo:'alfanumerico'},{campo:'a_cotizacion',titulo:'Cotización',tipo:'alfanumerico'},{campo:'a_po',titulo:'PO',tipo:'alfanumerico'},
          {campo:'a_color',titulo:'Color',tipo:'alfanumerico'},{campo:'a_cod_tela',titulo:'Cód. tela',tipo:'alfanumerico'}]
       : [{campo:'nom', titulo:D, tipo:'alfanumerico'}]).concat([
       {campo:'pedidos', titulo:'Veces pedido', tipo:'entero'},
@@ -2138,7 +2139,7 @@ function renderFicha(){
 function fTabla(){
   if(!FICHA) return;
   var K = FICHA.K, q = norm(FICHA.busca), partes = q ? q.split(/\s+/) : [];
-  var campos = function(o){ return K.dim==='pedido' ? [o.op,o.cliente,o.tipo.toUpperCase(),o.grupo,o.estilo,o.e_cliente,o.po,o.color,o.cod_tela].join(' ') : o.nom; };
+  var campos = function(o){ return K.dim==='pedido' ? [o.op,o.cliente,o.tipo.toUpperCase(),o.grupo,o.estilo,o.e_cliente,o.cotizacion,o.po,o.color,o.cod_tela].join(' ') : o.nom; };
   var lista = FICHA.lista.filter(function(o){ var s = campos(o); return partes.every(function(w){ return s.indexOf(w) >= 0; }); });
   if(!lista.length){ $('fTabla').innerHTML = '<div class="oculto">Nada contiene «' + esc(FICHA.busca) + '».</div>'; $('fMas').innerHTML = ''; return; }
   var hasta = Math.min(FICHA.mostrar, lista.length), h = '<table><thead><tr><th>#</th>';

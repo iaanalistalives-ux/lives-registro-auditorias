@@ -708,9 +708,9 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
   <div class="card">
     <h2>1 · Elige el archivo</h2>
     <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
-      COLOR · OP · COTIZACIÓN · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
+      COMBO (color) · OP · COTIZACIÓN · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
       por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
-      (<i>Cod_GrupoPro, Est_Prop, Cotizacion, des_present, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
+      (<i>Cod_GrupoPro, Est_Prop, Cotizacion, combo, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
       Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.
       La fecha de creaci&oacute;n es obligatoria: las OPs que vienen en el archivo se reemplazan, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas de esas OPs.</div>
 
@@ -775,14 +775,16 @@ function norm(s){
     .replace(/[^A-Z0-9]/g,'');
 }
 /* Alias reales del export del sistema (hoja V5: Cod_GrupoPro, Est_Prop,
-   des_present, cod_tela, desc_tela, cod_destino, Estilo_Cliente, Requeridas).
+   combo, cod_tela, desc_tela, cod_destino, Estilo_Cliente, Requeridas).
    Así el archivo se sube tal como sale del sistema, sin renombrar cabeceras
    a mano. El primer nombre de cada lista es el que se muestra si falta. */
 var COLS = {
   op:['OP','NUMOP','NROOP','CODOP','ORDENDEPRODUCCION','ORDENPRODUCCION'],
   grupo:['GRUPO','CODGRUPOPRO','CODGRUPOPROD','CODGRUPO','GRUPOPRO','GRUPOPROD'],
   estilo:['ESTILOPROPIO','ESTPROP','ESTILOPROP','ESTPROPIO','ESTILO'],
-  color:['COLOR','DESPRESENT','DESPRESENTACION','PRESENTACION','DESCOLOR','COLORES'],
+  /* 04/11/2026: el color de la OP es la columna COMBO (colores reales y actuales).
+     Ya no se acepta des_present / PRESENTACION: un archivo sin COMBO se rechaza. */
+  color:['COMBO','COLORCOMBO','COLOR'],
   po:['PO','NUMPO','NROPO','CODPO'],
   codTela:['CODIGOTELA','CODTELA','CODIGODETELA','CODMATERIAL'],
   descTela:['DESCRIPCIONTELA','DESCTELA','DESCRIPCIONDETELA','DESTELA','TELA'],

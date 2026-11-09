@@ -1205,7 +1205,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
           <select id="bqTipo"><option value="">Todos</option>
             <option value="LINEAS">Líneas</option><option value="SERVINSP">Serv. Inspección</option>
             <option value="EMPAQUE">Empaque</option><option value="CLIENTE">Cliente</option>
-            <option value="FINAL">Final</option></select></div>
+            </select></div>
         <div class="f sm"><label for="bqDesde">Desde</label><input type="date" id="bqDesde"></div>
         <div class="f sm"><label for="bqHasta">Hasta</label><input type="date" id="bqHasta"></div>
         <div class="f"><label for="bqGrupo">Grupo</label><input type="text" id="bqGrupo"></div>
@@ -1388,8 +1388,8 @@ var TIPOS_UI=[
   {v:'LINEAS',   n:'Líneas',            ic:'🧵'},
   {v:'SERVINSP', n:'Serv. Inspección',  ic:'🔍'},
   {v:'EMPAQUE',  n:'Empaque',           ic:'📦'},
-  {v:'CLIENTE',  n:'Cliente',           ic:'👔'},
-  {v:'FINAL',    n:'Final',             ic:'✅'}
+  {v:'CLIENTE',  n:'Cliente',           ic:'👔'}
+  /* 09/11/2026: Final ya no se registra aquí; se registra en el sistema de LIVES (Sistemas). */
 ];
 /* 06/10: MODO DE UN SOLO TIPO.
    registro.html sigue igual (Athina elige el tipo arriba). Cada tipo tiene además su
@@ -1401,7 +1401,7 @@ var TIPOS_UI=[
 var TIPO_FIJO = (function(){
   try{
     var t=(new URLSearchParams(location.search).get('tipo')||'').toUpperCase().trim();
-    return ['LINEAS','SERVINSP','EMPAQUE','CLIENTE','FINAL'].indexOf(t)>=0 ? t : '';
+    return ['LINEAS','SERVINSP','EMPAQUE','CLIENTE'].indexOf(t)>=0 ? t : '';
   }catch(e){ return ''; }
 })();
 /* 06/10: las auditoras registran Líneas, Inspección y Empaque en el momento, frente a
@@ -5162,7 +5162,7 @@ function cargarRecientes(){
 (function inicio(){
  try{
   var f=leerLocal('lives_fijo_aud');
-  if(f){ $('tipo').value=f.tipo||'LINEAS'; $('auditor').value=f.auditor||'';
+  if(f){ $('tipo').value=(f.tipo&&f.tipo!=='FINAL')?f.tipo:'LINEAS';  /* 09/11/2026: Final ya no se registra aquí */ $('auditor').value=f.auditor||'';
          $('inspector').value=f.inspector||''; $('digitador').value=f.digitador||'';
          if(f.mGrupo!==undefined){
            $('mGrupo').checked=!!f.mGrupo; $('mEstilo').checked=!!f.mEstilo;

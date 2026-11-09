@@ -5,7 +5,7 @@ Las reglas generales de trabajo están en el repo privado `lives-instrucciones` 
 ## Qué hace
 Calidad Manufactura registra aquí sus auditorías. Además, este repo mantiene la base de OPs y los programas de PCP, que usan otras herramientas.
 - `registro.html` — **formulario** "Registro de auditorías".
-  - Tipos LINEAS, SERVINSP, EMPAQUE, CLIENTE y FINAL. `?tipo=` fija el tipo.
+  - Tipos LINEAS, SERVINSP, EMPAQUE y CLIENTE (desde el 09/11/2026 FINAL ya no se ofrece: se registra en el sistema de LIVES; el valor sigue existiendo oculto para las auditorías antiguas). `?tipo=` fija el tipo.
   - Carga individual o por hoja de varias filas.
   - También busca, corrige y anula registros.
 - `catalogos.html` — **mantenimiento** de las listas: personal, talleres, destinos, clientes, líneas y defectos.

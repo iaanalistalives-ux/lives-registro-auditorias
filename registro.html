@@ -4677,7 +4677,7 @@ function bqBuscar(){
          resultado:$('bqRes').value, anuladas:$('bqAnul').checked?'1':'0', n:100},
     function(r){
       if(!r||!r.ok){ $('bqMsg').className='hint err'; $('bqMsg').textContent='No se pudo buscar.'; return; }
-      BQ=r.filas||[]; bqPintar();
+      BQ=(r.filas||[]).filter(function(f){ return String(f.tipo||'').toUpperCase()!=='FINAL'; });  /* 09/11/2026: las Final antiguas ya no se corrigen aquí */ bqPintar();
       $('bqMsg').className='hint'+(BQ.length?'':' err');
       $('bqMsg').textContent = BQ.length ? (BQ.length+' encontrada(s)') : 'Sin resultados.';
     }, function(){ $('bqMsg').className='hint err'; $('bqMsg').textContent='Sin conexión.'; });

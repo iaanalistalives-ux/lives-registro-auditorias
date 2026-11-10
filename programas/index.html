@@ -777,7 +777,7 @@ padding:8px 14px;cursor:pointer;border:1px solid var(--warm);background:#fff;col
       <button id="tabCOSTURA" class="active">Costura</button>
       <button id="tabACABADO">Acabados</button>
     </div>
-    <input type="search" id="q" placeholder="Buscar OP, estilo, grupo, color, PO...">
+    <input type="search" id="q" placeholder="Buscar estilo...">
     <div class="quick">
       <button data-q="">Todo</button>
       <button data-q="hoy">Hoy</button>
@@ -1147,11 +1147,7 @@ function filtrar(){
       if(!entra) return false;
     }
     if(q){
-      var hay = false;
-      for(var i = 0; i < def.cols.length; i++){
-        if(String(f[def.cols[i][0]] || '').toUpperCase().indexOf(q) >= 0){ hay = true; break; }
-      }
-      if(!hay) return false;
+      if(String(f.ESTILO || '').toUpperCase().indexOf(q) < 0) return false;
     }
     return true;
   });

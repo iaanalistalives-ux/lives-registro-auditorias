@@ -819,7 +819,7 @@ var DEF = {
   COSTURA: {
     hoja: 'DESTINO',
     campos: [
-      ['TALLER','DESTINO',1,'txt'],
+      ['TALLER','TALLER',1,'txt'],
       ['GRUPO','GRUPO',1,'txt'],
       ['ESTILO','ESTILO',1,'txt'],
       ['OP','OP',1,'txt'],
@@ -965,6 +965,8 @@ function leerPrograma(wb, tipo){
   for(var i = 0; i < def.campos.length; i++){
     var cp = def.campos[i], clave = cp[1] + '#' + cp[2];
     var nomCol = cp[1] + (cp[2] > 1 ? ' (2da vez)' : '');
+    /* PCP cambio el encabezado DESTINO por TALLER (nov-2026): se aceptan los dos nombres */
+    if(idx[clave] === undefined && cp[0] === 'TALLER' && tipo === 'COSTURA') clave = 'DESTINO#1';
     if(idx[clave] === undefined){
       if(cp[4]) faltanOpc.push(nomCol); else faltan.push(nomCol);
     }

@@ -707,9 +707,10 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
   <div class="card">
     <h2>1 · Elige el archivo</h2>
-    <div class="sub">Debe traer las columnas <b>GRUPO · ESTILO PROPIO · ESTILO CLIENTE ·
-      COMBO (color) · OP · COTIZACIÓN · FECHA DE CREACIÓN · PO · CODIGO TELA · DESCRIPCION TELA · DESTINO · PEDIDO</b>. El orden no importa; se buscan
-      por nombre. Tambi&eacute;n acepta los nombres tal como salen del sistema
+    <div class="sub">Debe traer las columnas <b>OP · Cotización · Fecha creación · Grupo · Estilo · Estilo cliente ·
+      Color · PO · Cód. tela · Descripción tela · Destino · Pedido</b> (la columna Cliente no se usa). El orden no importa; se buscan
+      por nombre, y los títulos pueden estar en cualquiera de las primeras 10 filas. Tambi&eacute;n acepta los nombres anteriores
+      (<i>ESTILO PROPIO, COMBO, CODIGO TELA</i>) y los del sistema
       (<i>Cod_GrupoPro, Est_Prop, Cotizacion, combo, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
       Estilo_Cliente, Requeridas</i>): en ese caso s&uacute;belo sin tocar nada.
       La fecha de creaci&oacute;n es obligatoria: las OPs que vienen en el archivo se reemplazan, y subir un archivo sin ella borrar&iacute;a las fechas ya cargadas de esas OPs.</div>
@@ -830,18 +831,23 @@ function leerArchivo(file){
       var crudo=null, mapa=null, hojaUsada='', mejorFaltan=null;
       for(var hi=wb.SheetNames.length-1; hi>=0; hi--){
         var nombreHoja=wb.SheetNames[hi];
-        var datos=XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja],{defval:''});
-        if(!datos.length) continue;
-        var cab={};
-        Object.keys(datos[0]).forEach(function(c){ cab[norm(c)]=c; });
-        var m={}, faltan=[];
-        for(var k in COLS){
-          var hallado=null;
-          for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]){ hallado=cab[COLS[k][i]]; break; }
-          if(hallado) m[k]=hallado; else faltan.push(COLS[k][0]);
+        /* 11/11/2026: los títulos pueden no estar en la fila 1 (el Excel con formato LIVES
+           trae dos filas de título antes): se busca la fila de títulos entre las 10 primeras. */
+        var A=XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja],{header:1,defval:'',blankrows:true});
+        if(!A.length) continue;
+        for(var fr0=0; fr0<Math.min(10,A.length) && !crudo; fr0++){
+          var cab={};
+          (A[fr0]||[]).forEach(function(c,ix){ var kk=norm(c); if(kk && cab[kk]==null) cab[kk]=ix; });
+          var m={}, faltan=[];
+          for(var k in COLS){
+            var hallado=null;
+            for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]!=null){ hallado=cab[COLS[k][i]]; break; }
+            if(hallado!=null) m[k]=hallado; else faltan.push(COLS[k][0]);
+          }
+          if(!faltan.length){ crudo=A.slice(fr0+1); mapa=m; hojaUsada=nombreHoja; }
+          else if(!mejorFaltan || faltan.length<mejorFaltan.length){ mejorFaltan=faltan; }
         }
-        if(!faltan.length){ crudo=datos; mapa=m; hojaUsada=nombreHoja; break; }
-        if(!mejorFaltan || faltan.length<mejorFaltan.length){ mejorFaltan=faltan; }
+        if(crudo) break;
       }
       if(!crudo) throw new Error('ninguna hoja tiene las columnas necesarias. '+
         'A la más parecida le faltan: '+(mejorFaltan||[]).join(', '));
@@ -853,7 +859,12 @@ function leerArchivo(file){
                  descTela:T(r[mapa.descTela]), destino:U(r[mapa.destino]),
                  pedido:num(r[mapa.pedido]),
                  fechaCreacion:fechaISO(r[mapa.fechaCreacion]) };
-      }).filter(function(f){ return f.op; });
+      }).filter(function(f){
+        if(!f.op) return false;
+        /* Pie del reporte ("Generado el…") u otra nota: texto solo en la columna de la OP. */
+        if(!f.grupo && !f.estilo && !f.color && !f.po && !f.codTela && !f.destino && !f.pedido && !f.fechaCreacion) return false;
+        return true;
+      });
 
       if(!FILAS.length) throw new Error('ninguna fila tiene OP');
       mostrar(file.name, hojaUsada);

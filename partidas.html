@@ -702,10 +702,11 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
   <div class="card">
     <h2>1 · Elige el archivo</h2>
-    <div class="sub">Se lee la <b>primera pestaña</b> del Excel. Debe traer las columnas <b>PARTIDA · CODIGO DE TELA · NOMBRE DE TELA ·
-      CODIGO DE COLOR · NOMBRE DE COLOR · GRUPO · PESO PROGRAMADO · OP · OC</b>. El orden no importa; se buscan por nombre.
-      También acepta los nombres tal como salen del sistema (<i>cod_ordprov, cod_tela, des_tela, cod_color, des_color,
-      cod_grupotex, Peso_Progr, OP, Orden_Corte</i>): en ese caso súbelo sin tocar nada. Si trae las dos filas de títulos, la segunda se salta.
+    <div class="sub">Se lee la <b>primera pestaña</b> del Excel. Debe traer las columnas <b>Partida · Fecha creación · OP · O/Corte · Grupo · Cód. tela · Tela ·
+      Cód. color · Color · Peso programado</b>. El orden no importa; se buscan por nombre.
+      También acepta los nombres anteriores (<i>CODIGO DE TELA, NOMBRE DE TELA, CODIGO DE COLOR, NOMBRE DE COLOR, OC</i>) y los del sistema
+      (<i>cod_ordprov, cod_tela, des_tela, cod_color, des_color, cod_grupotex, Peso_Progr, OP, Orden_Corte</i>). Si el archivo no trae
+      <b>Fecha creación</b>, las partidas se cargan sin fecha.
       <span id="hoy"></span></div>
 
     <div class="drop" id="zona">
@@ -725,7 +726,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
     <div class="tbl">
       <table>
-        <thead><tr><th>Partida</th><th>Código de tela</th><th>Nombre de tela</th><th>Código de color</th><th>Nombre de color</th>
+        <thead><tr><th>Partida</th><th>Fecha creación</th><th>Código de tela</th><th>Nombre de tela</th><th>Código de color</th><th>Nombre de color</th>
           <th>Grupo</th><th>Peso programado (kg)</th><th>OP</th><th>OC</th></tr></thead>
         <tbody id="prev"></tbody>
       </table>
@@ -780,14 +781,17 @@ function norm(s){
 var COLS = {
   partida:['PARTIDA','CODORDPROV','ORDPROV','NROPARTIDA'],
   codTela:['CODIGODETELA','CODTELA','CODIGOTELA'],
-  nomTela:['NOMBREDETELA','DESTELA','DESCTELA','NOMBRETELA','DESCRIPCIONTELA'],
+  nomTela:['NOMBREDETELA','DESTELA','DESCTELA','NOMBRETELA','DESCRIPCIONTELA','TELA'],
   codColor:['CODIGODECOLOR','CODCOLOR','CODIGOCOLOR'],
-  nomColor:['NOMBREDECOLOR','DESCOLOR','NOMBRECOLOR'],
+  nomColor:['NOMBREDECOLOR','DESCOLOR','NOMBRECOLOR','COLOR'],
   grupo:['GRUPO','CODGRUPOTEX','GRUPOTEX'],
   peso:['PESOPROGRAMADO','PESOPROGR','PESOPROG'],
   op:['OP','NUMOP','NROOP'],
-  oc:['OC','ORDENCORTE','ORDENDECORTE','NROOC']
+  oc:['OC','ORDENCORTE','ORDENDECORTE','NROOC','OCORTE'],
+  fecha:['FECHACREACION','FECHADECREACION','FECCREACION','FECHACREA','FECCREA']
 };
+/* Fecha de creación (11/11/2026): si el archivo no la trae, igual se carga, sin fecha. */
+var OPCIONAL = {fecha:1};
 var NOMBRE = {partida:'PARTIDA',codTela:'CODIGO DE TELA',nomTela:'NOMBRE DE TELA',codColor:'CODIGO DE COLOR',
   nomColor:'NOMBRE DE COLOR',grupo:'GRUPO',peso:'PESO PROGRAMADO',op:'OP',oc:'OC'};
 
@@ -797,10 +801,25 @@ function mapear(fila){
   var m={}, faltan=[];
   for(var k in COLS){
     var h=null; for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]!=null){ h=cab[COLS[k][i]]; break; }
-    if(h!=null) m[k]=h; else faltan.push(NOMBRE[k]);
+    if(h!=null) m[k]=h; else if(!OPCIONAL[k]) faltan.push(NOMBRE[k]);
   }
   return {mapa:m, faltan:faltan};
 }
+
+/* Fecha de una celda -> 'aaaa-mm-dd' (o '' si no se entiende). Acepta fecha de Excel
+   y texto dd/mm/aaaa (día primero, como en Perú) o aaaa-mm-dd; ignora la hora. */
+function isoF(y,m,d){ y=+y; m=+m; d=+d; if(y<100) y+=2000;
+  if(!(y>=1990&&y<=2100&&m>=1&&m<=12&&d>=1&&d<=31)) return '';
+  var t=new Date(Date.UTC(y,m-1,d)); if(t.getUTCMonth()!==m-1) return '';
+  return y+'-'+(m<10?'0':'')+m+'-'+(d<10?'0':'')+d; }
+function fechaCelda(cel, texto){
+  if(cel && cel.t==='n'){ var p=XLSX.SSF.parse_date_code(cel.v); return p?isoF(p.y,p.m,p.d):''; }
+  var s=T(cel && cel.t==='s' ? cel.v : texto), m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return isoF(m[1],m[2],m[3]);
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})(?!\d)/))) return isoF(m[3],m[2],m[1]);
+  return '';
+}
+function verF(iso){ return iso?(iso.slice(8)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4)):''; }
 
 function leerArchivo(file){
   $('msgLee').textContent='';
@@ -824,18 +843,26 @@ function leerArchivo(file){
       var desde=ini+1, salto=0;
       /* Si la fila siguiente también es de títulos (la del sistema), se salta. */
       if(A[desde] && !mapear(A[desde]).faltan.length){ desde++; salto=1; }
-      var filtradas=0;
+      var filtradas=0, conFecha=(mapa.fecha!=null);
+      /* Celda tal como está guardada (sin el formato de pantalla): el peso no pierde decimales
+         y la fecha no depende de cómo la muestre Excel. */
+      function celda(i,c){ return ws[XLSX.utils.encode_cell({r:i+rango.s.r, c:c+rango.s.c})]; }
       FILAS=[];
       for(var i=desde;i<A.length;i++){
         var f=A[i]; if(ocultas[i+rango.s.r]){ filtradas++; continue; }
+        var cp=celda(i,mapa.peso);
         var o={ partida:U(f[mapa.partida]), codTela:U(f[mapa.codTela]), nomTela:T(f[mapa.nomTela]),
                 codColor:U(f[mapa.codColor]), nomColor:T(f[mapa.nomColor]), grupo:U(f[mapa.grupo]),
-                peso:num(f[mapa.peso]), op:U(f[mapa.op]), oc:U(f[mapa.oc]) };
+                peso:(cp && cp.t==='n')?num(cp.v):num(f[mapa.peso]), op:U(f[mapa.op]), oc:U(f[mapa.oc]),
+                fecha:conFecha?fechaCelda(celda(i,mapa.fecha), f[mapa.fecha]):'',
+                fechaTxt:conFecha?T(f[mapa.fecha]):'' };
         if(!o.partida && !o.op && !o.oc && !o.codTela) continue;   /* fila vacía */
+        /* Pie del reporte ("Generado el…") u otra nota: texto solo en la primera columna. */
+        if(!o.op && !o.oc && !o.codTela && !o.codColor && !o.grupo && o.peso==null) continue;
         FILAS.push(o);
       }
       if(!FILAS.length) throw new Error('no trae filas con datos');
-      mostrar(file.name, hoja, salto, filtradas);
+      mostrar(file.name, hoja, salto, filtradas, conFecha);
     }catch(err){
       $('msgLee').textContent='No pude leer el archivo: '+err.message;
       $('cardPrev').style.display='none';
@@ -844,19 +871,23 @@ function leerArchivo(file){
   fr.readAsArrayBuffer(file);
 }
 
-function mostrar(nombre, hoja, salto, filtradas){
+function mostrar(nombre, hoja, salto, filtradas, conFecha){
   var par={}, ops={}, ocs={}, gr={}, tel={}, sinPartida=0, sinOp=0, sinOc=0, sinPeso=0, kgT=0, rep={}, nRep=0;
+  var sinFecha=0, malFecha=0, fMin='', fMax='';
   FILAS.forEach(function(f){
     if(f.partida) par[f.partida]=1; else sinPartida++;
     if(f.op) ops[f.op]=1; else sinOp++;
     if(f.oc) ocs[f.oc]=1; else sinOc++;
     if(f.grupo) gr[f.grupo]=1; if(f.codTela) tel[f.codTela]=1;
     if(f.peso==null) sinPeso++; else kgT+=f.peso;
-    var k=[f.partida,f.codTela,f.codColor,f.grupo,f.peso,f.op,f.oc].join('|'); if(rep[k]) nRep++; rep[k]=1;
+    if(f.fecha){ if(!fMin||f.fecha<fMin) fMin=f.fecha; if(f.fecha>fMax) fMax=f.fecha; }
+    else if(f.fechaTxt) malFecha++; else sinFecha++;
+    var k=[f.partida,f.codTela,f.codColor,f.grupo,f.peso,f.op,f.oc,f.fecha].join('|'); if(rep[k]) nRep++; rep[k]=1;
   });
   $('subPrev').innerHTML='Archivo <b>'+esc(nombre)+'</b> · pestaña <b>'+esc(hoja)+'</b>'+
     (salto?' (se saltó la segunda fila de títulos, la del sistema)':'')+
     (filtradas?(' · <b>'+ent(filtradas)+'</b> filas ocultas por filtro no se usan'):'')+
+    (conFecha?'':' · <b>el archivo no trae la columna Fecha creación</b>: estas partidas quedan sin fecha')+
     '. Así se va a guardar. Revisa que los datos se vean bien antes de reemplazar.';
   function K(v,l,s,bad){ return '<div class="kpi'+(bad?' bad':'')+'"><div class="v">'+v+'</div><div class="l">'+l+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'; }
   $('kpis').innerHTML=
@@ -866,6 +897,9 @@ function mostrar(nombre, hoja, salto, filtradas){
     K(ent(Object.keys(ocs).length),'Órdenes de corte')+
     K(ent(Object.keys(gr).length),'Grupos')+
     K(kg(kgT),'Kg programados','suma de todas las filas')+
+    (fMin?K(verF(fMin)+' – '+verF(fMax),'Fecha de creación','la más antigua y la más reciente'):'')+
+    (conFecha&&sinFecha?K(ent(sinFecha),'Sin fecha de creación','',1):'')+
+    (malFecha?K(ent(malFecha),'Fecha ilegible','se guardan sin fecha',1):'')+
     (sinPartida?K(sinPartida,'Sin partida','',1):'')+
     (sinOp?K(sinOp,'Sin OP','',1):'')+
     (sinOc?K(sinOc,'Sin OC','',1):'')+
@@ -873,7 +907,7 @@ function mostrar(nombre, hoja, salto, filtradas){
     (nRep?K(nRep,'Filas repetidas','iguales a otra fila del archivo',1):'');
 
   $('prev').innerHTML=FILAS.slice(0,100).map(function(f){
-    return '<tr><td><b>'+esc(f.partida)+'</b></td><td>'+esc(f.codTela)+'</td><td class="t">'+esc(f.nomTela)+'</td>'+
+    return '<tr><td><b>'+esc(f.partida)+'</b></td><td>'+esc(verF(f.fecha)||f.fechaTxt)+'</td><td>'+esc(f.codTela)+'</td><td class="t">'+esc(f.nomTela)+'</td>'+
       '<td>'+esc(f.codColor)+'</td><td>'+esc(f.nomColor)+'</td><td>'+esc(f.grupo)+'</td>'+
       '<td class="n">'+kg(f.peso)+'</td><td>'+esc(f.op)+'</td><td>'+esc(f.oc)+'</td></tr>';
   }).join('');
@@ -927,7 +961,7 @@ function subirDeUnaVez(forzar){
   var control=(typeof AbortController!=='undefined')?new AbortController():null;
   var reloj=setTimeout(function(){ if(control) control.abort(); },180000);
   var filas=FILAS.map(function(f){
-    return [f.partida,f.codTela,f.nomTela,f.codColor,f.nomColor,f.grupo,f.peso,f.op,f.oc];
+    return [f.partida,f.codTela,f.nomTela,f.codColor,f.nomColor,f.grupo,f.peso,f.op,f.oc,f.fecha||null];
   });
   return fetch(SB+'/rest/v1/rpc/sync_partidas_reemplazar',{
     method:'POST', headers:{'Content-Type':'application/json'},

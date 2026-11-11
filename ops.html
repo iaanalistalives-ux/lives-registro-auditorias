@@ -796,8 +796,24 @@ var COLS = {
   eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI'],
   cliente:['CLIENTE','CODCLIENTE','CODIGOCLIENTE','PREFIJOCLIENTE']
 };
-/* Cliente (11/11/2026): se guarda si el archivo lo trae; el export del sistema no lo trae y se carga igual. */
+/* Cliente (11/11/2026): se guarda si el archivo lo trae; el export del sistema no lo trae y se carga igual.
+   El archivo puede traer el prefijo (THY) o el nombre; la base guarda el NOMBRE COMPLETO (y su código interno). */
 var OPCIONAL = {cliente:1};
+var ULT = null;
+/* Pide a la base el nombre completo de cada cliente del archivo, solo para mostrarlo en la revisión.
+   Si no responde, la revisión muestra lo que trae el archivo; el nombre igual lo pone la base al guardar. */
+function nombresCliente(){
+  var vs={}; FILAS.forEach(function(f){ if(f.cliente) vs[f.cliente]=1; });
+  var lista=Object.keys(vs); if(!lista.length) return;
+  fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/ops_cliente_resolver_', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ p_valores: lista })
+  }).then(function(r){ return r.ok ? r.json() : []; }).then(function(d){
+    var m={}; (d||[]).forEach(function(x){ if(x && x.valor) m[x.valor]=x.nombre; });
+    var hubo=false;
+    FILAS.forEach(function(f){ if(f.cliente && m[f.cliente]){ f.clienteNombre=m[f.cliente]; hubo=true; } });
+    if(hubo && ULT) mostrar(ULT[0], ULT[1], true);
+  }).catch(function(){});
+}
 
 /* Fecha de creación de la OP -> 'AAAA-MM-DD'. El sistema la entrega como texto
    día/mes/año (18/08/2025); también se aceptan celdas de fecha de Excel y AAAA-MM-DD.
@@ -872,6 +888,7 @@ function leerArchivo(file){
 
       if(!FILAS.length) throw new Error('ninguna fila tiene OP');
       mostrar(file.name, hojaUsada);
+      nombresCliente();
     }catch(err){
       $('msgLee').textContent='No pude leer el archivo: '+err.message;
       $('cardPrev').style.display='none';
@@ -880,7 +897,8 @@ function leerArchivo(file){
   fr.readAsArrayBuffer(file);
 }
 
-function mostrar(nombre, hojaUsada){
+function mostrar(nombre, hojaUsada, sinMover){
+  ULT=[nombre, hojaUsada];
   var ops={}, gr={}, sinTela=0, sinPedido=0, sinFecha=0, fMin='', fMax='';
   FILAS.forEach(function(f){
     ops[f.op]=1; if(f.grupo) gr[f.grupo]=1;
@@ -905,14 +923,14 @@ function mostrar(nombre, hojaUsada){
     (sinFecha?('<div class="kpi bad"><div class="v">'+sinFecha+'</div><div class="l">Sin fecha de creación legible</div></div>'):'');
 
   $('prev').innerHTML=FILAS.slice(0,60).map(function(f){
-    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.cotizacion)+'</td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.cliente)+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
+    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.cotizacion)+'</td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.clienteNombre||f.cliente)+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
       '<td>'+esc(f.eCliente)+'</td><td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td>'+
       '<td>'+esc(f.codTela)+'</td><td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
   }).join('');
   $('cardPrev').style.display='';
   $('msgSube').textContent='';
   $('btnSubir').disabled=false;
-  $('cardPrev').scrollIntoView({behavior:'smooth'});
+  if(!sinMover) $('cardPrev').scrollIntoView({behavior:'smooth'});
 }
 
 /* Se manda por partes: mil filas no caben en una sola llamada. */

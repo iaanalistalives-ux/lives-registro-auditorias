@@ -707,8 +707,8 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
   <div class="card">
     <h2>1 · Elige el archivo</h2>
-    <div class="sub">Debe traer las columnas <b>OP · Cotización · Fecha creación · Grupo · Estilo · Estilo cliente ·
-      Color · PO · Cód. tela · Descripción tela · Destino · Pedido</b> (la columna Cliente no se usa). El orden no importa; se buscan
+    <div class="sub">Debe traer las columnas <b>OP · Cotización · Fecha creación · Cliente · Grupo · Estilo · Estilo cliente ·
+      Color · PO · Cód. tela · Descripción tela · Destino · Pedido</b>. El orden no importa; se buscan
       por nombre, y los títulos pueden estar en cualquiera de las primeras 10 filas. Tambi&eacute;n acepta los nombres anteriores
       (<i>ESTILO PROPIO, COMBO, CODIGO TELA</i>) y los del sistema
       (<i>Cod_GrupoPro, Est_Prop, Cotizacion, combo, OP, fec_creacion_op, PO, cod_tela, desc_tela, cod_destino,
@@ -732,7 +732,7 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
 
     <div class="tbl">
       <table>
-        <thead><tr><th>OP</th><th>Cotiz.</th><th>F. creación</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
+        <thead><tr><th>OP</th><th>Cotiz.</th><th>F. creación</th><th>Cliente</th><th>Grupo</th><th>Estilo</th><th>Est. cliente</th><th>Color</th>
           <th>PO</th><th>Cód. tela</th><th>Destino</th><th>Pedido</th></tr></thead>
         <tbody id="prev"></tbody>
       </table>
@@ -793,8 +793,11 @@ var COLS = {
   pedido:['PEDIDO','REQUERIDAS','REQUERIDA','CANTREQUERIDA','CANTIDADREQUERIDA','CANTIDAD','CANT'],
   fechaCreacion:['FECHACREACION','FECCREACIONOP','FECHACREACIONOP','FECCREACION','FECHADECREACION','FECHADECREACIONOP','FECCREAOP','FECHAOP'],
   cotizacion:['COTIZACION','COTIZ','NUMCOTIZACION','NROCOTIZACION','CODCOTIZACION'],
-  eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI']
+  eCliente:['ESTILOCLIENTE','ECLIENTE','ESTCLIENTE','ESTILODELCLIENTE','ESTILOCLI'],
+  cliente:['CLIENTE','CODCLIENTE','CODIGOCLIENTE','PREFIJOCLIENTE']
 };
+/* Cliente (11/11/2026): se guarda si el archivo lo trae; el export del sistema no lo trae y se carga igual. */
+var OPCIONAL = {cliente:1};
 
 /* Fecha de creación de la OP -> 'AAAA-MM-DD'. El sistema la entrega como texto
    día/mes/año (18/08/2025); también se aceptan celdas de fecha de Excel y AAAA-MM-DD.
@@ -842,7 +845,7 @@ function leerArchivo(file){
           for(var k in COLS){
             var hallado=null;
             for(var i=0;i<COLS[k].length;i++) if(cab[COLS[k][i]]!=null){ hallado=cab[COLS[k][i]]; break; }
-            if(hallado!=null) m[k]=hallado; else faltan.push(COLS[k][0]);
+            if(hallado!=null) m[k]=hallado; else if(!OPCIONAL[k]) faltan.push(COLS[k][0]);
           }
           if(!faltan.length){ crudo=A.slice(fr0+1); mapa=m; hojaUsada=nombreHoja; }
           else if(!mejorFaltan || faltan.length<mejorFaltan.length){ mejorFaltan=faltan; }
@@ -858,7 +861,8 @@ function leerArchivo(file){
                  color:U(r[mapa.color]), po:U(r[mapa.po]), codTela:U(r[mapa.codTela]),
                  descTela:T(r[mapa.descTela]), destino:U(r[mapa.destino]),
                  pedido:num(r[mapa.pedido]),
-                 fechaCreacion:fechaISO(r[mapa.fechaCreacion]) };
+                 fechaCreacion:fechaISO(r[mapa.fechaCreacion]),
+                 cliente:(mapa.cliente!=null)?U(r[mapa.cliente]):'' };
       }).filter(function(f){
         if(!f.op) return false;
         /* Pie del reporte ("Generado el…") u otra nota: texto solo en la columna de la OP. */
@@ -901,7 +905,7 @@ function mostrar(nombre, hojaUsada){
     (sinFecha?('<div class="kpi bad"><div class="v">'+sinFecha+'</div><div class="l">Sin fecha de creación legible</div></div>'):'');
 
   $('prev').innerHTML=FILAS.slice(0,60).map(function(f){
-    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.cotizacion)+'</td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
+    return '<tr><td><b>'+esc(f.op)+'</b></td><td>'+esc(f.cotizacion)+'</td><td>'+esc(fechaTxt(f.fechaCreacion))+'</td><td>'+esc(f.cliente)+'</td><td>'+esc(f.grupo)+'</td><td>'+esc(f.estilo)+'</td>'+
       '<td>'+esc(f.eCliente)+'</td><td>'+esc(f.color)+'</td><td>'+esc(f.po)+'</td>'+
       '<td>'+esc(f.codTela)+'</td><td>'+esc(f.destino)+'</td><td>'+(f.pedido||'')+'</td></tr>';
   }).join('');
@@ -969,7 +973,7 @@ function subirDeUnaVez(forzar){
   var control = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var reloj = setTimeout(function(){ if(control) control.abort(); }, 180000);
   var filas = FILAS.map(function(f){
-    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente,f.fechaCreacion||null,f.cotizacion];
+    return [f.op,f.grupo,f.estilo,f.color,f.po,f.codTela,f.descTela,f.destino,f.pedido,f.eCliente,f.fechaCreacion||null,f.cotizacion,f.cliente||null];
   });
   return fetch('https://xxfufpddgoyhbotjmaiy.supabase.co/rest/v1/rpc/sync_ops_reemplazar', {
     method:'POST', headers:{'Content-Type':'application/json'},

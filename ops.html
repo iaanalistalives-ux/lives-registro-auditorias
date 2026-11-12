@@ -983,6 +983,19 @@ function terminarCarga(r){
        (m?(' (incluye '+m.toLocaleString('es-PE')+' OP(s) que el archivo no traía y se mantuvieron).'):'.'))
     : ('Atención: se leyeron '+FILAS.length.toLocaleString('es-PE')+
        ' filas pero se cargaron '+c.toLocaleString('es-PE')+'. Vuelve a subir el archivo.');
+  /* 12/11/2026: resultado de la comparación para Alertas LIVES (antes fallaba sin avisar). */
+  if(bien && r && r.cambios!=null){
+    var nc=Number(r.cambios);
+    if(r.cambios_error || !(nc>=0)){
+      $('msgSube').className='hint err';
+      $('msgSube').textContent += ' Atención: las OPs sí se cargaron, pero la comparación para Alertas falló'+
+        (r.cambios_error?(' ('+String(r.cambios_error).slice(0,160)+')'):'')+'. Esta carga no generó alertas.';
+    } else {
+      $('msgSube').textContent += (nc>0)
+        ? (nc===1 ? ' Alertas: se detectó 1 cambio.' : (' Alertas: se detectaron '+nc.toLocaleString('es-PE')+' cambios.'))
+        : ' Alertas: sin cambios respecto de la carga anterior.';
+    }
+  }
   $('pill').className='pill ok';
   $('pill').textContent=t+' filas cargadas';
   $('btnSubir').disabled=false;

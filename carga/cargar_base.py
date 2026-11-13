@@ -137,6 +137,12 @@ def abrir(ruta):
     return openpyxl.load_workbook(ruta, data_only=True)
 
 
+def es_pie(fila):
+    """Fila del pie de los reportes con formato LIVES: una sola celda 'Generado el ... fila(s)'."""
+    con = [T(v) for v in fila if T(v)]
+    return len(con) == 1 and con[0].upper().startswith('GENERADO EL')
+
+
 def mapear(fila, cols):
     cab = {}
     for i, c in enumerate(fila):
@@ -161,17 +167,24 @@ def leer_ops(ruta):
         filas = list(ws.iter_rows(values_only=True))
         if len(filas) < 2:
             continue
-        m, faltan = mapear(filas[0], COLS_OPS)
-        if faltan:
+        # Titulos: fila 1 en el export del sistema de produccion; fila 3 en el reporte "Consulta de OPs"
+        # del sistema de la empresa (formato LIVES, aceptado desde el 13/11/2026: su columna Color es el combo).
+        cab, m = -1, None
+        for i in range(min(10, len(filas))):
+            mm, faltan = mapear(filas[i], COLS_OPS)
+            if not faltan:
+                cab, m = i, mm
+                break
             f = [COLS_OPS[k][0] for k in faltan]
             if mejor is None or len(f) < len(mejor):
                 mejor = f
+        if cab < 0:
             continue
-        ocultas = sum(1 for i in range(2, len(filas) + 1) if ws.row_dimensions[i].hidden) if ws.row_dimensions else 0
+        ocultas = sum(1 for i in range(cab + 2, len(filas) + 1) if ws.row_dimensions[i].hidden)
         out = []
-        for r in filas[1:]:
+        for r in filas[cab + 1:]:
             g = lambda k: r[m[k]] if m[k] < len(r) else None
-            if not U(g('op')):
+            if not U(g('op')) or es_pie(r):
                 continue
             out.append({'op': U(g('op')), 'grupo': U(g('grupo')), 'estilo': U(g('estilo')), 'color': U(g('color')),
                         'po': U(g('po')), 'codTela': U(g('codTela')), 'descTela': T(g('descTela')),
@@ -234,7 +247,7 @@ def leer_partidas(ruta):
         o = {'partida': U(g('partida')), 'codTela': U(g('codTela')), 'nomTela': T(g('nomTela')),
              'codColor': U(g('codColor')), 'nomColor': T(g('nomColor')), 'grupo': U(g('grupo')),
              'peso': num_par(g('peso')), 'op': U(g('op')), 'oc': U(g('oc'))}
-        if not o['partida'] and not o['op'] and not o['oc'] and not o['codTela']:
+        if (not o['partida'] and not o['op'] and not o['oc'] and not o['codTela']) or es_pie(f):
             continue
         out.append(o)
     if not out:

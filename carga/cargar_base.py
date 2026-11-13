@@ -43,13 +43,13 @@ COLS_OPS = {
 COLS_PAR = {
     'partida': ['PARTIDA', 'CODORDPROV', 'ORDPROV', 'NROPARTIDA'],
     'codTela': ['CODIGODETELA', 'CODTELA', 'CODIGOTELA'],
-    'nomTela': ['NOMBREDETELA', 'DESTELA', 'DESCTELA', 'NOMBRETELA', 'DESCRIPCIONTELA'],
+    'nomTela': ['NOMBREDETELA', 'DESTELA', 'DESCTELA', 'NOMBRETELA', 'DESCRIPCIONTELA', 'TELA'],
     'codColor': ['CODIGODECOLOR', 'CODCOLOR', 'CODIGOCOLOR'],
-    'nomColor': ['NOMBREDECOLOR', 'DESCOLOR', 'NOMBRECOLOR'],
+    'nomColor': ['NOMBREDECOLOR', 'DESCOLOR', 'NOMBRECOLOR', 'COLOR'],
     'grupo': ['GRUPO', 'CODGRUPOTEX', 'GRUPOTEX'],
     'peso': ['PESOPROGRAMADO', 'PESOPROGR', 'PESOPROG'],
     'op': ['OP', 'NUMOP', 'NROOP'],
-    'oc': ['OC', 'ORDENCORTE', 'ORDENDECORTE', 'NROOC'],
+    'oc': ['OC', 'ORDENCORTE', 'ORDENDECORTE', 'NROOC', 'OCORTE'],
 }
 NOMBRE_PAR = {'partida': 'PARTIDA', 'codTela': 'CODIGO DE TELA', 'nomTela': 'NOMBRE DE TELA',
               'codColor': 'CODIGO DE COLOR', 'nomColor': 'NOMBRE DE COLOR', 'grupo': 'GRUPO',

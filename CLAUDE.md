@@ -25,6 +25,7 @@ Calidad Manufactura registra aquí sus auditorías. Además, este repo mantiene 
 - Auditorías (`registro.html`):
   - Guardar: `registro_guardar_directo`, `registro_corregir_directo` y `registro_anular_directo`. Escriben en `auditorias`, `auditoria_defectos`, `auditoria_colores`, `auditoria_auditoras` y `auditoria_destinos`. Son las mismas tablas de `lives-auditoria-final`.
   - Consultar: `registro_buscar`, `registro_buscaraud`, `registro_leer`, `registro_recientes` y `registro_sugerir`.
+  - Aviso «Ya hay N auditoría(s) de este mismo pedido» (`registro_buscar`): Líneas y Servicios juntan por grupo + estilo + color + lote; Empaque por grupo + estilo + color + PO + destino (y OP, desde el 12/11/2026); Cliente por grupo + estilo + PO + destino y, desde el 13/11/2026, solo las que comparten al menos un color (una auditoría de varios colores «A + B» sale con cualquiera de ellos). Registro: `Ra01`.
   - `es_tipo_directo` lee `auditorias_ajustes`.
   - `sync_agregar_cat` agrega un valor al catálogo sobre la marcha.
   - Catálogos: vistas `publico_ref_*`, que salen de las tablas `cat_*` y de `ops`.
